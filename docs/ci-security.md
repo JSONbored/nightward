@@ -17,6 +17,7 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 - Keep the upstream tag in a nearby comment for maintainability.
 - Use least-privilege workflow and job permissions.
 - Prefer read-only `contents: read` unless a job needs SARIF upload or OIDC.
+- Keep OpenSSF Scorecard publish permissions job-scoped; global `id-token: write` fails Scorecard workflow verification.
 - Keep Trunk Flaky Tests uploads gated on `TRUNK_ORG_URL_SLUG` and `TRUNK_API_TOKEN`.
 - Never make flaky-test quarantining a default CI behavior.
 - Use Renovate instead of Dependabot whenever possible.
