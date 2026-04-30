@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shadowbook/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/inventory"
 )
 
 type Action string

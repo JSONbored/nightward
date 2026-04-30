@@ -116,14 +116,14 @@ func Install(home, executable, preset string) (Plan, error) {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
 		return plan, errors.New("automatic schedule install is only supported for launchd and systemd user timers in v1")
 	}
-	if err := os.MkdirAll(plan.ReportDir, 0755); err != nil {
+	if err := os.MkdirAll(plan.ReportDir, 0700); err != nil {
 		return plan, err
 	}
-	if err := os.MkdirAll(plan.LogDir, 0755); err != nil {
+	if err := os.MkdirAll(plan.LogDir, 0700); err != nil {
 		return plan, err
 	}
 	for _, file := range plan.Files {
-		if err := os.MkdirAll(filepath.Dir(file.Path), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(file.Path), 0700); err != nil {
 			return plan, err
 		}
 		if err := os.WriteFile(file.Path, []byte(file.Content), os.FileMode(file.Mode)); err != nil {
@@ -132,8 +132,8 @@ func Install(home, executable, preset string) (Plan, error) {
 	}
 	if runtime.GOOS == "darwin" {
 		uid := strconv.Itoa(os.Getuid())
-		_ = exec.Command("launchctl", "bootout", "gui/"+uid, plan.Files[0].Path).Run()
-		if err := exec.Command("launchctl", "bootstrap", "gui/"+uid, plan.Files[0].Path).Run(); err != nil {
+		_ = exec.Command("launchctl", "bootout", "gui/"+uid, plan.Files[0].Path).Run()                       // #nosec G204 -- fixed system command, generated user LaunchAgent path, no shell.
+		if err := exec.Command("launchctl", "bootstrap", "gui/"+uid, plan.Files[0].Path).Run(); err != nil { // #nosec G204 -- fixed system command, generated user LaunchAgent path, no shell.
 			return plan, fmt.Errorf("wrote launchd plist but failed to bootstrap: %w", err)
 		}
 	} else if runtime.GOOS == "linux" {
@@ -152,7 +152,7 @@ func Remove(home string) (Plan, error) {
 	case "darwin":
 		path := filepath.Join(home, "Library", "LaunchAgents", Label+".plist")
 		uid := strconv.Itoa(os.Getuid())
-		_ = exec.Command("launchctl", "bootout", "gui/"+uid, path).Run()
+		_ = exec.Command("launchctl", "bootout", "gui/"+uid, path).Run() // #nosec G204 -- fixed system command, generated user LaunchAgent path, no shell.
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return plan, err
 		}
@@ -265,7 +265,7 @@ func lastReport(reportDir string) (string, *time.Time, int) {
 	var newest os.FileInfo
 	var newestPath string
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+		if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
 		info, err := entry.Info()
@@ -285,7 +285,7 @@ func lastReport(reportDir string) (string, *time.Time, int) {
 }
 
 func countFindings(path string) int {
-	contents, err := os.ReadFile(path)
+	contents, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- path is selected from the private Nightward report directory.
 	if err != nil {
 		return 0
 	}

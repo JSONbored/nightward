@@ -11,10 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shadowbook/nightward/internal/backupplan"
-	"github.com/shadowbook/nightward/internal/inventory"
-	"github.com/shadowbook/nightward/internal/schedule"
-	"github.com/shadowbook/nightward/internal/tui"
+	"github.com/jsonbored/nightward/internal/analysis"
+	"github.com/jsonbored/nightward/internal/backupplan"
+	"github.com/jsonbored/nightward/internal/fixplan"
+	"github.com/jsonbored/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/policy"
+	"github.com/jsonbored/nightward/internal/schedule"
+	"github.com/jsonbored/nightward/internal/snapshot"
+	"github.com/jsonbored/nightward/internal/tui"
 )
 
 const version = "0.1.0"
@@ -44,9 +48,13 @@ func RunWithName(commandName string, args []string, stdout, stderr io.Writer) in
 	if commandName == "" {
 		commandName = "nightward"
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fail(stderr, "cannot determine home directory: %v", err)
+	home := os.Getenv("NIGHTWARD_HOME")
+	if home == "" {
+		var err error
+		home, err = os.UserHomeDir()
+		if err != nil {
+			return fail(stderr, "cannot determine home directory: %v", err)
+		}
 	}
 
 	if len(args) == 0 {
@@ -70,10 +78,77 @@ func RunWithName(commandName string, args []string, stdout, stderr io.Writer) in
 		return runPlan(home, args[1:], stdout, stderr)
 	case "adapters":
 		return runAdapters(home, args[1:], stdout, stderr)
+	case "findings":
+		return runFindings(home, args[1:], stdout, stderr)
+	case "fix":
+		return runFix(home, args[1:], stdout, stderr)
+	case "analyze":
+		return runAnalyze(home, args[1:], stdout, stderr)
+	case "trust":
+		return runTrust(home, args[1:], stdout, stderr)
+	case "providers":
+		return runProviders(args[1:], stdout, stderr)
+	case "policy":
+		return runPolicy(home, args[1:], stdout, stderr)
+	case "snapshot":
+		return runSnapshot(home, args[1:], stdout, stderr)
 	case "schedule":
 		return runSchedule(home, args[1:], stdout, stderr)
 	default:
 		return fail(stderr, "unknown command %q\n\nRun `%s --help` for usage.", args[0], commandName)
+	}
+	return 0
+}
+
+func runSnapshot(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		return fail(stderr, "usage: nightward snapshot <plan|diff> [flags]")
+	}
+	switch args[0] {
+	case "plan":
+		fs := flag.NewFlagSet("snapshot plan", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		target := fs.String("target", "", "snapshot target root")
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if *target == "" {
+			return fail(stderr, "missing required --target")
+		}
+		report := inventory.NewScanner(home).Scan()
+		plan := snapshot.Build(report, expandHome(home, *target))
+		if *jsonOut {
+			return writeJSON(stdout, plan, stderr)
+		}
+		printSnapshotPlan(stdout, plan)
+	case "diff":
+		fs := flag.NewFlagSet("snapshot diff", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		fromPath := fs.String("from", "", "previous snapshot plan JSON")
+		toPath := fs.String("to", "", "new snapshot plan JSON")
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if *fromPath == "" || *toPath == "" {
+			return fail(stderr, "missing required --from and --to")
+		}
+		from, err := snapshot.Load(expandHome(home, *fromPath))
+		if err != nil {
+			return fail(stderr, "failed to load --from snapshot: %v", err)
+		}
+		to, err := snapshot.Load(expandHome(home, *toPath))
+		if err != nil {
+			return fail(stderr, "failed to load --to snapshot: %v", err)
+		}
+		diff := snapshot.Compare(*fromPath, *toPath, from, to)
+		if *jsonOut {
+			return writeJSON(stdout, diff, stderr)
+		}
+		printSnapshotDiff(stdout, diff)
+	default:
+		return fail(stderr, "usage: nightward snapshot <plan|diff> [flags]")
 	}
 	return 0
 }
@@ -84,11 +159,15 @@ func runScan(home string, args []string, stdout, stderr io.Writer) int {
 	jsonOut := fs.Bool("json", false, "print JSON output")
 	output := fs.String("output", "", "write JSON report to a file")
 	outputDir := fs.String("output-dir", "", "write JSON report to a timestamped file in this directory")
+	workspace := fs.String("workspace", "", "scan a repository/workspace instead of HOME")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 
-	report := inventory.NewScanner(home).Scan()
+	report := scanReport(home, *workspace)
+	if *output == "-" {
+		return writeJSON(stdout, report, stderr)
+	}
 	if err := maybeWriteReport(report, *output, *outputDir); err != nil {
 		return fail(stderr, "failed to write scan report: %v", err)
 	}
@@ -158,6 +237,360 @@ func runAdapters(home string, args []string, stdout, stderr io.Writer) int {
 			status = "found"
 		}
 		fmt.Fprintf(stdout, "%-12s %s - %s\n", adapter.Name, status, adapter.Description)
+	}
+	return 0
+}
+
+func runFindings(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		return fail(stderr, "usage: nightward findings <list|explain> [flags]")
+	}
+	report := inventory.NewScanner(home).Scan()
+	switch args[0] {
+	case "list":
+		fs := flag.NewFlagSet("findings list", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if *jsonOut {
+			return writeJSON(stdout, report.Findings, stderr)
+		}
+		printFindingsList(stdout, report.Findings)
+	case "explain":
+		fs := flag.NewFlagSet("findings explain", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		remaining := fs.Args()
+		if len(remaining) != 1 {
+			return fail(stderr, "usage: nightward findings explain <finding-id> [--json]")
+		}
+		finding, ok := fixplan.Find(report, remaining[0])
+		if !ok {
+			return fail(stderr, "finding not found: %s", remaining[0])
+		}
+		if *jsonOut {
+			return writeJSON(stdout, finding, stderr)
+		}
+		printFindingExplain(stdout, finding)
+	default:
+		return fail(stderr, "usage: nightward findings <list|explain> [flags]")
+	}
+	return 0
+}
+
+func runFix(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		return fail(stderr, "usage: nightward fix <plan|preview|export> [flags]")
+	}
+	report := inventory.NewScanner(home).Scan()
+	switch args[0] {
+	case "plan":
+		fs := flag.NewFlagSet("fix plan", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		findingID := fs.String("finding", "", "limit to a finding ID or unique prefix")
+		rule := fs.String("rule", "", "limit to a rule ID")
+		all := fs.Bool("all", false, "include all findings")
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		selector, err := fixSelector(report, *findingID, *rule, *all)
+		if err != nil {
+			return fail(stderr, err.Error())
+		}
+		plan := fixplan.Build(report, selector)
+		if *jsonOut {
+			return writeJSON(stdout, plan, stderr)
+		}
+		printFixPlan(stdout, plan)
+	case "preview":
+		fs := flag.NewFlagSet("fix preview", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		format := fs.String("format", "diff", "preview format: diff, markdown, or json")
+		findingID := fs.String("finding", "", "limit to a finding ID or unique prefix")
+		rule := fs.String("rule", "", "limit to a rule ID")
+		all := fs.Bool("all", false, "include all findings")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		selector, err := fixSelector(report, *findingID, *rule, *all)
+		if err != nil {
+			return fail(stderr, err.Error())
+		}
+		preview := fixplan.BuildPreview(report, selector)
+		switch *format {
+		case "json":
+			return writeJSON(stdout, preview, stderr)
+		case "markdown", "md":
+			fmt.Fprint(stdout, fixplan.PreviewMarkdown(preview))
+		case "diff":
+			fmt.Fprint(stdout, fixplan.PreviewDiff(preview))
+		default:
+			return fail(stderr, "unsupported fix preview format %q", *format)
+		}
+	case "export":
+		fs := flag.NewFlagSet("fix export", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		format := fs.String("format", "markdown", "export format: markdown or json")
+		findingID := fs.String("finding", "", "limit to a finding ID or unique prefix")
+		rule := fs.String("rule", "", "limit to a rule ID")
+		all := fs.Bool("all", false, "include all findings")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		selector, err := fixSelector(report, *findingID, *rule, *all)
+		if err != nil {
+			return fail(stderr, err.Error())
+		}
+		plan := fixplan.Build(report, selector)
+		switch *format {
+		case "json":
+			return writeJSON(stdout, plan, stderr)
+		case "markdown", "md":
+			fmt.Fprint(stdout, fixplan.Markdown(plan))
+		default:
+			return fail(stderr, "unsupported fix export format %q", *format)
+		}
+	default:
+		return fail(stderr, "usage: nightward fix <plan|preview|export> [flags]")
+	}
+	return 0
+}
+
+func runAnalyze(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "finding" {
+		ordered := flagsFirst(args[1:], map[string]bool{"--workspace": true, "--with": true})
+		fs := flag.NewFlagSet("analyze finding", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		workspace := fs.String("workspace", "", "scan a repository/workspace instead of HOME")
+		with := fs.String("with", "", "comma-separated optional providers to enable")
+		online := fs.Bool("online", false, "allow explicitly selected network-capable providers")
+		if err := fs.Parse(ordered); err != nil {
+			return 2
+		}
+		if fs.NArg() != 1 {
+			return fail(stderr, "usage: nightward analyze finding <finding-id> [--json]")
+		}
+		_, analysisReport := analyzeReport(home, *workspace, analysis.Options{FindingID: fs.Arg(0), With: splitCSV(*with), Online: *online})
+		if len(analysisReport.Signals) != 1 {
+			return fail(stderr, "finding not found or ambiguous: %s", fs.Arg(0))
+		}
+		if *jsonOut {
+			return writeJSON(stdout, analysisReport, stderr)
+		}
+		printAnalysis(stdout, analysisReport)
+		return 0
+	}
+	if len(args) > 0 && args[0] == "package" {
+		ordered := flagsFirst(args[1:], map[string]bool{"--with": true})
+		fs := flag.NewFlagSet("analyze package", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		with := fs.String("with", "", "comma-separated optional providers to enable")
+		online := fs.Bool("online", false, "allow explicitly selected network-capable providers")
+		if err := fs.Parse(ordered); err != nil {
+			return 2
+		}
+		if fs.NArg() != 1 {
+			return fail(stderr, "usage: nightward analyze package <package> [--json]")
+		}
+		analysisReport := analysis.Run(inventory.Report{GeneratedAt: time.Now().UTC()}, analysis.Options{Mode: "package", Package: fs.Arg(0), With: splitCSV(*with), Online: *online})
+		if *jsonOut {
+			return writeJSON(stdout, analysisReport, stderr)
+		}
+		printAnalysis(stdout, analysisReport)
+		return 0
+	}
+
+	fs := flag.NewFlagSet("analyze", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	all := fs.Bool("all", false, "analyze all discovered subjects")
+	jsonOut := fs.Bool("json", false, "print JSON output")
+	workspace := fs.String("workspace", "", "scan a repository/workspace instead of HOME")
+	with := fs.String("with", "", "comma-separated optional providers to enable")
+	online := fs.Bool("online", false, "allow explicitly selected network-capable providers")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if !*all {
+		return fail(stderr, "usage: nightward analyze --all [--json]")
+	}
+	_, analysisReport := analyzeReport(home, *workspace, analysis.Options{With: splitCSV(*with), Online: *online})
+	if *jsonOut {
+		return writeJSON(stdout, analysisReport, stderr)
+	}
+	printAnalysis(stdout, analysisReport)
+	return 0
+}
+
+func runTrust(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 || args[0] != "explain" {
+		return fail(stderr, "usage: nightward trust explain <finding-id> [--json]")
+	}
+	ordered := flagsFirst(args[1:], map[string]bool{"--workspace": true})
+	fs := flag.NewFlagSet("trust explain", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	jsonOut := fs.Bool("json", false, "print JSON output")
+	workspace := fs.String("workspace", "", "scan a repository/workspace instead of HOME")
+	if err := fs.Parse(ordered); err != nil {
+		return 2
+	}
+	if fs.NArg() != 1 {
+		return fail(stderr, "usage: nightward trust explain <finding-id> [--json]")
+	}
+	_, analysisReport := analyzeReport(home, *workspace, analysis.Options{FindingID: fs.Arg(0)})
+	if len(analysisReport.Signals) != 1 {
+		return fail(stderr, "finding not found or ambiguous: %s", fs.Arg(0))
+	}
+	if *jsonOut {
+		return writeJSON(stdout, analysisReport.Signals[0], stderr)
+	}
+	printSignal(stdout, analysisReport.Signals[0])
+	return 0
+}
+
+func runProviders(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		return fail(stderr, "usage: nightward providers <list|doctor> [--json]")
+	}
+	switch args[0] {
+	case "list":
+		fs := flag.NewFlagSet("providers list", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		providers := analysis.Providers()
+		if *jsonOut {
+			return writeJSON(stdout, providers, stderr)
+		}
+		for _, provider := range providers {
+			mode := "offline"
+			if provider.Online {
+				mode = "online-capable"
+			}
+			fmt.Fprintf(stdout, "%-12s %-14s %s\n", provider.Name, mode, provider.Capabilities)
+		}
+	case "doctor":
+		fs := flag.NewFlagSet("providers doctor", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		with := fs.String("with", "", "comma-separated optional providers to enable")
+		online := fs.Bool("online", false, "allow explicitly selected network-capable providers")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		statuses := analysis.ProviderStatuses(splitCSV(*with), *online)
+		if *jsonOut {
+			return writeJSON(stdout, statuses, stderr)
+		}
+		for _, status := range statuses {
+			fmt.Fprintf(stdout, "%-12s %-9s %-8t %s\n", status.Name, status.Status, status.Enabled, status.Detail)
+		}
+	default:
+		return fail(stderr, "usage: nightward providers <list|doctor> [--json]")
+	}
+	return 0
+}
+
+func runPolicy(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		return fail(stderr, "usage: nightward policy <init|explain|check|sarif> [flags]")
+	}
+	switch args[0] {
+	case "init":
+		fs := flag.NewFlagSet("policy init", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		dryRun := fs.Bool("dry-run", false, "print default policy config without writing")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if !*dryRun {
+			return fail(stderr, "policy init is dry-run only in this release; rerun with --dry-run")
+		}
+		fmt.Fprint(stdout, policy.DefaultConfigYAML())
+	case "explain":
+		fs := flag.NewFlagSet("policy explain", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		fmt.Fprint(stdout, policy.Explain())
+	case "check":
+		fs := flag.NewFlagSet("policy check", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		strict := fs.Bool("strict", false, "fail on medium or higher findings")
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		configPath := fs.String("config", "", "optional .nightward.yml policy config")
+		workspace := fs.String("workspace", "", "scan a repository/workspace instead of HOME")
+		includeAnalysis := fs.Bool("include-analysis", false, "include offline analysis signals in policy decisions")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		config, err := policy.LoadConfig(expandConfigPath(home, *configPath))
+		if err != nil {
+			return fail(stderr, "failed to load policy config: %v", err)
+		}
+		report := scanReport(home, *workspace)
+		mode := "home"
+		if *workspace != "" {
+			mode = "workspace"
+		}
+		analysisReport := analysis.Run(report, analysis.Options{Mode: mode, Workspace: report.Workspace, With: config.AnalysisProviders, Online: config.AllowOnlineProviders})
+		policyReport := policy.CheckWithOptions(report, policy.Options{Strict: *strict, Config: config, IncludeAnalysis: *includeAnalysis, Analysis: analysisReport})
+		if *jsonOut {
+			code := writeJSON(stdout, policyReport, stderr)
+			if code != 0 {
+				return code
+			}
+		} else {
+			printPolicy(stdout, policyReport)
+		}
+		if !policyReport.Passed {
+			return 1
+		}
+	case "sarif":
+		fs := flag.NewFlagSet("policy sarif", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		output := fs.String("output", "nightward.sarif", "write SARIF report to this path")
+		configPath := fs.String("config", "", "optional .nightward.yml policy config")
+		workspace := fs.String("workspace", "", "scan a repository/workspace instead of HOME")
+		includeAnalysis := fs.Bool("include-analysis", false, "include offline analysis signals in SARIF output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		config, err := policy.LoadConfig(expandConfigPath(home, *configPath))
+		if err != nil {
+			return fail(stderr, "failed to load policy config: %v", err)
+		}
+		report := scanReport(home, *workspace)
+		var sarif map[string]any
+		if *includeAnalysis || config.IncludeAnalysis {
+			mode := "home"
+			if *workspace != "" {
+				mode = "workspace"
+			}
+			analysisReport := analysis.Run(report, analysis.Options{Mode: mode, Workspace: report.Workspace, With: config.AnalysisProviders, Online: config.AllowOnlineProviders})
+			sarif = policy.BuildSARIFWithAnalysis(report, analysisReport, config)
+		} else {
+			sarif = policy.BuildSARIFWithConfig(report, config)
+		}
+		if *output == "-" {
+			return writeJSON(stdout, sarif, stderr)
+		}
+		if err := policy.WriteSARIFObject(sarif, *output); err != nil {
+			return fail(stderr, "failed to write SARIF: %v", err)
+		}
+		fmt.Fprintf(stdout, "Wrote SARIF policy report to %s\n", *output)
+	default:
+		return fail(stderr, "usage: nightward policy <init|explain|check|sarif> [flags]")
 	}
 	return 0
 }
@@ -280,23 +713,29 @@ func commandCheck(name, detail string) Check {
 }
 
 func pathCheck(id, path string, required bool) Check {
-	info, err := os.Stat(path)
+	cleanPath := filepath.Clean(path)
+	info, err := os.Stat(cleanPath) // #nosec G703 -- doctor checks expected local filesystem prerequisites, not web/user content.
 	if err != nil {
 		status := "info"
 		if required {
 			status = "warn"
 		}
-		return Check{ID: id, Status: status, Message: "path missing", Detail: path}
+		return Check{ID: id, Status: status, Message: "path missing", Detail: cleanPath}
 	}
 	if !info.IsDir() {
-		return Check{ID: id, Status: "warn", Message: "path is not a directory", Detail: path}
+		return Check{ID: id, Status: "warn", Message: "path is not a directory", Detail: cleanPath}
 	}
-	return Check{ID: id, Status: "ok", Message: "path available", Detail: path}
+	return Check{ID: id, Status: "ok", Message: "path available", Detail: cleanPath}
 }
 
 func maybeWriteReport(report inventory.Report, output, outputDir string) error {
 	if outputDir != "" {
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
+		var err error
+		outputDir, err = filepath.Abs(filepath.Clean(outputDir))
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(outputDir, 0700); err != nil {
 			return err
 		}
 		output = filepath.Join(outputDir, "nightward-scan-"+report.GeneratedAt.Format("20060102-150405Z")+".json")
@@ -304,7 +743,12 @@ func maybeWriteReport(report inventory.Report, output, outputDir string) error {
 	if output == "" {
 		return nil
 	}
-	if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+	var err error
+	output, err = filepath.Abs(filepath.Clean(output))
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(output), 0700); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(report, "", "  ")
@@ -312,7 +756,7 @@ func maybeWriteReport(report inventory.Report, output, outputDir string) error {
 		return err
 	}
 	data = append(data, '\n')
-	return os.WriteFile(output, data, 0600)
+	return os.WriteFile(output, data, 0600) // #nosec G703 -- explicit user-selected report output path, normalized and private.
 }
 
 func printHelp(w io.Writer, commandName string) {
@@ -320,15 +764,32 @@ func printHelp(w io.Writer, commandName string) {
 
 Usage:
   %[1]s                                Open the TUI
-  %[1]s scan [--json] [--output FILE] [--output-dir DIR]
+  %[1]s scan [--json] [--workspace DIR] [--output FILE|-] [--output-dir DIR]
   %[1]s doctor [--json]
   %[1]s plan backup --target <repo> [--json]
   %[1]s adapters list [--json]
+  %[1]s findings list [--json]
+  %[1]s findings explain <finding-id> [--json]
+  %[1]s fix plan [--finding <id>|--rule <rule>|--all] [--json]
+  %[1]s fix preview [--finding <id>|--rule <rule>|--all] [--format diff|json|markdown]
+  %[1]s fix export --format markdown|json
+  %[1]s analyze --all [--workspace DIR] [--with providers] [--online] [--json]
+  %[1]s analyze finding <finding-id> [--workspace DIR] [--json]
+  %[1]s analyze package <package> [--with providers] [--online] [--json]
+  %[1]s trust explain <finding-id> [--workspace DIR] [--json]
+  %[1]s providers list [--json]
+  %[1]s providers doctor [--with providers] [--online] [--json]
+  %[1]s policy init --dry-run
+  %[1]s policy explain
+  %[1]s policy check [--config .nightward.yml] [--workspace DIR] [--include-analysis] [--strict] [--json]
+  %[1]s policy sarif [--config .nightward.yml] [--workspace DIR] [--include-analysis] --output nightward.sarif|-
+  %[1]s snapshot plan --target <dir> [--json]
+  %[1]s snapshot diff --from <plan.json> --to <plan.json> [--json]
   %[1]s schedule plan --preset nightly [--json]
   %[1]s schedule install --preset nightly --dry-run [--json]
   %[1]s schedule remove --dry-run [--json]
 
-V1 is read-only except explicit schedule install/remove commands.
+Nightward does not mutate agent configs. It only writes explicit report/SARIF outputs and schedule install/remove files.
 
 Canonical command: nightward
 Short alias: nw
@@ -337,8 +798,17 @@ Short alias: nw
 
 func printScan(w io.Writer, report inventory.Report) {
 	fmt.Fprintf(w, "Nightward scan: %d items, %d findings\n", report.Summary.TotalItems, report.Summary.TotalFindings)
-	for class, count := range report.Summary.ByClassification {
+	fmt.Fprintln(w, "Items by classification:")
+	for class, count := range report.Summary.ItemsByClassification {
 		fmt.Fprintf(w, "  %-14s %d\n", class, count)
+	}
+	if len(report.Summary.FindingsBySeverity) > 0 {
+		fmt.Fprintln(w, "Findings by severity:")
+		for _, severity := range []inventory.RiskLevel{inventory.RiskCritical, inventory.RiskHigh, inventory.RiskMedium, inventory.RiskLow, inventory.RiskInfo} {
+			if count := report.Summary.FindingsBySeverity[severity]; count > 0 {
+				fmt.Fprintf(w, "  %-14s %d\n", severity, count)
+			}
+		}
 	}
 	if len(report.Findings) > 0 {
 		fmt.Fprintln(w, "\nTop findings:")
@@ -371,6 +841,129 @@ func printBackupPlan(w io.Writer, plan backupplan.Plan) {
 	}
 }
 
+func printFindingsList(w io.Writer, findings []inventory.Finding) {
+	if len(findings) == 0 {
+		fmt.Fprintln(w, "No findings.")
+		return
+	}
+	for _, finding := range findings {
+		fmt.Fprintf(w, "%s  %-8s %-22s %-12s %s\n", finding.ID, finding.Severity, finding.Rule, finding.Tool, finding.Message)
+	}
+}
+
+func printFindingExplain(w io.Writer, finding inventory.Finding) {
+	fmt.Fprintf(w, "%s\n", finding.ID)
+	fmt.Fprintf(w, "  rule:      %s\n", finding.Rule)
+	fmt.Fprintf(w, "  severity:  %s\n", finding.Severity)
+	fmt.Fprintf(w, "  tool:      %s\n", finding.Tool)
+	fmt.Fprintf(w, "  path:      %s\n", finding.Path)
+	fmt.Fprintf(w, "  message:   %s\n", finding.Message)
+	if finding.Evidence != "" {
+		fmt.Fprintf(w, "  evidence:  %s\n", finding.Evidence)
+	}
+	if finding.Impact != "" {
+		fmt.Fprintf(w, "\nImpact: %s\n", finding.Impact)
+	}
+	if finding.Why != "" {
+		fmt.Fprintf(w, "Why this matters: %s\n", finding.Why)
+	}
+	if finding.FixAvailable {
+		fmt.Fprintf(w, "\nSuggested fix (%s, confidence=%s, risk=%s):\n", finding.FixKind, finding.Confidence, finding.Risk)
+		fmt.Fprintf(w, "  %s\n", finding.FixSummary)
+		for i, step := range finding.FixSteps {
+			fmt.Fprintf(w, "  %d. %s\n", i+1, step)
+		}
+		if finding.RequiresReview {
+			fmt.Fprintln(w, "  review: required before applying manually")
+		}
+	} else {
+		fmt.Fprintf(w, "\nRecommendation: %s\n", finding.Recommendation)
+	}
+}
+
+func printFixPlan(w io.Writer, plan fixplan.Plan) {
+	fmt.Fprintf(w, "Fix plan: total=%d safe=%d review=%d blocked=%d\n", plan.Summary.Total, plan.Summary.Safe, plan.Summary.Review, plan.Summary.Blocked)
+	for _, fix := range plan.Fixes {
+		fmt.Fprintf(w, "  %-7s %-20s %-22s %s\n", fix.Status, fix.FixKind, fix.Rule, fix.FindingID)
+		if fix.Summary != "" {
+			fmt.Fprintf(w, "    %s\n", fix.Summary)
+		}
+	}
+}
+
+func printPolicy(w io.Writer, report policy.Report) {
+	status := "passed"
+	if !report.Passed {
+		status = "failed"
+	}
+	fmt.Fprintf(w, "Nightward policy %s: threshold=%s violations=%d signal_violations=%d total_findings=%d\n", status, report.Threshold, report.Summary.Violations, report.Summary.SignalViolations, report.Summary.TotalFindings)
+	for _, finding := range report.Violations {
+		fmt.Fprintf(w, "  [%s] %s %s\n", finding.Severity, finding.Rule, finding.ID)
+	}
+	for _, signal := range report.SignalViolations {
+		fmt.Fprintf(w, "  [%s] %s %s\n", signal.Severity, signal.Rule, signal.ID)
+	}
+}
+
+func printAnalysis(w io.Writer, report analysis.Report) {
+	status := "no known risky signals"
+	if report.Summary.TotalSignals > 0 {
+		status = fmt.Sprintf("%d signals, highest=%s", report.Summary.TotalSignals, report.Summary.HighestSeverity)
+	}
+	fmt.Fprintf(w, "Nightward analysis: %s\n", status)
+	if report.Summary.ProviderWarnings > 0 {
+		fmt.Fprintf(w, "Provider warnings: %d\n", report.Summary.ProviderWarnings)
+	}
+	if len(report.Signals) > 0 {
+		fmt.Fprintln(w, "Top signals:")
+		for i, signal := range report.Signals {
+			if i >= 8 {
+				break
+			}
+			fmt.Fprintf(w, "  [%s] %-30s %s\n", signal.Severity, signal.Rule, signal.Message)
+		}
+	}
+}
+
+func printSignal(w io.Writer, signal analysis.Signal) {
+	fmt.Fprintf(w, "%s\n", signal.ID)
+	fmt.Fprintf(w, "  rule:       %s\n", signal.Rule)
+	fmt.Fprintf(w, "  severity:   %s\n", signal.Severity)
+	fmt.Fprintf(w, "  confidence: %s\n", signal.Confidence)
+	fmt.Fprintf(w, "  provider:   %s\n", signal.Provider)
+	if signal.Path != "" {
+		fmt.Fprintf(w, "  path:       %s\n", signal.Path)
+	}
+	if signal.Evidence != "" {
+		fmt.Fprintf(w, "  evidence:   %s\n", signal.Evidence)
+	}
+	fmt.Fprintf(w, "\nRecommendation: %s\n", signal.Recommendation)
+	if signal.Why != "" {
+		fmt.Fprintf(w, "Why this matters: %s\n", signal.Why)
+	}
+}
+
+func printSnapshotPlan(w io.Writer, plan snapshot.Plan) {
+	fmt.Fprintf(w, "Snapshot dry-run plan for %s\n", plan.TargetRoot)
+	fmt.Fprintf(w, "  total: %d  include: %d  review: %d  exclude: %d\n", plan.Summary.Total, plan.Summary.Include, plan.Summary.Review, plan.Summary.Excluded)
+	for _, entry := range plan.Entries {
+		fmt.Fprintf(w, "  %-7s %-12s %s -> %s\n", entry.Action, entry.Tool, entry.Source, entry.Target)
+	}
+}
+
+func printSnapshotDiff(w io.Writer, diff snapshot.Diff) {
+	fmt.Fprintf(w, "Snapshot diff: added=%d removed=%d changed=%d\n", diff.Summary.Added, diff.Summary.Removed, diff.Summary.Changed)
+	for _, entry := range diff.Added {
+		fmt.Fprintf(w, "  added   %-12s %s\n", entry.Tool, entry.Source)
+	}
+	for _, entry := range diff.Removed {
+		fmt.Fprintf(w, "  removed %-12s %s\n", entry.Tool, entry.Source)
+	}
+	for _, change := range diff.Changed {
+		fmt.Fprintf(w, "  changed %-12s %s (%s -> %s)\n", change.After.Tool, change.Source, change.Before.Action, change.After.Action)
+	}
+}
+
 func printSchedulePlan(w io.Writer, plan schedule.Plan) {
 	fmt.Fprintf(w, "Schedule preset: %s (%s)\n", plan.Preset, plan.Platform)
 	fmt.Fprintf(w, "Command: %s\n", strings.Join(plan.Command, " "))
@@ -384,6 +977,93 @@ func printSchedulePlan(w io.Writer, plan schedule.Plan) {
 	for _, note := range plan.Notes {
 		fmt.Fprintf(w, "\nNote: %s\n", note)
 	}
+}
+
+func fixSelector(report inventory.Report, findingID, rule string, all bool) (fixplan.Selector, error) {
+	selected := 0
+	if findingID != "" {
+		selected++
+	}
+	if rule != "" {
+		selected++
+	}
+	if all {
+		selected++
+	}
+	if selected > 1 {
+		return fixplan.Selector{}, fmt.Errorf("choose only one of --finding, --rule, or --all")
+	}
+	if selected == 0 {
+		all = true
+	}
+	if findingID != "" {
+		finding, ok := fixplan.Find(report, findingID)
+		if !ok {
+			return fixplan.Selector{}, fmt.Errorf("finding not found or ambiguous: %s", findingID)
+		}
+		findingID = finding.ID
+	}
+	return fixplan.Selector{FindingID: findingID, Rule: rule, All: all}, nil
+}
+
+func scanReport(home, workspace string) inventory.Report {
+	if workspace != "" {
+		return inventory.NewWorkspaceScanner(expandHome(home, workspace)).Scan()
+	}
+	return inventory.NewScanner(home).Scan()
+}
+
+func analyzeReport(home, workspace string, options analysis.Options) (inventory.Report, analysis.Report) {
+	report := scanReport(home, workspace)
+	options.Workspace = report.Workspace
+	if options.Mode == "" {
+		options.Mode = "home"
+		if workspace != "" {
+			options.Mode = "workspace"
+		}
+	}
+	return report, analysis.Run(report, options)
+}
+
+func splitCSV(value string) []string {
+	if value == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+func flagsFirst(args []string, valueFlags map[string]bool) []string {
+	var flags []string
+	var rest []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			rest = append(rest, args[i+1:]...)
+			break
+		}
+		if strings.HasPrefix(arg, "--") {
+			flags = append(flags, arg)
+			name := arg
+			if eq := strings.IndexByte(name, '='); eq >= 0 {
+				name = name[:eq]
+			}
+			if valueFlags[name] && !strings.Contains(arg, "=") && i+1 < len(args) {
+				i++
+				flags = append(flags, args[i])
+			}
+			continue
+		}
+		rest = append(rest, arg)
+	}
+	return append(flags, rest...)
 }
 
 func writeJSON(w io.Writer, value any, stderr io.Writer) int {
@@ -411,6 +1091,13 @@ func expandHome(home, path string) string {
 		return abs
 	}
 	return path
+}
+
+func expandConfigPath(home, path string) string {
+	if path == "" {
+		return ""
+	}
+	return expandHome(home, path)
 }
 
 func executablePath() string {

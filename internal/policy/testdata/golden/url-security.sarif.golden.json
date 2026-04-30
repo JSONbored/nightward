@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/tmp/nightward-golden-home/.codex/config.toml"
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "MCP server \"headers\" stores a sensitive header."
+          },
+          "properties": {
+            "confidence": "high",
+            "evidence": "header_key=Authorization",
+            "finding_id": "mcp_secret_header-111111111111",
+            "fix_kind": "externalize-secret",
+            "fix_risk": "high",
+            "fix_steps": [
+              "Remove the inline value for the Authorization header."
+            ],
+            "recommended_fix": "Move the Authorization header value out of this config.",
+            "requires_review": true,
+            "severity": "critical",
+            "tool": "Codex"
+          },
+          "ruleId": "mcp_secret_header"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/tmp/nightward-golden-home/.cursor/mcp.json"
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "MCP server \"local\" points at a local or private endpoint."
+          },
+          "properties": {
+            "confidence": "medium",
+            "evidence": "transport=remote-url type=unknown url=http://127.0.0.1:8787",
+            "finding_id": "mcp_local_endpoint-222222222222",
+            "fix_kind": "manual-review",
+            "fix_risk": "low",
+            "fix_steps": [
+              "Confirm whether this MCP endpoint is intentionally machine-local."
+            ],
+            "recommended_fix": "Move local endpoint assumptions into a machine-local overlay.",
+            "requires_review": true,
+            "severity": "medium",
+            "tool": "Cursor"
+          },
+          "ruleId": "mcp_local_endpoint"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/JSONbored/nightward",
+          "name": "Nightward",
+          "rules": [
+            {
+              "fullDescription": {
+                "text": "Portable dotfiles should distinguish remote service configuration from machine-local development endpoints."
+              },
+              "help": {
+                "markdown": "Move local endpoint assumptions into a machine-local overlay.",
+                "text": "Keep local endpoint assumptions machine-local unless intentionally templated."
+              },
+              "id": "mcp_local_endpoint",
+              "name": "mcp local endpoint",
+              "properties": {
+                "fix_available": true,
+                "fix_kind": "manual-review",
+                "requires_review": true,
+                "severity": "medium"
+              },
+              "shortDescription": {
+                "text": "MCP server \"local\" points at a local or private endpoint."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Remote MCP servers often use headers for authentication."
+              },
+              "help": {
+                "markdown": "Move the Authorization header value out of this config.",
+                "text": "Keep sensitive header values outside dotfiles."
+              },
+              "id": "mcp_secret_header",
+              "name": "mcp secret header",
+              "properties": {
+                "fix_available": true,
+                "fix_kind": "externalize-secret",
+                "requires_review": true,
+                "severity": "critical"
+              },
+              "shortDescription": {
+                "text": "MCP server \"headers\" stores a sensitive header."
+              }
+            }
+          ],
+          "semanticVersion": "0.1.0"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}
