@@ -10,6 +10,7 @@ make test-race
 make test-junit
 make trunk-flaky-validate
 make trunk-check
+make raycast-verify
 make verify
 ```
 
@@ -27,15 +28,33 @@ make verify
 - Redaction tests must cover scan JSON, policy output, SARIF, Markdown exports, fix previews, and TUI text.
 - Golden-style tests should stay stable for JSON/SARIF shape, not timestamps or host-specific paths.
 - Scheduler tests verify generated launchd, systemd user timer, and cron text without installing schedules.
+- Raycast extension tests cover pure redaction/formatting helpers and safe command execution wrappers.
 
 ## Trunk Flaky Tests
 
-`make test-junit` writes `reports/go-tests.xml` with `gotestsum`.
+`make test-junit` writes:
+
+- `reports/go-tests.xml` from Go tests with `gotestsum`
+- `reports/junit/raycast.xml` from the Raycast extension Node tests
 
 `make trunk-flaky-validate` runs:
 
 ```sh
-trunk flakytests validate --junit-paths reports/go-tests.xml
+trunk flakytests validate --junit-paths reports/go-tests.xml,reports/junit/raycast.xml
 ```
 
 CI validates that the JUnit report is parseable for every pull request. Trunk uploads are gated on `TRUNK_ORG_URL_SLUG` and `TRUNK_API_TOKEN`, so contributors do not need Trunk credentials.
+
+## Raycast Extension
+
+The extension has its own npm package under `integrations/raycast`.
+
+```sh
+cd integrations/raycast
+npm ci
+npm test
+npm run lint
+npm run build
+```
+
+`npm run dev` is the manual smoke path when the Raycast CLI is available. Do not run `npm run publish` unless release/publish scope is explicit.

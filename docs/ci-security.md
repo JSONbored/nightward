@@ -4,11 +4,11 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 
 ## Workflows
 
-- `ci.yml`: Go tests, JUnit reports, local JUnit shape validation, gated Trunk Flaky Tests uploads, Trunk Check, Gitleaks, govulncheck, and OSV dependency scanning.
+- `ci.yml`: Go tests, JUnit reports, local JUnit shape validation, gated Trunk Flaky Tests uploads, Trunk Check, Raycast extension tests/build, Gitleaks, govulncheck, and OSV dependency scanning.
 - `nightward-policy.yml`: generates Nightward SARIF from a fixture home and uploads it to GitHub code scanning.
 - `scorecard.yml`: runs OpenSSF Scorecard and uploads SARIF.
 - `release.yml`: publishes signed GoReleaser artifacts from strict `vX.Y.Z` tags.
-- `renovate.json`: manages Go modules, pinned GitHub Actions, local tool pins, and release tooling updates.
+- `renovate.json`: manages Go modules, Raycast npm packages, pinned GitHub Actions, local tool pins, and release tooling updates.
 
 ## Action Policy
 

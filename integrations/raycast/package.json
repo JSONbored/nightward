@@ -1,0 +1,96 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "nightward",
+  "version": "0.1.0",
+  "type": "module",
+  "title": "Nightward",
+  "description": "Review local AI agent state, findings, and redacted fix plans from Raycast.",
+  "icon": "icon.png",
+  "author": "jsonbored",
+  "platforms": ["macOS"],
+  "categories": ["Developer Tools", "Security", "Productivity"],
+  "license": "MIT",
+  "keywords": ["ai", "agents", "security", "dotfiles", "mcp"],
+  "preferences": [
+    {
+      "name": "nightwardPath",
+      "title": "Nightward Command",
+      "description": "Path or command name used to run Nightward locally.",
+      "type": "textfield",
+      "required": false,
+      "default": "nw",
+      "placeholder": "nw"
+    },
+    {
+      "name": "homeOverride",
+      "title": "Home Override",
+      "description": "Optional HOME-equivalent directory passed as NIGHTWARD_HOME for testing.",
+      "type": "directory",
+      "required": false
+    }
+  ],
+  "commands": [
+    {
+      "name": "dashboard",
+      "title": "Nightward Dashboard",
+      "description": "Show local scan counts, schedule status, adapters, and top findings.",
+      "mode": "view",
+      "keywords": ["nightward", "nw", "scan", "doctor", "security"]
+    },
+    {
+      "name": "findings",
+      "title": "Nightward Findings",
+      "description": "Browse redacted Nightward findings with severity filters and fix guidance.",
+      "mode": "view",
+      "keywords": ["findings", "mcp", "security", "privacy", "fix"]
+    },
+    {
+      "name": "explain-finding",
+      "title": "Explain Nightward Finding",
+      "description": "Open a detailed explanation for one Nightward finding ID.",
+      "mode": "view",
+      "keywords": ["explain", "finding", "security", "mcp"],
+      "arguments": [
+        {
+          "name": "findingId",
+          "placeholder": "Finding ID",
+          "type": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "export-fix-plan",
+      "title": "Export Nightward Fix Plan",
+      "description": "Copy the redacted Nightward fix plan markdown to the clipboard.",
+      "mode": "no-view",
+      "keywords": ["fix", "export", "clipboard", "markdown"]
+    },
+    {
+      "name": "open-report-folder",
+      "title": "Open Nightward Reports",
+      "description": "Open the local Nightward scheduled report folder in Finder.",
+      "mode": "no-view",
+      "keywords": ["reports", "folder", "nightly", "schedule"]
+    }
+  ],
+  "scripts": {
+    "dev": "ray develop",
+    "test": "node --import tsx --test test/*.test.ts",
+    "test:junit": "mkdir -p ../../reports/junit && node --import tsx --test --test-reporter=spec --test-reporter=junit --test-reporter-destination=stdout --test-reporter-destination=../../reports/junit/raycast.raw.xml test/*.test.ts && node scripts/normalize-junit.mjs ../../reports/junit/raycast.raw.xml ../../reports/junit/raycast.xml",
+    "build": "ray build -e dist",
+    "lint": "ray lint",
+    "fix-lint": "ray lint --fix",
+    "publish": "ray publish"
+  },
+  "dependencies": {
+    "@raycast/api": "1.104.15",
+    "@raycast/utils": "2.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.17",
+    "@raycast/eslint-config": "2.1.1",
+    "tsx": "4.21.0",
+    "typescript": "6.0.3"
+  }
+}

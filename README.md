@@ -36,6 +36,7 @@ Nightward answers the practical questions first:
 - Redacted patch previews for parseable MCP config fixes.
 - Read-only snapshot plan/diff commands.
 - Reusable GitHub Action for scan, policy, and SARIF modes.
+- Read-only Raycast extension for Dashboard, Findings, Explain Finding, Fix Plan export, and report-folder access.
 - User-level nightly scan scheduling for macOS launchd, Linux systemd user timers, and cron text fallback.
 - No telemetry, no cloud dashboard, no network calls from Nightward runtime, and no live config mutation.
 
@@ -183,6 +184,29 @@ Nightward can run as a local GitHub Action in scan, policy, or SARIF mode:
 
 See [docs/action.md](docs/action.md) for inputs, outputs, and SARIF upload examples.
 
+## Raycast Extension
+
+The read-only Raycast extension lives in [integrations/raycast](integrations/raycast).
+
+```sh
+cd integrations/raycast
+npm ci
+npm run build
+npm run dev
+```
+
+Commands:
+
+- `Nightward Dashboard`
+- `Nightward Findings`
+- `Explain Nightward Finding`
+- `Export Nightward Fix Plan`
+- `Open Nightward Reports`
+
+The extension shells out to `nw` or `nightward`, renders redacted output, copies an explicitly requested fix-plan export, and opens the local reports folder. It does not mutate agent configs or install schedules.
+
+See [docs/raycast-extension.md](docs/raycast-extension.md) for preferences, validation, and read-only boundaries.
+
 ## Scheduling
 
 The `nightly` preset runs:
@@ -207,6 +231,7 @@ make test-race
 make test-junit
 make trunk-flaky-validate
 make trunk-check
+make raycast-verify
 make verify
 go run ./cmd/nightward --help
 go run ./cmd/nw --help
@@ -238,6 +263,7 @@ go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 - [Testing](docs/testing.md)
 - [Dependency maintenance](docs/dependency-maintenance.md)
 - [GitHub Action](docs/action.md)
+- [Raycast extension](docs/raycast-extension.md)
 - [CI/security notes](docs/ci-security.md)
 - [Privacy model](docs/privacy-model.md)
 - [Screenshot/GIF capture plan](docs/screenshots.md)

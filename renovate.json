@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Nightward uses Renovate instead of Dependabot for Go modules, GitHub Actions, and pinned local tool versions.",
+  "description": "Nightward uses Renovate instead of Dependabot for Go modules, Raycast extension packages, GitHub Actions, and pinned local tool versions.",
   "extends": [
     "config:recommended",
     ":semanticCommits",
@@ -31,6 +31,12 @@
       "groupName": "go modules",
       "labels": ["dependencies", "go"],
       "postUpdateOptions": ["gomodTidy"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchFileNames": ["integrations/raycast/package.json"],
+      "groupName": "raycast extension npm packages",
+      "labels": ["dependencies", "raycast", "npm"]
     },
     {
       "matchPackageNames": ["gotest.tools/gotestsum"],
