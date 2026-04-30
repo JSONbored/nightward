@@ -1,0 +1,54 @@
+version: 0.1
+required_trunk_version: ">=1.25.0"
+runtimes:
+  enabled:
+    - go@1.25.9
+tools:
+  definitions:
+    - name: nightward
+      runtime: go
+      package: github.com/jsonbored/nightward/cmd/nw
+      shims: [nw]
+      known_good_version: 0.1.0
+lint:
+  definitions:
+    - name: nightward-policy
+      files: [ALL]
+      tools: [nightward]
+      main_tool: nightward
+      direct_configs:
+        - .nightward.yml
+        - .mcp.json
+        - mcp.json
+        - AGENTS.md
+      suggest_if: config_present
+      known_good_version: 0.1.0
+      commands:
+        - name: lint
+          output: sarif
+          run: nw policy sarif --workspace ${workspace} --output -
+          success_codes: [0]
+          read_output_from: stdout
+          batch: true
+          cache_results: false
+          is_security: true
+    - name: nightward-analyze
+      files: [ALL]
+      tools: [nightward]
+      main_tool: nightward
+      direct_configs:
+        - .nightward.yml
+        - .mcp.json
+        - mcp.json
+        - AGENTS.md
+      suggest_if: config_present
+      known_good_version: 0.1.0
+      commands:
+        - name: lint
+          output: sarif
+          run: nw policy sarif --workspace ${workspace} --include-analysis --output -
+          success_codes: [0]
+          read_output_from: stdout
+          batch: true
+          cache_results: false
+          is_security: true

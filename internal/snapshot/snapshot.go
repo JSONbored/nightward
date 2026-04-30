@@ -6,8 +6,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/shadowbook/nightward/internal/backupplan"
-	"github.com/shadowbook/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/backupplan"
+	"github.com/jsonbored/nightward/internal/inventory"
 )
 
 type Plan struct {

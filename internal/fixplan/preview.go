@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jsonbored/nightward/internal/inventory"
 	"github.com/pelletier/go-toml/v2"
-	"github.com/shadowbook/nightward/internal/inventory"
 )
 
 type Preview struct {

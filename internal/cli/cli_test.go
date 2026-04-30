@@ -26,11 +26,16 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 		{"fix", "plan", "--all", "--json"},
 		{"fix", "preview", "--all", "--format", "json"},
 		{"fix", "export", "--format", "markdown"},
+		{"analyze", "--all", "--json"},
+		{"providers", "list", "--json"},
+		{"providers", "doctor", "--json"},
 		{"policy", "check", "--json"},
+		{"policy", "check", "--include-analysis", "--json"},
 		{"policy", "init", "--dry-run"},
 		{"policy", "explain"},
 		{"snapshot", "plan", "--target", filepath.Join(home, "snapshot"), "--json"},
 		{"policy", "sarif", "--output", filepath.Join(outputDir, "nightward.sarif")},
+		{"policy", "sarif", "--include-analysis", "--output", "-"},
 	}
 	for _, args := range commands {
 		var stdout, stderr bytes.Buffer
@@ -49,6 +54,38 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 	targetAfter := listOptionalTestFiles(t, targetDir)
 	if strings.Join(targetBefore, "\n") != strings.Join(targetAfter, "\n") {
 		t.Fatalf("read-only backup plan mutated target\nbefore=%v\nafter=%v", targetBefore, targetAfter)
+	}
+}
+
+func TestWorkspaceCommandsAreReadOnlyAndSupportStdoutSARIF(t *testing.T) {
+	workspace := t.TempDir()
+	writeTestFile(t, filepath.Join(workspace, ".cursor", "mcp.json"), `{"mcpServers":{"demo":{"url":"http://127.0.0.1:8787/mcp","headers":{"Authorization":"Bearer super-secret-value"}}}}`)
+	before := listTestFiles(t, workspace)
+
+	commands := [][]string{
+		{"scan", "--workspace", workspace, "--json"},
+		{"scan", "--workspace", workspace, "--output", "-"},
+		{"analyze", "--all", "--workspace", workspace, "--json"},
+		{"policy", "check", "--workspace", workspace, "--include-analysis", "--json"},
+		{"policy", "sarif", "--workspace", workspace, "--include-analysis", "--output", "-"},
+	}
+	for _, args := range commands {
+		var stdout, stderr bytes.Buffer
+		code := RunWithName("nw", args, &stdout, &stderr)
+		if args[0] == "policy" && args[1] == "check" {
+			if code != 1 {
+				t.Fatalf("expected policy check to report violations, got %d: %s", code, stderr.String())
+			}
+		} else if code != 0 {
+			t.Fatalf("%s failed with %d: %s", strings.Join(args, " "), code, stderr.String())
+		}
+		if stdout.Len() == 0 {
+			t.Fatalf("%s produced no stdout", strings.Join(args, " "))
+		}
+	}
+	after := listTestFiles(t, workspace)
+	if strings.Join(before, "\n") != strings.Join(after, "\n") {
+		t.Fatalf("workspace commands mutated files\nbefore=%v\nafter=%v", before, after)
 	}
 }
 

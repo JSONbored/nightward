@@ -11,30 +11,34 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shadowbook/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/analysis"
+	"github.com/jsonbored/nightward/internal/inventory"
 	"gopkg.in/yaml.v3"
 )
 
 type Report struct {
-	GeneratedAt time.Time           `json:"generated_at"`
-	Strict      bool                `json:"strict"`
-	Passed      bool                `json:"passed"`
-	Threshold   inventory.RiskLevel `json:"threshold"`
-	ConfigPath  string              `json:"config_path,omitempty"`
-	Summary     Summary             `json:"summary"`
-	Violations  []inventory.Finding `json:"violations"`
-	Ignored     []IgnoredFinding    `json:"ignored,omitempty"`
+	GeneratedAt      time.Time           `json:"generated_at"`
+	Strict           bool                `json:"strict"`
+	Passed           bool                `json:"passed"`
+	Threshold        inventory.RiskLevel `json:"threshold"`
+	ConfigPath       string              `json:"config_path,omitempty"`
+	Summary          Summary             `json:"summary"`
+	Violations       []inventory.Finding `json:"violations"`
+	SignalViolations []analysis.Signal   `json:"signal_violations,omitempty"`
+	Ignored          []IgnoredFinding    `json:"ignored,omitempty"`
 }
 
 type Summary struct {
-	TotalFindings int `json:"total_findings"`
-	Violations    int `json:"violations"`
-	Ignored       int `json:"ignored"`
-	Critical      int `json:"critical"`
-	High          int `json:"high"`
-	Medium        int `json:"medium"`
-	Low           int `json:"low"`
-	Info          int `json:"info"`
+	TotalFindings    int `json:"total_findings"`
+	TotalSignals     int `json:"total_signals,omitempty"`
+	Violations       int `json:"violations"`
+	SignalViolations int `json:"signal_violations,omitempty"`
+	Ignored          int `json:"ignored"`
+	Critical         int `json:"critical"`
+	High             int `json:"high"`
+	Medium           int `json:"medium"`
+	Low              int `json:"low"`
+	Info             int `json:"info"`
 }
 
 type Config struct {
@@ -45,6 +49,10 @@ type Config struct {
 	TrustedPackages       []string            `json:"trusted_packages,omitempty" yaml:"trusted_packages"`
 	PortableAllowPaths    []string            `json:"portable_allow_paths,omitempty" yaml:"portable_allow_paths"`
 	MachineLocalDenyPaths []string            `json:"machine_local_deny_paths,omitempty" yaml:"machine_local_deny_paths"`
+	IncludeAnalysis       bool                `json:"include_analysis,omitempty" yaml:"include_analysis"`
+	AnalysisThreshold     inventory.RiskLevel `json:"analysis_threshold,omitempty" yaml:"analysis_threshold"`
+	AnalysisProviders     []string            `json:"analysis_providers,omitempty" yaml:"analysis_providers"`
+	AllowOnlineProviders  bool                `json:"allow_online_providers,omitempty" yaml:"allow_online_providers"`
 	SARIF                 SARIFConfig         `json:"sarif,omitempty" yaml:"sarif"`
 	path                  string
 }
@@ -72,9 +80,13 @@ type SARIFConfig struct {
 	SemanticVersion string `json:"semantic_version,omitempty" yaml:"semantic_version"`
 }
 
+const sarifAnalysisRulePrefix = "nightward/" + "analyze/"
+
 type Options struct {
-	Strict bool
-	Config Config
+	Strict          bool
+	Config          Config
+	IncludeAnalysis bool
+	Analysis        analysis.Report
 }
 
 func Check(report inventory.Report, strict bool) Report {
@@ -119,9 +131,22 @@ func CheckWithOptions(report inventory.Report, options Options) Report {
 			out.Violations = append(out.Violations, finding)
 		}
 	}
+	if options.IncludeAnalysis || options.Config.IncludeAnalysis {
+		analysisThreshold := threshold
+		if options.Config.AnalysisThreshold != "" {
+			analysisThreshold = options.Config.AnalysisThreshold
+		}
+		out.Summary.TotalSignals = len(options.Analysis.Signals)
+		for _, signal := range options.Analysis.Signals {
+			if riskRank(signal.Severity) >= riskRank(analysisThreshold) {
+				out.SignalViolations = append(out.SignalViolations, signal)
+			}
+		}
+		out.Summary.SignalViolations = len(out.SignalViolations)
+	}
 	out.Summary.Violations = len(out.Violations)
 	out.Summary.Ignored = len(out.Ignored)
-	out.Passed = len(out.Violations) == 0
+	out.Passed = len(out.Violations) == 0 && len(out.SignalViolations) == 0
 	return out
 }
 
@@ -131,6 +156,10 @@ func WriteSARIF(report inventory.Report, path string) error {
 
 func WriteSARIFWithConfig(report inventory.Report, path string, config Config) error {
 	sarif := BuildSARIFWithConfig(report, config)
+	return WriteSARIFObject(sarif, path)
+}
+
+func WriteSARIFObject(sarif map[string]any, path string) error {
 	data, err := json.MarshalIndent(sarif, "", "  ")
 	if err != nil {
 		return err
@@ -147,6 +176,10 @@ func BuildSARIF(report inventory.Report) map[string]any {
 }
 
 func BuildSARIFWithConfig(report inventory.Report, config Config) map[string]any {
+	return BuildSARIFWithAnalysis(report, analysis.Report{}, config)
+}
+
+func BuildSARIFWithAnalysis(report inventory.Report, analysisReport analysis.Report, config Config) map[string]any {
 	included := make([]inventory.Finding, 0, len(report.Findings))
 	for _, finding := range report.Findings {
 		if _, ignored := ignoreReason(finding, config); ignored {
@@ -155,9 +188,18 @@ func BuildSARIFWithConfig(report inventory.Report, config Config) map[string]any
 		included = append(included, finding)
 	}
 	rules := sarifRules(included)
+	if len(analysisReport.Signals) > 0 {
+		rules = append(rules, sarifSignalRules(analysisReport.Signals)...)
+		sort.Slice(rules, func(i, j int) bool {
+			return fmt.Sprint(rules[i]["id"]) < fmt.Sprint(rules[j]["id"])
+		})
+	}
 	results := make([]map[string]any, 0, len(included))
 	for _, finding := range included {
 		results = append(results, sarifResult(finding))
+	}
+	for _, signal := range analysisReport.Signals {
+		results = append(results, sarifSignalResult(signal))
 	}
 	name := config.SARIF.ToolName
 	if name == "" {
@@ -195,6 +237,7 @@ func BuildSARIFWithConfig(report inventory.Report, config Config) map[string]any
 func DefaultConfig() Config {
 	return Config{
 		SeverityThreshold: inventory.RiskHigh,
+		AnalysisThreshold: inventory.RiskHigh,
 		SARIF: SARIFConfig{
 			ToolName:        "Nightward",
 			Category:        "nightward",
@@ -225,6 +268,10 @@ Fields:
   trusted_packages: package names to suppress unpinned-package policy noise when evidence matches
   portable_allow_paths: reviewed portable path prefixes for future adapter policy
   machine_local_deny_paths: path prefixes that should remain local-only
+  include_analysis: include offline analysis signals in policy decisions
+  analysis_threshold: optional signal threshold when include_analysis is true
+  analysis_providers: optional provider names for future explicit provider analysis
+  allow_online_providers: allow selected network-capable providers when analysis_providers requests them
   sarif.tool_name: SARIF tool display name
   sarif.category: SARIF automation category
   sarif.information_uri: SARIF tool information URI
@@ -257,6 +304,9 @@ func LoadConfig(path string) (Config, error) {
 func ValidateConfig(config Config) error {
 	if config.SeverityThreshold != "" && !validRisk(config.SeverityThreshold) {
 		return fmt.Errorf("unsupported severity_threshold %q", config.SeverityThreshold)
+	}
+	if config.AnalysisThreshold != "" && !validRisk(config.AnalysisThreshold) {
+		return fmt.Errorf("unsupported analysis_threshold %q", config.AnalysisThreshold)
 	}
 	for _, entry := range config.IgnoreFindings {
 		if strings.TrimSpace(entry.ID) == "" {
@@ -316,6 +366,46 @@ func sarifRules(findings []inventory.Finding) []map[string]any {
 	return rules
 }
 
+func sarifSignalRules(signals []analysis.Signal) []map[string]any {
+	byRule := map[string]analysis.Signal{}
+	for _, signal := range signals {
+		ruleID := sarifAnalysisRulePrefix + strings.TrimPrefix(signal.Rule, "nightward/")
+		if _, ok := byRule[ruleID]; !ok {
+			byRule[ruleID] = signal
+		}
+	}
+	keys := make([]string, 0, len(byRule))
+	for key := range byRule {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	rules := make([]map[string]any, 0, len(keys))
+	for _, key := range keys {
+		signal := byRule[key]
+		rules = append(rules, map[string]any{
+			"id":   key,
+			"name": strings.ReplaceAll(strings.TrimPrefix(key, sarifAnalysisRulePrefix), "_", " "),
+			"shortDescription": map[string]string{
+				"text": signal.Message,
+			},
+			"fullDescription": map[string]string{
+				"text": signal.Why,
+			},
+			"help": map[string]any{
+				"text":     signal.Recommendation,
+				"markdown": signal.Recommendation,
+			},
+			"properties": map[string]any{
+				"severity":   signal.Severity,
+				"provider":   signal.Provider,
+				"category":   signal.Category,
+				"confidence": signal.Confidence,
+			},
+		})
+	}
+	return rules
+}
+
 func sarifResult(finding inventory.Finding) map[string]any {
 	return map[string]any{
 		"ruleId":  finding.Rule,
@@ -341,6 +431,39 @@ func sarifResult(finding inventory.Finding) map[string]any {
 			"fix_risk":        finding.Risk,
 			"confidence":      finding.Confidence,
 			"requires_review": finding.RequiresReview,
+		},
+	}
+}
+
+func sarifSignalResult(signal analysis.Signal) map[string]any {
+	path := "."
+	if signal.Path != "" {
+		path = signal.Path
+	}
+	ruleID := sarifAnalysisRulePrefix + strings.TrimPrefix(signal.Rule, "nightward/")
+	return map[string]any{
+		"ruleId":  ruleID,
+		"level":   sarifLevel(signal.Severity),
+		"message": map[string]string{"text": signal.Message},
+		"locations": []map[string]any{
+			{
+				"physicalLocation": map[string]any{
+					"artifactLocation": map[string]string{
+						"uri": artifactURI(path),
+					},
+				},
+			},
+		},
+		"properties": map[string]any{
+			"signal_id":          signal.ID,
+			"provider":           signal.Provider,
+			"category":           signal.Category,
+			"subject_id":         signal.SubjectID,
+			"subject_type":       signal.SubjectType,
+			"severity":           signal.Severity,
+			"confidence":         signal.Confidence,
+			"evidence":           signal.Evidence,
+			"recommended_action": signal.Recommendation,
 		},
 	}
 }

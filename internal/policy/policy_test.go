@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shadowbook/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/analysis"
+	"github.com/jsonbored/nightward/internal/inventory"
 )
 
 func TestCheckUsesStrictThreshold(t *testing.T) {
@@ -139,6 +140,45 @@ func TestSARIFUsesConfigMetadataAndIgnores(t *testing.T) {
 	}
 	if strings.Contains(text, "ignored") {
 		t.Fatalf("SARIF included ignored finding: %s", text)
+	}
+}
+
+func TestPolicyCanIncludeAnalysisSignals(t *testing.T) {
+	report := inventory.Report{Findings: []inventory.Finding{
+		{ID: "review", Severity: inventory.RiskInfo, Rule: "mcp_server_review", Message: "review"},
+	}}
+	analysisReport := analysis.Report{Signals: []analysis.Signal{
+		{
+			ID:             "signal-1",
+			Provider:       "nightward",
+			Rule:           "nightward/secret_auth_path",
+			Category:       analysis.CategorySecrets,
+			SubjectID:      "item-1",
+			SubjectType:    analysis.SubjectItem,
+			Path:           "/tmp/workspace/.env",
+			Severity:       inventory.RiskCritical,
+			Confidence:     "high",
+			Message:        "Secret path present.",
+			Evidence:       "classification=secret-auth path=/tmp/workspace/.env",
+			Recommendation: "Exclude it.",
+		},
+	}}
+
+	checked := CheckWithOptions(report, Options{IncludeAnalysis: true, Analysis: analysisReport})
+	if checked.Passed || checked.Summary.SignalViolations != 1 || len(checked.SignalViolations) != 1 {
+		t.Fatalf("expected analysis signal policy violation: %#v", checked)
+	}
+
+	sarif := BuildSARIFWithAnalysis(report, analysisReport, Config{})
+	data, err := json.Marshal(sarif)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, want := range []string{"nightward/analyze/secret_auth_path", "signal-1", ".env"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("SARIF missing analysis signal %q: %s", want, text)
+		}
 	}
 }
 
