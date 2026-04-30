@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jsonbored/nightward/internal/inventory"
 	"github.com/pelletier/go-toml/v2"
-	"github.com/shadowbook/nightward/internal/inventory"
 )
 
 type Preview struct {
@@ -217,7 +217,7 @@ func previewReplaceShellWrapper(patch PatchPreview, parsed parsedMCP, hint *inve
 }
 
 func parseMCPServer(path, serverName string) (parsedMCP, error) {
-	contents, err := os.ReadFile(path)
+	contents, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- preview reads scanner-discovered local MCP config without mutating it.
 	if err != nil {
 		return parsedMCP{}, err
 	}

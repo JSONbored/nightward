@@ -5,6 +5,7 @@ Nightward uses Renovate instead of Dependabot.
 ## What Renovate Owns
 
 - Go modules in `go.mod` and `go.sum`.
+- Raycast extension packages in `integrations/raycast/package.json` and `package-lock.json`.
 - GitHub Actions versions and pinned action digests.
 - `gotestsum` in `Makefile`.
 - GoReleaser binary version in `.github/workflows/release.yml`.
@@ -26,4 +27,5 @@ Dependency PRs should still be reviewed like code changes. Check:
 - changed release notes for security or breaking changes
 - workflow diffs for permission or publish-surface changes
 - `go.sum` changes for unexpected transitive churn
-- CI results for Go tests, Trunk Check, Gitleaks, govulncheck, OSV, and Nightward SARIF
+- `integrations/raycast/package-lock.json` changes for unexpected runtime dependency additions
+- CI results for Go tests, Raycast extension tests/build, Trunk Check, Gitleaks, govulncheck, OSV, and Nightward SARIF

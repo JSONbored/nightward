@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shadowbook/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/inventory"
 )
 
 func TestBuildClassifiesActions(t *testing.T) {

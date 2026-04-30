@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Nightward uses Renovate instead of Dependabot for Go modules, GitHub Actions, and pinned local tool versions.",
+  "description": "Nightward uses Renovate instead of Dependabot for Go modules, Raycast extension packages, GitHub Actions, and pinned local tool versions.",
   "extends": [
     "config:recommended",
     ":semanticCommits",
@@ -33,6 +33,12 @@
       "postUpdateOptions": ["gomodTidy"]
     },
     {
+      "matchManagers": ["npm"],
+      "matchFileNames": ["integrations/raycast/package.json"],
+      "groupName": "raycast extension npm packages",
+      "labels": ["dependencies", "raycast", "npm"]
+    },
+    {
       "matchPackageNames": ["gotest.tools/gotestsum"],
       "groupName": "go test tooling",
       "labels": ["dependencies", "go", "test"]
@@ -52,7 +58,7 @@
     {
       "customType": "regex",
       "description": "Update gotestsum used by Makefile JUnit test reports.",
-      "managerFilePatterns": ["/^Makefile$/"],
+      "fileMatch": ["^Makefile$"],
       "matchStrings": [
         "GOTESTSUM_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
       ],
@@ -62,7 +68,7 @@
     {
       "customType": "regex",
       "description": "Update the GoReleaser binary version used by the release workflow.",
-      "managerFilePatterns": ["/^\\.github/workflows/release\\.yml$/"],
+      "fileMatch": ["^\\.github/workflows/release\\.yml$"],
       "matchStrings": ["version:\\s*(?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
       "depNameTemplate": "goreleaser/goreleaser",
       "datasourceTemplate": "github-releases"
@@ -70,7 +76,7 @@
     {
       "customType": "regex",
       "description": "Update the Trunk plugin registry pin.",
-      "managerFilePatterns": ["/^\\.trunk/trunk\\.yaml$/"],
+      "fileMatch": ["^\\.trunk/trunk\\.yaml$"],
       "matchStrings": ["ref:\\s*(?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
       "depNameTemplate": "trunk-io/plugins",
       "datasourceTemplate": "github-tags"

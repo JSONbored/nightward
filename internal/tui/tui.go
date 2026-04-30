@@ -1,16 +1,24 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
+	"net/url"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/shadowbook/nightward/internal/backupplan"
-	"github.com/shadowbook/nightward/internal/fixplan"
-	"github.com/shadowbook/nightward/internal/inventory"
-	"github.com/shadowbook/nightward/internal/schedule"
+	"github.com/jsonbored/nightward/internal/analysis"
+	"github.com/jsonbored/nightward/internal/backupplan"
+	"github.com/jsonbored/nightward/internal/fixplan"
+	"github.com/jsonbored/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/schedule"
 )
 
 type model struct {
@@ -27,6 +35,10 @@ type model struct {
 	status    string
 	searching bool
 	showHelp  bool
+}
+
+type actionMsg struct {
+	status string
 }
 
 var (
@@ -62,7 +74,13 @@ var (
 			Padding(0, 1)
 )
 
-var tabs = []string{"Dashboard", "Inventory", "Findings", "Fix Plan", "Backup Plan"}
+var tabs = []string{"Dashboard", "Inventory", "Findings", "Analysis", "Fix Plan", "Backup Plan"}
+
+const remediationDocsURL = "https://github.com/JSONbored/nightward/blob/main/docs/remediation.md"
+const analysisDocsURL = "https://github.com/JSONbored/nightward/blob/main/docs/analysis.md"
+
+var tuiSecretAssignmentPattern = regexp.MustCompile(`(?i)((?:token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)[^"',\s}]+`)
+var tuiLongSecretPattern = regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{12,}\b`)
 
 func Run(report inventory.Report, scheduleStatus schedule.Plan) error {
 	_, err := tea.NewProgram(model{report: report, schedule: scheduleStatus}, tea.WithAltScreen()).Run()
@@ -78,6 +96,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+	case actionMsg:
+		m.status = msg.status
 	case tea.KeyMsg:
 		if m.searching {
 			switch msg.String() {
@@ -126,6 +146,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tab = 3
 		case "5":
 			m.tab = 4
+		case "6":
+			m.tab = 5
 		case "s":
 			if m.tab == 2 {
 				m.severity = cycle(m.severity, riskOptions(m.report.Findings))
@@ -156,17 +178,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.status = "filters cleared"
 			}
 		case "c":
-			if finding, ok := m.currentFinding(); ok && len(finding.FixSteps) > 0 {
-				m.status = "copy: " + finding.FixSteps[0]
+			value, label, ok := m.copySelection()
+			if !ok {
+				m.status = "copy: nothing selected"
+				return m, nil
 			}
+			m.status = "copying " + label + "..."
+			return m, copyToClipboardCmd(value, label)
 		case "e":
-			m.status = "export: nw fix export --format markdown"
+			m.status = "exporting fix plan..."
+			return m, exportFixPlanCmd(m.report)
 		case "o":
-			if finding, ok := m.currentFinding(); ok && finding.DocsURL != "" {
-				m.status = "open docs: " + finding.DocsURL
-			} else {
-				m.status = "open docs: no docs URL for selected finding"
+			docsURL, ok := m.currentDocsURL()
+			if !ok {
+				m.status = "open docs: no docs URL for selected row"
+				return m, nil
 			}
+			m.status = "opening docs..."
+			return m, openURLCmd(docsURL)
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
@@ -192,7 +221,7 @@ func (m model) View() string {
 		bodyText = m.help(bodyWidth - 6)
 	}
 	body := panelStyle.Width(bodyWidth).Height(bodyHeight).Render(bodyText)
-	footerText := "1-5 tabs  arrows/hjkl navigate  / search  s/t/r filters  x clear  ? help  q quit"
+	footerText := "1-6 tabs  arrows/hjkl navigate  / search  s/t/r filters  x clear  c copy  e export  o docs  ? help  q quit"
 	if m.searching {
 		footerText = "search: " + m.search
 	}
@@ -225,6 +254,8 @@ func (m model) renderBody(width, height int) string {
 	case 2:
 		return m.findings(width, height)
 	case 3:
+		return m.analysis(width, height)
+	case 4:
 		return m.fixPlan(width, height)
 	default:
 		return m.backupPlan(width, height)
@@ -244,8 +275,14 @@ func (m model) dashboard(width int) string {
 		section("Classifications"),
 	}
 	for _, class := range []inventory.Classification{inventory.Portable, inventory.MachineLocal, inventory.SecretAuth, inventory.RuntimeCache, inventory.AppOwned, inventory.Unknown} {
-		if count := m.report.Summary.ByClassification[class]; count > 0 {
+		if count := m.report.Summary.ItemsByClassification[class]; count > 0 {
 			lines = append(lines, fmt.Sprintf("%-14s %d", class, count))
+		}
+	}
+	lines = append(lines, "", section("Finding Severity"))
+	for _, risk := range []inventory.RiskLevel{inventory.RiskCritical, inventory.RiskHigh, inventory.RiskMedium, inventory.RiskLow, inventory.RiskInfo} {
+		if count := m.report.Summary.FindingsBySeverity[risk]; count > 0 {
+			lines = append(lines, fmt.Sprintf("%-14s %d", risk, count))
 		}
 	}
 	lines = append(lines, "", section("Schedule"))
@@ -346,6 +383,34 @@ func (m model) fixPlan(width, height int) string {
 	return fitLines(lines, width)
 }
 
+func (m model) analysis(width, height int) string {
+	report := analysis.Run(m.report, analysis.Options{Mode: m.report.ScanMode, Workspace: m.report.Workspace})
+	lines := []string{
+		section("Analysis"),
+		fmt.Sprintf("Signals: %d  Subjects: %d  Highest: %s  Provider warnings: %d", report.Summary.TotalSignals, report.Summary.TotalSubjects, report.Summary.HighestSeverity, report.Summary.ProviderWarnings),
+		"",
+	}
+	if len(report.Signals) == 0 {
+		lines = append(lines, "No known risky signals from enabled providers.")
+		return fitLines(lines, width)
+	}
+	visible := max(1, height-5)
+	if m.cursor >= len(report.Signals) {
+		m.cursor = len(report.Signals) - 1
+	}
+	start := clampCursor(m.cursor, len(report.Signals), visible)
+	for i := start; i < len(report.Signals) && len(lines) < visible+3; i++ {
+		signal := report.Signals[i]
+		prefix := "  "
+		if i == m.cursor {
+			prefix = "> "
+		}
+		lines = append(lines, fmt.Sprintf("%s%-8s %-30s %s", prefix, signal.Severity, signal.Rule, signal.Message))
+	}
+	lines = append(lines, "", "Use `nw analyze --all --json` or `nw providers doctor --json` for full details.")
+	return fitLines(lines, width)
+}
+
 func (m model) backupPlan(width, height int) string {
 	target := filepath.Join(m.report.Home, "dotfiles")
 	plan := backupplan.Build(m.report, target)
@@ -408,20 +473,32 @@ func findingMatchesSearch(finding inventory.Finding, query string) bool {
 func (m model) help(width int) string {
 	lines := []string{
 		section("Help"),
-		"1-5 or tab: switch tabs",
+		"1-6 or tab: switch tabs",
 		"arrows or h/j/k/l: navigate rows",
 		"s/t/r: cycle severity, tool, and rule filters in Findings",
 		"/: search findings",
 		"x: clear finding filters",
-		"c: show first suggested command or step for selected finding",
-		"e: show export command for fix plan",
-		"o: show docs URL for selected finding",
+		"c: copy selected path, recommendation, or fix step to clipboard",
+		"e: export a redacted fix plan to ~/.local/state/nightward/exports",
+		"o: open docs URL for the selected finding or fix",
 		"?: toggle this help",
 		"q or esc: quit",
 		"",
 		"Nightward TUI actions do not mutate agent configs.",
 	}
 	return fitLines(lines, width)
+}
+
+func (m model) currentSignal() (analysis.Signal, bool) {
+	report := analysis.Run(m.report, analysis.Options{Mode: m.report.ScanMode, Workspace: m.report.Workspace})
+	if len(report.Signals) == 0 {
+		return analysis.Signal{}, false
+	}
+	cursor := m.cursor
+	if cursor >= len(report.Signals) {
+		cursor = len(report.Signals) - 1
+	}
+	return report.Signals[cursor], true
 }
 
 func (m model) currentFinding() (inventory.Finding, bool) {
@@ -434,6 +511,120 @@ func (m model) currentFinding() (inventory.Finding, bool) {
 		cursor = len(findings) - 1
 	}
 	return findings[cursor], true
+}
+
+func (m model) currentItem() (inventory.Item, bool) {
+	if len(m.report.Items) == 0 {
+		return inventory.Item{}, false
+	}
+	cursor := m.cursor
+	if cursor >= len(m.report.Items) {
+		cursor = len(m.report.Items) - 1
+	}
+	return m.report.Items[cursor], true
+}
+
+func (m model) currentFix() (fixplan.Fix, bool) {
+	plan := fixplan.Build(m.report, fixplan.Selector{All: true})
+	if len(plan.Fixes) == 0 {
+		return fixplan.Fix{}, false
+	}
+	cursor := m.cursor
+	if cursor >= len(plan.Fixes) {
+		cursor = len(plan.Fixes) - 1
+	}
+	return plan.Fixes[cursor], true
+}
+
+func (m model) currentBackupEntry() (backupplan.Entry, bool) {
+	plan := backupplan.Build(m.report, filepath.Join(m.report.Home, "dotfiles"))
+	if len(plan.Entries) == 0 {
+		return backupplan.Entry{}, false
+	}
+	cursor := m.cursor
+	if cursor >= len(plan.Entries) {
+		cursor = len(plan.Entries) - 1
+	}
+	return plan.Entries[cursor], true
+}
+
+func (m model) copySelection() (string, string, bool) {
+	switch m.tab {
+	case 0:
+		if m.schedule.ReportDir != "" {
+			return m.schedule.ReportDir, "report path", true
+		}
+	case 1:
+		if item, ok := m.currentItem(); ok {
+			return item.Path, "path", true
+		}
+	case 2:
+		if finding, ok := m.currentFinding(); ok {
+			return findingCopyText(finding), "finding action", true
+		}
+	case 3:
+		if signal, ok := m.currentSignal(); ok {
+			return signal.Recommendation, "analysis recommendation", true
+		}
+	case 4:
+		if fix, ok := m.currentFix(); ok {
+			return fixCopyText(fix), "fix step", true
+		}
+	case 5:
+		if entry, ok := m.currentBackupEntry(); ok {
+			return entry.Source, "backup source path", true
+		}
+	}
+	return "", "", false
+}
+
+func (m model) currentDocsURL() (string, bool) {
+	switch m.tab {
+	case 2:
+		if finding, ok := m.currentFinding(); ok {
+			if finding.DocsURL != "" {
+				return finding.DocsURL, true
+			}
+			return ruleDocsURL(finding.Rule), true
+		}
+	case 3:
+		return analysisDocsURL, true
+	case 4:
+		if fix, ok := m.currentFix(); ok && fix.Rule != "" {
+			return ruleDocsURL(fix.Rule), true
+		}
+	}
+	return "", false
+}
+
+func ruleDocsURL(rule string) string {
+	if rule == "" {
+		return remediationDocsURL
+	}
+	return remediationDocsURL + "#" + url.QueryEscape(strings.ToLower(rule))
+}
+
+func findingCopyText(finding inventory.Finding) string {
+	if len(finding.FixSteps) > 0 {
+		return redactTUIText(finding.FixSteps[0])
+	}
+	if finding.Recommendation != "" {
+		return redactTUIText(finding.Recommendation)
+	}
+	if finding.Evidence != "" {
+		return redactTUIText(finding.Evidence)
+	}
+	return finding.Path
+}
+
+func fixCopyText(fix fixplan.Fix) string {
+	if len(fix.Steps) > 0 {
+		return redactTUIText(fix.Steps[0])
+	}
+	if fix.Summary != "" {
+		return redactTUIText(fix.Summary)
+	}
+	return fix.Path
 }
 
 func findingDetail(finding inventory.Finding, width, height int) string {
@@ -463,6 +654,123 @@ func findingDetail(finding inventory.Finding, width, height int) string {
 		lines = lines[:height]
 	}
 	return fitLines(lines, width)
+}
+
+func copyToClipboardCmd(value, label string) tea.Cmd {
+	value = redactTUIText(value)
+	cmd, err := clipboardCommand(value)
+	if err != nil {
+		return actionStatusCmd(fmt.Sprintf("copy failed: %v", err))
+	}
+	return runActionCommand(cmd, "copied "+label)
+}
+
+func openURLCmd(target string) tea.Cmd {
+	cmd, err := openURLCommand(target)
+	if err != nil {
+		return actionStatusCmd(fmt.Sprintf("open docs failed: %v", err))
+	}
+	return runActionCommand(cmd, "opened docs")
+}
+
+func exportFixPlanCmd(report inventory.Report) tea.Cmd {
+	return func() tea.Msg {
+		path, err := exportFixPlan(report, time.Now().UTC())
+		if err != nil {
+			return actionMsg{status: fmt.Sprintf("export failed: %v", err)}
+		}
+		return actionMsg{status: "exported fix plan: " + path}
+	}
+}
+
+func actionStatusCmd(status string) tea.Cmd {
+	return func() tea.Msg {
+		return actionMsg{status: status}
+	}
+}
+
+func runActionCommand(cmd *exec.Cmd, success string) tea.Cmd {
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		if err != nil {
+			return actionMsg{status: fmt.Sprintf("%s failed: %v", success, err)}
+		}
+		return actionMsg{status: success}
+	})
+}
+
+func clipboardCommand(value string) (*exec.Cmd, error) {
+	return clipboardCommandFor(runtime.GOOS, value, exec.LookPath)
+}
+
+func clipboardCommandFor(goos, value string, lookPath func(string) (string, error)) (*exec.Cmd, error) {
+	var cmd *exec.Cmd
+	switch goos {
+	case "darwin":
+		cmd = exec.Command("pbcopy")
+	case "linux":
+		if path, err := lookPath("wl-copy"); err == nil {
+			cmd = exec.Command(path) // #nosec G204 -- clipboard helper resolved by PATH and invoked without a shell.
+		} else if path, err := lookPath("xclip"); err == nil {
+			cmd = exec.Command(path, "-selection", "clipboard") // #nosec G204 -- clipboard helper resolved by PATH and invoked without a shell.
+		} else if path, err := lookPath("xsel"); err == nil {
+			cmd = exec.Command(path, "--clipboard", "--input") // #nosec G204 -- clipboard helper resolved by PATH and invoked without a shell.
+		} else {
+			return nil, errors.New("no clipboard command found: install wl-copy, xclip, or xsel")
+		}
+	case "windows":
+		cmd = exec.Command("clip")
+	default:
+		return nil, fmt.Errorf("clipboard unsupported on %s", goos)
+	}
+	cmd.Stdin = strings.NewReader(value)
+	return cmd, nil
+}
+
+func openURLCommand(target string) (*exec.Cmd, error) {
+	return openURLCommandFor(runtime.GOOS, target)
+}
+
+func openURLCommandFor(goos, target string) (*exec.Cmd, error) {
+	parsed, err := url.Parse(target)
+	if err != nil || parsed == nil || parsed.Host == "" {
+		return nil, fmt.Errorf("invalid URL %q", target)
+	}
+	if parsed.Scheme != "https" && parsed.Scheme != "http" {
+		return nil, fmt.Errorf("unsupported URL scheme %q", parsed.Scheme)
+	}
+	switch goos {
+	case "darwin":
+		return exec.Command("open", target), nil // #nosec G204 -- validated http(s) documentation URL, invoked without a shell.
+	case "linux":
+		return exec.Command("xdg-open", target), nil // #nosec G204 -- validated http(s) documentation URL, invoked without a shell.
+	case "windows":
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", target), nil // #nosec G204 -- validated http(s) documentation URL, invoked without a shell.
+	default:
+		return nil, fmt.Errorf("opening URLs unsupported on %s", goos)
+	}
+}
+
+func exportFixPlan(report inventory.Report, now time.Time) (string, error) {
+	if report.Home == "" {
+		return "", errors.New("home directory missing from report")
+	}
+	dir := filepath.Join(report.Home, ".local", "state", "nightward", "exports")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return "", err
+	}
+	plan := fixplan.Build(report, fixplan.Selector{All: true})
+	markdown := redactTUIText(fixplan.Markdown(plan))
+	name := "fix-plan-" + now.UTC().Format("20060102T150405Z") + ".md"
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte(markdown), 0600); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func redactTUIText(value string) string {
+	value = tuiSecretAssignmentPattern.ReplaceAllString(value, "$1$2[redacted]")
+	return tuiLongSecretPattern.ReplaceAllString(value, "[redacted]")
 }
 
 func riskOptions(findings []inventory.Finding) []string {

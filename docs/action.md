@@ -24,6 +24,8 @@ Inputs:
 - `strict`: fail policy checks on medium or higher findings
 - `output`: output path for scan JSON or SARIF
 - `home`: optional HOME override for fixture scans
+- `workspace`: optional repository/workspace path to scan instead of HOME
+- `include-analysis`: include offline analysis signals in policy or SARIF modes
 
 Outputs:
 
@@ -32,3 +34,14 @@ Outputs:
 - `output`
 
 The action runs Nightward locally. It does not upload findings unless your workflow separately uploads artifacts or SARIF.
+
+For repository CI, prefer workspace mode:
+
+```yaml
+- uses: JSONbored/nightward@v0.1.0
+  with:
+    mode: sarif
+    workspace: ${{ github.workspace }}
+    include-analysis: "true"
+    output: nightward.sarif
+```

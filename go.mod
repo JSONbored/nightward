@@ -1,4 +1,4 @@
-module github.com/shadowbook/nightward
+module github.com/jsonbored/nightward
 
 go 1.25.9
 
