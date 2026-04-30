@@ -1,5 +1,7 @@
 import type {
   AdapterStatus,
+  AnalysisReport,
+  AnalysisSignal,
   Classification,
   Finding,
   FixPlan,
@@ -9,8 +11,7 @@ import type {
 
 const secretAssignmentPattern =
   /((?:token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)[^"',\s}]+/gi;
-const longSecretLikePattern =
-  /\b(?:sk-[A-Za-z0-9_-]{12,}|[A-Za-z0-9_./+=-]{32,})\b/g;
+const longSecretLikePattern = /\bsk-[A-Za-z0-9_-]{12,}\b/g;
 
 const riskRank: Record<RiskLevel, number> = {
   info: 0,
@@ -140,6 +141,71 @@ export function findingMarkdown(finding: Finding): string {
   return lines.join("\n");
 }
 
+export function sortedSignals(signals: AnalysisSignal[]): AnalysisSignal[] {
+  return [...signals].sort((a, b) => {
+    const riskDelta = riskRank[b.severity] - riskRank[a.severity];
+    if (riskDelta !== 0) return riskDelta;
+    if (a.provider !== b.provider) return a.provider.localeCompare(b.provider);
+    if (a.rule !== b.rule) return a.rule.localeCompare(b.rule);
+    return a.id.localeCompare(b.id);
+  });
+}
+
+export function signalMarkdown(signal: AnalysisSignal): string {
+  return [
+    `# ${escapeMarkdown(signal.rule)}`,
+    "",
+    redactText(signal.message),
+    "",
+    "## Evidence",
+    signal.evidence
+      ? `\`${escapeCode(redactText(signal.evidence))}\``
+      : "No redacted evidence was emitted for this signal.",
+    "",
+    "## Recommended Action",
+    redactText(signal.recommended_action),
+    "",
+    "## Metadata",
+    `Provider: \`${signal.provider}\``,
+    `Category: \`${signal.category}\``,
+    `Severity: \`${signal.severity}\``,
+    `Confidence: \`${signal.confidence}\``,
+    signal.path ? `Path: \`${escapeCode(signal.path)}\`` : "",
+    signal.why_this_matters ? "" : "",
+    signal.why_this_matters ? "## Why This Matters" : "",
+    signal.why_this_matters ? redactText(signal.why_this_matters) : "",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+}
+
+export function analysisMarkdown(report: AnalysisReport): string {
+  const lines = [
+    "# Nightward Analysis",
+    "",
+    `Generated: \`${report.generated_at}\``,
+    `Mode: \`${report.mode}\``,
+    report.workspace ? `Workspace: \`${report.workspace}\`` : "",
+    "",
+    "## Summary",
+    `Signals: \`${report.summary.total_signals}\``,
+    `Subjects: \`${report.summary.total_subjects}\``,
+    `Highest severity: \`${report.summary.highest_severity || "info"}\``,
+    `Provider warnings: \`${report.summary.provider_warnings}\``,
+    "",
+    "Nightward analysis is offline by default and does not claim a package or server is safe.",
+  ].filter(Boolean);
+  if (report.signals.length > 0) {
+    lines.push("", "## Top Signals");
+    for (const signal of sortedSignals(report.signals).slice(0, 8)) {
+      lines.push(
+        `- \`${signal.severity}\` ${signal.rule}: ${redactText(signal.message)}`,
+      );
+    }
+  }
+  return lines.join("\n");
+}
+
 export function dashboardMarkdown(
   report: ScanReport,
   doctor: {
@@ -163,6 +229,8 @@ export function dashboardMarkdown(
     `Items: \`${report.summary.total_items}\``,
     `Findings: \`${report.summary.total_findings}\``,
     `Max severity: \`${max}\``,
+    `Critical findings: \`${report.summary.findings_by_severity.critical ?? 0}\``,
+    `High findings: \`${report.summary.findings_by_severity.high ?? 0}\``,
     "",
     "## Schedule",
     `Installed: \`${doctor.schedule?.installed ? "yes" : "no"}\``,

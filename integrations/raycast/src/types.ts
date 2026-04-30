@@ -19,9 +19,12 @@ export type FixKind =
 export type Summary = {
   total_items: number;
   total_findings: number;
-  by_classification: Partial<Record<Classification, number>>;
-  by_risk: Partial<Record<RiskLevel, number>>;
-  tools: Record<string, number>;
+  items_by_classification: Partial<Record<Classification, number>>;
+  items_by_risk: Partial<Record<RiskLevel, number>>;
+  items_by_tool: Record<string, number>;
+  findings_by_severity: Partial<Record<RiskLevel, number>>;
+  findings_by_rule: Record<string, number>;
+  findings_by_tool: Record<string, number>;
 };
 
 export type InventoryItem = {
@@ -73,10 +76,80 @@ export type ScanReport = {
   generated_at: string;
   hostname: string;
   home: string;
+  workspace?: string;
+  scan_mode?: string;
   summary: Summary;
   items: InventoryItem[];
   findings: Finding[];
   adapters: AdapterStatus[];
+};
+
+export type SignalCategory =
+  | "supply-chain"
+  | "secrets-exposure"
+  | "filesystem-scope"
+  | "network-exposure"
+  | "execution-risk"
+  | "machine-locality"
+  | "app-state"
+  | "unknown";
+
+export type AnalysisSignal = {
+  id: string;
+  provider: string;
+  rule: string;
+  category: SignalCategory;
+  subject_id: string;
+  subject_type: "finding" | "item" | "package";
+  path?: string;
+  severity: RiskLevel;
+  confidence: string;
+  message: string;
+  evidence?: string;
+  recommended_action: string;
+  why_this_matters?: string;
+};
+
+export type ProviderStatus = {
+  name: string;
+  kind: string;
+  command?: string;
+  online: boolean;
+  default: boolean;
+  privacy: string;
+  capabilities: string;
+  enabled: boolean;
+  available: boolean;
+  status: string;
+  detail?: string;
+};
+
+export type AnalysisReport = {
+  generated_at: string;
+  mode: string;
+  workspace?: string;
+  summary: {
+    total_subjects: number;
+    total_signals: number;
+    signals_by_severity: Partial<Record<RiskLevel, number>>;
+    signals_by_category: Partial<Record<SignalCategory, number>>;
+    signals_by_provider: Record<string, number>;
+    highest_severity: RiskLevel;
+    provider_warnings: number;
+    no_known_risk_signals: boolean;
+  };
+  providers: ProviderStatus[];
+  subjects: Array<{
+    id: string;
+    type: "finding" | "item" | "package";
+    name: string;
+    tool?: string;
+    path?: string;
+    rule?: string;
+    package?: string;
+    evidence?: string;
+  }>;
+  signals: AnalysisSignal[];
 };
 
 export type DoctorCheck = {

@@ -4,8 +4,9 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 
 ## Workflows
 
-- `ci.yml`: Go tests, JUnit reports, local JUnit shape validation, gated Trunk Flaky Tests uploads, Trunk Check, Raycast extension tests/build, Gitleaks, govulncheck, and OSV dependency scanning.
+- `ci.yml`: Go tests, race tests, `go vet`, `staticcheck`, `gosec`, JUnit reports, local JUnit shape validation, gated Trunk Flaky Tests uploads, Trunk Check, Raycast extension tests/build/audit, Gitleaks, govulncheck, and OSV dependency scanning.
 - `nightward-policy.yml`: generates Nightward SARIF from a fixture home and uploads it to GitHub code scanning.
+- `plugin.yaml`: defines Trunk Check linters for workspace policy and analysis SARIF once release tags are available.
 - `scorecard.yml`: runs OpenSSF Scorecard and uploads SARIF.
 - `release.yml`: publishes signed GoReleaser artifacts from strict `vX.Y.Z` tags.
 - `renovate.json`: manages Go modules, Raycast npm packages, pinned GitHub Actions, local tool pins, and release tooling updates.
@@ -20,6 +21,20 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 - Never make flaky-test quarantining a default CI behavior.
 - Use Renovate instead of Dependabot whenever possible.
 - Keep dependency PRs reviewed; do not enable broad automerge by default.
+
+## Trunk Plugin Notes
+
+The in-repo plugin exposes:
+
+- `nightward-policy`: runs `nw policy sarif --workspace ${workspace} --output -`
+- `nightward-analyze`: runs `nw policy sarif --workspace ${workspace} --include-analysis --output -`
+
+Users should import a pinned Nightward tag, not a moving branch:
+
+```sh
+trunk plugins add --id nightward https://github.com/JSONbored/nightward v0.1.0
+trunk check enable nightward-policy
+```
 
 ## Release Hardening Backlog
 

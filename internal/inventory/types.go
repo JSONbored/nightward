@@ -26,7 +26,8 @@ const (
 type FixKind string
 
 const (
-	FixPinPackage          FixKind = "pin-package"
+	FixPinPackage FixKind = "pin-package"
+	// #nosec G101 -- user-facing remediation kind name, not a credential.
 	FixExternalizeSecret   FixKind = "externalize-secret"
 	FixReplaceShellWrapper FixKind = "replace-shell-wrapper"
 	FixNarrowFilesystem    FixKind = "narrow-filesystem"
@@ -90,17 +91,22 @@ type AdapterStatus struct {
 }
 
 type Summary struct {
-	TotalItems       int                    `json:"total_items"`
-	TotalFindings    int                    `json:"total_findings"`
-	ByClassification map[Classification]int `json:"by_classification"`
-	ByRisk           map[RiskLevel]int      `json:"by_risk"`
-	Tools            map[string]int         `json:"tools"`
+	TotalItems            int                    `json:"total_items"`
+	TotalFindings         int                    `json:"total_findings"`
+	ItemsByClassification map[Classification]int `json:"items_by_classification"`
+	ItemsByRisk           map[RiskLevel]int      `json:"items_by_risk"`
+	ItemsByTool           map[string]int         `json:"items_by_tool"`
+	FindingsBySeverity    map[RiskLevel]int      `json:"findings_by_severity"`
+	FindingsByRule        map[string]int         `json:"findings_by_rule"`
+	FindingsByTool        map[string]int         `json:"findings_by_tool"`
 }
 
 type Report struct {
 	GeneratedAt time.Time       `json:"generated_at"`
 	Hostname    string          `json:"hostname"`
 	Home        string          `json:"home"`
+	Workspace   string          `json:"workspace,omitempty"`
+	ScanMode    string          `json:"scan_mode,omitempty"`
 	Summary     Summary         `json:"summary"`
 	Items       []Item          `json:"items"`
 	Findings    []Finding       `json:"findings"`

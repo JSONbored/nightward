@@ -45,6 +45,20 @@
       "keywords": ["findings", "mcp", "security", "privacy", "fix"]
     },
     {
+      "name": "analysis",
+      "title": "Nightward Analysis",
+      "description": "Browse offline analysis signals and provider status.",
+      "mode": "view",
+      "keywords": ["analysis", "signals", "security", "privacy", "trust"]
+    },
+    {
+      "name": "provider-doctor",
+      "title": "Nightward Provider Doctor",
+      "description": "Check optional local and online-capable analysis providers.",
+      "mode": "view",
+      "keywords": ["providers", "doctor", "security", "privacy"]
+    },
+    {
       "name": "explain-finding",
       "title": "Explain Nightward Finding",
       "description": "Open a detailed explanation for one Nightward finding ID.",
@@ -60,11 +74,33 @@
       ]
     },
     {
+      "name": "explain-signal",
+      "title": "Explain Nightward Signal",
+      "description": "Open the analysis signal for a Nightward finding ID.",
+      "mode": "view",
+      "keywords": ["explain", "signal", "trust", "analysis"],
+      "arguments": [
+        {
+          "name": "findingId",
+          "placeholder": "Finding ID",
+          "type": "text",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "export-fix-plan",
       "title": "Export Nightward Fix Plan",
       "description": "Copy the redacted Nightward fix plan markdown to the clipboard.",
       "mode": "no-view",
       "keywords": ["fix", "export", "clipboard", "markdown"]
+    },
+    {
+      "name": "export-analysis",
+      "title": "Export Nightward Analysis",
+      "description": "Copy the redacted offline analysis report markdown to the clipboard.",
+      "mode": "no-view",
+      "keywords": ["analysis", "export", "clipboard", "markdown"]
     },
     {
       "name": "open-report-folder",

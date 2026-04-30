@@ -23,6 +23,14 @@ inputs:
     description: HOME path Nightward should scan.
     required: false
     default: ""
+  workspace:
+    description: Repository/workspace path Nightward should scan instead of HOME.
+    required: false
+    default: ""
+  include-analysis:
+    description: Include offline analysis signals in policy or SARIF modes.
+    required: false
+    default: "false"
 
 outputs:
   findings-count:
@@ -53,6 +61,8 @@ runs:
         INPUT_STRICT: ${{ inputs.strict }}
         INPUT_OUTPUT: ${{ inputs.output }}
         INPUT_HOME: ${{ inputs.home }}
+        INPUT_WORKSPACE: ${{ inputs.workspace }}
+        INPUT_INCLUDE_ANALYSIS: ${{ inputs.include-analysis }}
       run: |
         set -euo pipefail
 
@@ -61,6 +71,8 @@ runs:
         strict="${INPUT_STRICT}"
         output="${INPUT_OUTPUT}"
         scan_home="${INPUT_HOME}"
+        scan_workspace="${INPUT_WORKSPACE:-}"
+        include_analysis="${INPUT_INCLUDE_ANALYSIS}"
 
         if [[ -n "${scan_home}" ]]; then
           export NIGHTWARD_HOME="${scan_home}"
@@ -70,15 +82,23 @@ runs:
         if [[ -n "${config}" ]]; then
           config_args+=(--config "${config}")
         fi
+        workspace_args=()
+        if [[ -n "${scan_workspace}" ]]; then
+          workspace_args+=(--workspace "${scan_workspace}")
+        fi
+        analysis_args=()
+        if [[ "${include_analysis}" == "true" ]]; then
+          analysis_args+=(--include-analysis)
+        fi
 
         cd "${GITHUB_ACTION_PATH}"
         case "${mode}" in
           scan)
-            go run ./cmd/nw scan --json --output "${GITHUB_WORKSPACE}/${output}"
+            go run ./cmd/nw scan "${workspace_args[@]}" --json --output "${GITHUB_WORKSPACE}/${output}"
             echo "output=${output}" >>"${GITHUB_OUTPUT}"
             ;;
           policy)
-            args=(policy check "${config_args[@]}" --json)
+            args=(policy check "${config_args[@]}" "${workspace_args[@]}" "${analysis_args[@]}" --json)
             if [[ "${strict}" == "true" ]]; then
               args+=(--strict)
             fi
@@ -90,7 +110,7 @@ runs:
             echo "output=nightward-policy.json" >>"${GITHUB_OUTPUT}"
             ;;
           sarif)
-            go run ./cmd/nw policy sarif "${config_args[@]}" --output "${GITHUB_WORKSPACE}/${output}"
+            go run ./cmd/nw policy sarif "${config_args[@]}" "${workspace_args[@]}" "${analysis_args[@]}" --output "${GITHUB_WORKSPACE}/${output}"
             echo "output=${output}" >>"${GITHUB_OUTPUT}"
             ;;
           *)

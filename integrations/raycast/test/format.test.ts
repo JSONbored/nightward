@@ -1,15 +1,31 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findingMarkdown, maxSeverity, redactText, sortedFindings } from "../src/format";
-import type { Finding } from "../src/types";
+import {
+  analysisMarkdown,
+  findingMarkdown,
+  maxSeverity,
+  redactText,
+  signalMarkdown,
+  sortedFindings,
+  sortedSignals,
+} from "../src/format";
+import type { AnalysisReport, AnalysisSignal, Finding } from "../src/types";
 
 test("redacts obvious secret assignments and long token-like values", () => {
   const keyName = "API_" + "KEY";
   const token = "sk-" + "1234567890abcdef";
   const longValue = "abcdefghijklmno" + "pqrstuvwxyz123456";
-  const output = redactText(`${keyName}=${token} secret: ${longValue}`);
+  const path =
+    "/Users/example/Library/Application Support/Claude/claude_desktop_config.json";
+  const output = redactText(
+    `${keyName}=${token} secret: ${longValue} path: ${path}`,
+  );
   assert.match(output, /API_KEY=\[redacted\]/);
   assert.match(output, /secret: \[redacted\]/);
+  assert.match(
+    output,
+    /Library\/Application Support\/Claude\/claude_desktop_config\.json/,
+  );
   assert.doesNotMatch(output, /1234567890abcdef/);
   assert.doesNotMatch(output, /abcdefghijklmnopqrstuvwxyz123456/);
 });
@@ -57,7 +73,50 @@ test("findings sort by severity then stable identity", () => {
   );
 });
 
-function baseFinding(id: string, severity: Finding["severity"], tool: string): Finding {
+test("analysis markdown redacts signal evidence", () => {
+  const keyName = "API_" + "KEY";
+  const token = "sk-" + "1234567890abcdef";
+  const signal: AnalysisSignal = {
+    id: "signal-a",
+    provider: "nightward",
+    rule: "nightward/mcp_secret_env",
+    category: "secrets-exposure",
+    subject_id: "finding-a",
+    subject_type: "finding",
+    severity: "critical",
+    confidence: "high",
+    message: `${keyName}=${token}`,
+    evidence: "env_key=API_KEY",
+    recommended_action: `Remove ${keyName}=${token}.`,
+  };
+  const report: AnalysisReport = {
+    generated_at: "2026-04-30T00:00:00Z",
+    mode: "home",
+    summary: {
+      total_subjects: 1,
+      total_signals: 1,
+      signals_by_severity: { critical: 1 },
+      signals_by_category: { "secrets-exposure": 1 },
+      signals_by_provider: { nightward: 1 },
+      highest_severity: "critical",
+      provider_warnings: 0,
+      no_known_risk_signals: false,
+    },
+    providers: [],
+    subjects: [],
+    signals: [signal],
+  };
+
+  assert.equal(sortedSignals([baseSignal("b", "low"), signal])[0]?.id, "signal-a");
+  assert.doesNotMatch(signalMarkdown(signal), /1234567890abcdef/);
+  assert.doesNotMatch(analysisMarkdown(report), /1234567890abcdef/);
+});
+
+function baseFinding(
+  id: string,
+  severity: Finding["severity"],
+  tool: string,
+): Finding {
   return {
     id,
     tool,
@@ -68,5 +127,20 @@ function baseFinding(id: string, severity: Finding["severity"], tool: string): F
     recommended_action: "Review manually.",
     fix_available: false,
     requires_review: true,
+  };
+}
+
+function baseSignal(id: string, severity: AnalysisSignal["severity"]): AnalysisSignal {
+  return {
+    id,
+    provider: "nightward",
+    rule: "nightward/review",
+    category: "execution-risk",
+    subject_id: id,
+    subject_type: "finding",
+    severity,
+    confidence: "medium",
+    message: "Review signal",
+    recommended_action: "Review manually.",
   };
 }

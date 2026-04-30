@@ -3,11 +3,12 @@ package snapshot
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"sort"
 	"time"
 
-	"github.com/shadowbook/nightward/internal/backupplan"
-	"github.com/shadowbook/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/backupplan"
+	"github.com/jsonbored/nightward/internal/inventory"
 )
 
 type Plan struct {
@@ -82,7 +83,7 @@ func Build(report inventory.Report, targetRoot string) Plan {
 }
 
 func Load(path string) (Plan, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- snapshot path is an explicit local CLI input for diff planning.
 	if err != nil {
 		return Plan{}, err
 	}
