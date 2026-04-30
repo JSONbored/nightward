@@ -7,6 +7,9 @@ Nightward treats read-only behavior, redaction, and policy stability as release 
 ```sh
 make test
 make test-race
+make vet
+make staticcheck
+make gosec
 make test-junit
 make trunk-flaky-validate
 make trunk-check
@@ -31,12 +34,14 @@ make verify
 - Scheduler tests verify generated launchd, systemd user timer, and cron text without installing schedules.
 - TUI action tests cover clipboard/open command construction and private redacted fix-plan exports.
 - Raycast extension tests cover pure redaction/formatting helpers and safe command execution wrappers.
+- `go vet`, `staticcheck`, and `gosec` are part of the local verification bar. `#nosec` comments must include a narrow reason tied to an intentional local CLI behavior.
+- Raycast dependency audits run with `npm audit --audit-level=moderate`.
 
 ## Trunk Flaky Tests
 
 `make test-junit` writes:
 
-- `reports/go-tests.xml` from Go tests with `gotestsum`
+- `reports/go-tests.xml` from Go tests with `gotestsum`, normalized to include testcase file paths
 - `reports/junit/raycast.xml` from the Raycast extension Node tests
 
 `make trunk-flaky-validate` runs:

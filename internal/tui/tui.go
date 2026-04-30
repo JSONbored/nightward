@@ -14,10 +14,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/shadowbook/nightward/internal/backupplan"
-	"github.com/shadowbook/nightward/internal/fixplan"
-	"github.com/shadowbook/nightward/internal/inventory"
-	"github.com/shadowbook/nightward/internal/schedule"
+	"github.com/jsonbored/nightward/internal/analysis"
+	"github.com/jsonbored/nightward/internal/backupplan"
+	"github.com/jsonbored/nightward/internal/fixplan"
+	"github.com/jsonbored/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/schedule"
 )
 
 type model struct {
@@ -73,9 +74,10 @@ var (
 			Padding(0, 1)
 )
 
-var tabs = []string{"Dashboard", "Inventory", "Findings", "Fix Plan", "Backup Plan"}
+var tabs = []string{"Dashboard", "Inventory", "Findings", "Analysis", "Fix Plan", "Backup Plan"}
 
 const remediationDocsURL = "https://github.com/JSONbored/nightward/blob/main/docs/remediation.md"
+const analysisDocsURL = "https://github.com/JSONbored/nightward/blob/main/docs/analysis.md"
 
 var tuiSecretAssignmentPattern = regexp.MustCompile(`(?i)((?:token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)[^"',\s}]+`)
 var tuiLongSecretPattern = regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{12,}\b`)
@@ -144,6 +146,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tab = 3
 		case "5":
 			m.tab = 4
+		case "6":
+			m.tab = 5
 		case "s":
 			if m.tab == 2 {
 				m.severity = cycle(m.severity, riskOptions(m.report.Findings))
@@ -217,7 +221,7 @@ func (m model) View() string {
 		bodyText = m.help(bodyWidth - 6)
 	}
 	body := panelStyle.Width(bodyWidth).Height(bodyHeight).Render(bodyText)
-	footerText := "1-5 tabs  arrows/hjkl navigate  / search  s/t/r filters  x clear  c copy  e export  o docs  ? help  q quit"
+	footerText := "1-6 tabs  arrows/hjkl navigate  / search  s/t/r filters  x clear  c copy  e export  o docs  ? help  q quit"
 	if m.searching {
 		footerText = "search: " + m.search
 	}
@@ -250,6 +254,8 @@ func (m model) renderBody(width, height int) string {
 	case 2:
 		return m.findings(width, height)
 	case 3:
+		return m.analysis(width, height)
+	case 4:
 		return m.fixPlan(width, height)
 	default:
 		return m.backupPlan(width, height)
@@ -377,6 +383,34 @@ func (m model) fixPlan(width, height int) string {
 	return fitLines(lines, width)
 }
 
+func (m model) analysis(width, height int) string {
+	report := analysis.Run(m.report, analysis.Options{Mode: m.report.ScanMode, Workspace: m.report.Workspace})
+	lines := []string{
+		section("Analysis"),
+		fmt.Sprintf("Signals: %d  Subjects: %d  Highest: %s  Provider warnings: %d", report.Summary.TotalSignals, report.Summary.TotalSubjects, report.Summary.HighestSeverity, report.Summary.ProviderWarnings),
+		"",
+	}
+	if len(report.Signals) == 0 {
+		lines = append(lines, "No known risky signals from enabled providers.")
+		return fitLines(lines, width)
+	}
+	visible := max(1, height-5)
+	if m.cursor >= len(report.Signals) {
+		m.cursor = len(report.Signals) - 1
+	}
+	start := clampCursor(m.cursor, len(report.Signals), visible)
+	for i := start; i < len(report.Signals) && len(lines) < visible+3; i++ {
+		signal := report.Signals[i]
+		prefix := "  "
+		if i == m.cursor {
+			prefix = "> "
+		}
+		lines = append(lines, fmt.Sprintf("%s%-8s %-30s %s", prefix, signal.Severity, signal.Rule, signal.Message))
+	}
+	lines = append(lines, "", "Use `nw analyze --all --json` or `nw providers doctor --json` for full details.")
+	return fitLines(lines, width)
+}
+
 func (m model) backupPlan(width, height int) string {
 	target := filepath.Join(m.report.Home, "dotfiles")
 	plan := backupplan.Build(m.report, target)
@@ -439,7 +473,7 @@ func findingMatchesSearch(finding inventory.Finding, query string) bool {
 func (m model) help(width int) string {
 	lines := []string{
 		section("Help"),
-		"1-5 or tab: switch tabs",
+		"1-6 or tab: switch tabs",
 		"arrows or h/j/k/l: navigate rows",
 		"s/t/r: cycle severity, tool, and rule filters in Findings",
 		"/: search findings",
@@ -453,6 +487,18 @@ func (m model) help(width int) string {
 		"Nightward TUI actions do not mutate agent configs.",
 	}
 	return fitLines(lines, width)
+}
+
+func (m model) currentSignal() (analysis.Signal, bool) {
+	report := analysis.Run(m.report, analysis.Options{Mode: m.report.ScanMode, Workspace: m.report.Workspace})
+	if len(report.Signals) == 0 {
+		return analysis.Signal{}, false
+	}
+	cursor := m.cursor
+	if cursor >= len(report.Signals) {
+		cursor = len(report.Signals) - 1
+	}
+	return report.Signals[cursor], true
 }
 
 func (m model) currentFinding() (inventory.Finding, bool) {
@@ -517,10 +563,14 @@ func (m model) copySelection() (string, string, bool) {
 			return findingCopyText(finding), "finding action", true
 		}
 	case 3:
+		if signal, ok := m.currentSignal(); ok {
+			return signal.Recommendation, "analysis recommendation", true
+		}
+	case 4:
 		if fix, ok := m.currentFix(); ok {
 			return fixCopyText(fix), "fix step", true
 		}
-	case 4:
+	case 5:
 		if entry, ok := m.currentBackupEntry(); ok {
 			return entry.Source, "backup source path", true
 		}
@@ -538,6 +588,8 @@ func (m model) currentDocsURL() (string, bool) {
 			return ruleDocsURL(finding.Rule), true
 		}
 	case 3:
+		return analysisDocsURL, true
+	case 4:
 		if fix, ok := m.currentFix(); ok && fix.Rule != "" {
 			return ruleDocsURL(fix.Rule), true
 		}
@@ -657,11 +709,11 @@ func clipboardCommandFor(goos, value string, lookPath func(string) (string, erro
 		cmd = exec.Command("pbcopy")
 	case "linux":
 		if path, err := lookPath("wl-copy"); err == nil {
-			cmd = exec.Command(path)
+			cmd = exec.Command(path) // #nosec G204 -- clipboard helper resolved by PATH and invoked without a shell.
 		} else if path, err := lookPath("xclip"); err == nil {
-			cmd = exec.Command(path, "-selection", "clipboard")
+			cmd = exec.Command(path, "-selection", "clipboard") // #nosec G204 -- clipboard helper resolved by PATH and invoked without a shell.
 		} else if path, err := lookPath("xsel"); err == nil {
-			cmd = exec.Command(path, "--clipboard", "--input")
+			cmd = exec.Command(path, "--clipboard", "--input") // #nosec G204 -- clipboard helper resolved by PATH and invoked without a shell.
 		} else {
 			return nil, errors.New("no clipboard command found: install wl-copy, xclip, or xsel")
 		}
@@ -688,11 +740,11 @@ func openURLCommandFor(goos, target string) (*exec.Cmd, error) {
 	}
 	switch goos {
 	case "darwin":
-		return exec.Command("open", target), nil
+		return exec.Command("open", target), nil // #nosec G204 -- validated http(s) documentation URL, invoked without a shell.
 	case "linux":
-		return exec.Command("xdg-open", target), nil
+		return exec.Command("xdg-open", target), nil // #nosec G204 -- validated http(s) documentation URL, invoked without a shell.
 	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", target), nil
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", target), nil // #nosec G204 -- validated http(s) documentation URL, invoked without a shell.
 	default:
 		return nil, fmt.Errorf("opening URLs unsupported on %s", goos)
 	}

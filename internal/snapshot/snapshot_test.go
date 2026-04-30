@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shadowbook/nightward/internal/backupplan"
-	"github.com/shadowbook/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/backupplan"
+	"github.com/jsonbored/nightward/internal/inventory"
 )
 
 func TestBuildCreatesReadOnlySnapshotPlan(t *testing.T) {

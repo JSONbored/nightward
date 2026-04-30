@@ -18,6 +18,7 @@ import {
   sortedFindings,
 } from "./format";
 import {
+  analysisReport,
   doctor,
   fixPlan,
   normalizePreferences,
@@ -26,6 +27,7 @@ import {
 } from "./nightward";
 import type {
   Classification,
+  AnalysisReport,
   DoctorReport,
   FixPlan,
   ScanReport,
@@ -37,17 +39,19 @@ type DashboardData = {
   report: ScanReport;
   doctor: DoctorReport;
   fixPlan: FixPlan;
+  analysis: AnalysisReport;
 };
 
 export default function Command() {
   const runtime = normalizePreferences(getPreferenceValues());
   const { data, error, isLoading, revalidate } = usePromise(async () => {
-    const [report, doctorReport, plan] = await Promise.all([
+    const [report, doctorReport, plan, analysis] = await Promise.all([
       scan(runtime),
       doctor(runtime),
       fixPlan(runtime),
+      analysisReport(runtime),
     ]);
-    return { report, doctor: doctorReport, fixPlan: plan };
+    return { report, doctor: doctorReport, fixPlan: plan, analysis };
   });
 
   if (error) {
@@ -139,6 +143,30 @@ export default function Command() {
             />
           }
         />
+        <List.Item
+          title="Analysis"
+          subtitle={`${data.analysis.summary.total_signals} signals - ${data.analysis.summary.provider_warnings} provider warnings`}
+          icon={{
+            source: Icon.MagnifyingGlass,
+            tintColor: severityColor(
+              data.analysis.summary.highest_severity || "info",
+            ),
+          }}
+          accessories={[
+            { text: data.analysis.summary.highest_severity || "info" },
+          ]}
+          detail={
+            <List.Item.Detail
+              markdown={`# Analysis\n\nSignals: \`${data.analysis.summary.total_signals}\`\n\nProvider warnings: \`${data.analysis.summary.provider_warnings}\`\n\nOffline analysis does not claim a server or package is safe.`}
+            />
+          }
+          actions={
+            <DashboardActions
+              onRefresh={revalidate}
+              reportDir={data.doctor.schedule.report_dir}
+            />
+          }
+        />
       </List.Section>
 
       <List.Section title="Classifications">
@@ -221,6 +249,10 @@ function DashboardDetail({ data }: { data: DashboardData }) {
           <List.Item.Detail.Metadata.Label
             title="Fix Plan"
             text={`${data.fixPlan.summary.total} total`}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Analysis"
+            text={`${data.analysis.summary.total_signals} signals`}
           />
           <List.Item.Detail.Metadata.Label
             title="Report Directory"

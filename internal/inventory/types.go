@@ -26,7 +26,8 @@ const (
 type FixKind string
 
 const (
-	FixPinPackage          FixKind = "pin-package"
+	FixPinPackage FixKind = "pin-package"
+	// #nosec G101 -- user-facing remediation kind name, not a credential.
 	FixExternalizeSecret   FixKind = "externalize-secret"
 	FixReplaceShellWrapper FixKind = "replace-shell-wrapper"
 	FixNarrowFilesystem    FixKind = "narrow-filesystem"
@@ -104,6 +105,8 @@ type Report struct {
 	GeneratedAt time.Time       `json:"generated_at"`
 	Hostname    string          `json:"hostname"`
 	Home        string          `json:"home"`
+	Workspace   string          `json:"workspace,omitempty"`
+	ScanMode    string          `json:"scan_mode,omitempty"`
 	Summary     Summary         `json:"summary"`
 	Items       []Item          `json:"items"`
 	Findings    []Finding       `json:"findings"`

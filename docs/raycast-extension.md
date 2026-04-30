@@ -12,8 +12,12 @@ integrations/raycast
 
 - `Nightward Dashboard`: scan counts, schedule status, adapter summary, and top findings.
 - `Nightward Findings`: searchable findings with a severity filter, detail pane, and copy/open-doc actions.
+- `Nightward Analysis`: offline analysis signals with severity, confidence, evidence, and recommended action.
+- `Nightward Provider Doctor`: optional provider availability and privacy posture.
 - `Explain Nightward Finding`: detail view for a known finding ID.
+- `Explain Nightward Signal`: analysis signal view for a known finding ID.
 - `Export Nightward Fix Plan`: copies `nw fix export --all --format markdown`.
+- `Export Nightward Analysis`: copies a redacted offline analysis Markdown report.
 - `Open Nightward Reports`: opens `~/.local/state/nightward/reports` when it already exists.
 
 ## Preferences
@@ -31,6 +35,9 @@ The extension uses `execFile`, not a shell, for local Nightward commands. It cal
 - `findings explain <id> --json`
 - `fix plan --all --json`
 - `fix export --all --format markdown`
+- `analyze --all --json`
+- `analyze finding <id> --json`
+- `providers doctor --json`
 
 It does not call schedule install/remove, backup writes, snapshot writes, restore, Git, or any config mutation command.
 

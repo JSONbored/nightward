@@ -2,7 +2,14 @@ import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { DoctorReport, Finding, FixPlan, ScanReport } from "./types";
+import type {
+  AnalysisReport,
+  DoctorReport,
+  Finding,
+  FixPlan,
+  ProviderStatus,
+  ScanReport,
+} from "./types";
 import { redactText } from "./format";
 
 type ExecFileOptions = {
@@ -81,6 +88,65 @@ export async function explainFinding(
 
 export async function fixPlan(options: RuntimeOptions): Promise<FixPlan> {
   return runNightwardJSON<FixPlan>(["fix", "plan", "--all", "--json"], options);
+}
+
+export async function analysisReport(
+  options: RuntimeOptions,
+): Promise<AnalysisReport> {
+  return runNightwardJSON<AnalysisReport>(
+    ["analyze", "--all", "--json"],
+    options,
+  );
+}
+
+export async function providersDoctor(
+  options: RuntimeOptions,
+): Promise<ProviderStatus[]> {
+  return runNightwardJSON<ProviderStatus[]>(
+    ["providers", "doctor", "--json"],
+    options,
+  );
+}
+
+export async function explainSignal(
+  findingId: string,
+  options: RuntimeOptions,
+): Promise<AnalysisReport> {
+  return runNightwardJSON<AnalysisReport>(
+    ["analyze", "finding", findingId, "--json"],
+    options,
+  );
+}
+
+export async function exportAnalysisMarkdown(
+  options: RuntimeOptions,
+): Promise<string> {
+  const report = await analysisReport(options);
+  return [
+    "# Nightward Analysis",
+    "",
+    `Generated: \`${report.generated_at}\``,
+    `Mode: \`${report.mode}\``,
+    `Signals: \`${report.summary.total_signals}\``,
+    `Highest severity: \`${report.summary.highest_severity || "info"}\``,
+    "",
+    ...report.signals.map((signal) =>
+      [
+        `## ${signal.rule}`,
+        "",
+        `- Severity: \`${signal.severity}\``,
+        `- Confidence: \`${signal.confidence}\``,
+        `- Provider: \`${signal.provider}\``,
+        signal.path ? `- Path: \`${signal.path}\`` : "",
+        "",
+        redactText(signal.message),
+        "",
+        `Recommended action: ${redactText(signal.recommended_action)}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    ),
+  ].join("\n");
 }
 
 export async function exportFixPlanMarkdown(

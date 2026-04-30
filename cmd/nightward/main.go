@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/shadowbook/nightward/internal/cli"
+	"github.com/jsonbored/nightward/internal/cli"
 )
 
 func main() {

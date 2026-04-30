@@ -204,6 +204,42 @@ func TestScannerDoesNotWriteToHome(t *testing.T) {
 	}
 }
 
+func TestWorkspaceScannerFindsRepoAIConfigAndSecrets(t *testing.T) {
+	workspace := t.TempDir()
+	writeFile(t, filepath.Join(workspace, ".cursor", "mcp.json"), `{
+  "mcpServers": {
+    "local": {
+      "url": "http://127.0.0.1:8787/mcp",
+      "headers": {
+        "Authorization": "${MCP_TOKEN}"
+      }
+    }
+  }
+}`)
+	writeFile(t, filepath.Join(workspace, ".env"), "TOKEN=super-secret-value\n")
+
+	scanner := NewWorkspaceScanner(workspace)
+	scanner.Now = func() time.Time { return time.Date(2026, 4, 30, 7, 0, 0, 0, time.UTC) }
+	report := scanner.Scan()
+
+	if report.ScanMode != "workspace" || report.Workspace != workspace {
+		t.Fatalf("unexpected workspace report metadata: %#v", report)
+	}
+	if report.Summary.ItemsByClassification[SecretAuth] != 1 {
+		t.Fatalf("expected secret workspace item, got %#v", report.Summary.ItemsByClassification)
+	}
+	if report.Summary.FindingsByRule["mcp_local_endpoint"] != 1 || report.Summary.FindingsByRule["mcp_secret_header"] != 1 {
+		t.Fatalf("expected URL/header MCP findings, got %#v", report.Summary.FindingsByRule)
+	}
+	data, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "super-secret-value") {
+		t.Fatal("workspace scan leaked .env contents")
+	}
+}
+
 func TestScannerFindsExpandedAdaptersWithConservativeClassifications(t *testing.T) {
 	home := t.TempDir()
 	writeFile(t, filepath.Join(home, ".config", "zed", "settings.json"), `{}`)
