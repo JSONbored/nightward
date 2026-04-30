@@ -42,3 +42,5 @@ New adapters must include:
 - conservative classification for app databases, auth, model blobs, caches, and extension storage
 
 If an adapter parses executable config, its findings should include remediation metadata and never emit secret values.
+
+MCP adapters should treat URL-shaped remote servers as first-class config, not as unknown commands. They should still flag sensitive headers and local/private endpoints without printing header values or URL path/query details.

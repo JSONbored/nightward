@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shadowbook/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/inventory"
 )
 
 func TestBuildGroupsFixStatusesAndRedacts(t *testing.T) {
