@@ -23,6 +23,8 @@ Open a private security advisory through [GitHub Security Advisories](https://gi
 
 Do not include real tokens, auth files, private MCP configs, or personal paths in reports. Redact values and keep only the minimum config shape needed to reproduce the issue.
 
+Maintainers aim to acknowledge vulnerability reports within 14 days. If no public response is appropriate, acknowledgement may happen privately in the GitHub Security Advisory thread.
+
 ## What Counts
 
 - Secret value disclosure in any output surface.
