@@ -19,6 +19,7 @@ make trunk-flaky-validate
 make trunk-check
 make ci-scripts-test
 make raycast-verify
+make npm-package-verify
 make release-snapshot
 make verify
 ```
@@ -45,6 +46,7 @@ make verify
 - `make coverage-check` enforces at least 80% combined statement coverage for `./internal/...`.
 - `make ci-scripts-test` verifies repository-maintained CI helper scripts such as DCO checking.
 - Raycast dependency audits run with `npm audit --audit-level=moderate`.
+- The npm launcher tests run with `make npm-package-verify`, including unit tests, `npm audit`, and `npm pack --dry-run`.
 
 ## Trunk Flaky Tests
 
@@ -78,3 +80,17 @@ npm run build
 ```
 
 `npm run dev` is the manual smoke path when the Raycast CLI is available. Do not run `npm run publish` unless release/publish scope is explicit.
+
+## NPM Launcher
+
+The release-gated npm package lives under `packages/npm`.
+
+```sh
+cd packages/npm
+npm ci
+npm test
+npm audit --audit-level=moderate
+npm run pack:dry-run
+```
+
+The launcher must remain dependency-light, avoid `postinstall`, and verify downloaded GitHub Release archives against `checksums.txt` before extraction.

@@ -198,6 +198,36 @@ jobs:
         run: npm run build
         working-directory: integrations/raycast
 
+  npm-package:
+    name: NPM package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: packages/npm/package-lock.json
+
+      - name: Install npm package dependencies
+        run: npm ci --ignore-scripts --no-audit
+        working-directory: packages/npm
+
+      - name: Test npm launcher
+        run: npm test
+        working-directory: packages/npm
+
+      - name: Audit npm launcher dependencies
+        run: npm audit --audit-level=moderate
+        working-directory: packages/npm
+
+      - name: Dry-run npm package
+        run: npm run pack:dry-run
+        working-directory: packages/npm
+
   gitleaks:
     name: Secret scan
     runs-on: ubuntu-latest

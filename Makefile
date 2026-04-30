@@ -9,10 +9,11 @@ GORELEASER_VERSION ?= v2.9.0
 SYFT_VERSION ?= v1.43.0
 COVERAGE_THRESHOLD ?= 80.0
 RAYCAST_DIR ?= integrations/raycast
+NPM_PACKAGE_DIR ?= packages/npm
 GO_PACKAGES ?= $(shell go list ./cmd/... ./internal/... ./tools/...)
 COVERAGE_PACKAGES ?= ./internal/...
 
-.PHONY: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage coverage-check go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-verify tool-syft release-snapshot verify build install-local clean-reports
+.PHONY: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage coverage-check go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify tool-syft release-snapshot verify build install-local clean-reports
 
 test:
 	go test $(GO_PACKAGES)
@@ -90,13 +91,27 @@ raycast-build:
 
 raycast-verify: raycast-install raycast-test raycast-audit raycast-lint raycast-build
 
+npm-package-install:
+	cd $(NPM_PACKAGE_DIR) && npm ci --ignore-scripts --no-audit
+
+npm-package-test:
+	cd $(NPM_PACKAGE_DIR) && npm test
+
+npm-package-audit:
+	cd $(NPM_PACKAGE_DIR) && npm audit --audit-level=moderate
+
+npm-package-pack:
+	cd $(NPM_PACKAGE_DIR) && npm run pack:dry-run
+
+npm-package-verify: npm-package-install npm-package-test npm-package-audit npm-package-pack
+
 tool-syft:
 	go install github.com/anchore/syft/cmd/syft@$(SYFT_VERSION)
 
 release-snapshot: tool-syft
 	PATH="$$(go env GOPATH)/bin:$$PATH" go run github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION) release --snapshot --clean --skip=publish,sign
 
-verify: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage-check test-junit trunk-flaky-validate trunk-check ci-scripts-test raycast-audit raycast-lint raycast-build
+verify: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage-check test-junit trunk-flaky-validate trunk-check ci-scripts-test raycast-audit raycast-lint raycast-build npm-package-verify
 
 build:
 	go build -o bin/nightward ./cmd/nightward

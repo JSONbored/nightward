@@ -87,6 +87,16 @@ This installs:
 - `nightward`: canonical project command
 - `nw`: short alias for frequent terminal/TUI use
 
+After the first tagged release, Nightward will also ship a release-gated npm launcher:
+
+```sh
+npx nightward --help
+npm install -g nightward
+nw scan --json
+```
+
+The npm package is intentionally a thin launcher for GitHub Release binaries. It does not run a `postinstall` script; on first execution it downloads the matching release archive, verifies the archive SHA-256 from `checksums.txt`, caches the binaries locally, and then runs `nightward` or `nw`.
+
 ## Quick Start
 
 Open the TUI:
@@ -349,6 +359,7 @@ make trunk-flaky-validate
 make trunk-check
 make ci-scripts-test
 make raycast-verify
+make npm-package-verify
 make release-snapshot
 make verify
 go run ./cmd/nightward --help
@@ -387,6 +398,7 @@ make release-snapshot
 - [Code of conduct](CODE_OF_CONDUCT.md)
 - [Support](SUPPORT.md)
 - [Roadmap](ROADMAP.md)
+- [Install and release channels](docs/install.md)
 - [Adapters](docs/adapters.md)
 - [Analysis](docs/analysis.md)
 - [Remediation](docs/remediation.md)
@@ -395,6 +407,7 @@ make release-snapshot
 - [GitHub Action](docs/action.md)
 - [Raycast extension](docs/raycast-extension.md)
 - [CI/security notes](docs/ci-security.md)
+- [Release process](docs/release.md)
 - [Threat model](docs/threat-model.md)
 - [OpenSSF evidence](docs/openssf-best-practices.md)
 - [Privacy model](docs/privacy-model.md)

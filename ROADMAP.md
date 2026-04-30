@@ -13,6 +13,7 @@ Nightward is intentionally staged. The scanner and policy model need to stay tru
 - Read-only snapshot plan and diff commands.
 - SARIF and policy output for CI.
 - GitHub Action wrapper for repository policy checks.
+- Release-gated npm launcher package with checksum verification and no postinstall.
 - Read-only Raycast extension for scan summaries, findings, redacted fix-plan export, and report-folder access.
 - User-level nightly schedule generation.
 - Trunk Check and Trunk Flaky Tests JUnit validation.
@@ -25,8 +26,7 @@ Nightward is intentionally staged. The scanner and policy model need to stay tru
 - Bubble Tea/Bubbles TUI upgrade with list, table, viewport, textinput, help, filter modal, command palette, report history, and mouse-wheel support.
 - Optional provider execution for local scanners with timeouts, file-size caps, redaction, and explicit online-provider opt-in.
 - Fuzz coverage for MCP JSON/TOML/YAML parsing, URL/header redaction, symlink traversal, huge files, and malformed configs.
-- Validate GoReleaser on the first release candidate tag.
-- Add SLSA provenance/attestation after the first release snapshot and signed checksum flow are stable.
+- Add SLSA provenance/attestation after signed checksum and npm provenance flow are stable.
 - Screenshot and GIF assets for the README.
 
 ## Later

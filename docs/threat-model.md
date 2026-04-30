@@ -17,7 +17,7 @@ Nightward inspects local AI agent and devtool state, so its primary risk is acci
 - Optional providers are execution boundaries. They are discovered but not installed or run online by default.
 - GitHub Actions and Trunk integrations treat repository contents and PR input as untrusted.
 - Scheduler install/remove is an explicit write boundary and must stay user-level.
-- Release automation is a privileged publishing boundary.
+- Release automation and npm publishing are privileged publishing boundaries.
 
 ## Threats And Controls
 
@@ -25,7 +25,7 @@ Nightward inspects local AI agent and devtool state, so its primary risk is acci
 - Unexpected mutation: scan, doctor, findings, fix, policy, backup-plan, snapshot, analysis, TUI, Raycast, and GitHub Action policy paths stay read-only except explicit output files.
 - Unsafe portability: classify secret-auth, app-owned, runtime-cache, machine-local, and unknown state conservatively.
 - MCP execution ambiguity: flag shell wrappers, broad filesystem access, unpinned package execution, local endpoints, sensitive headers/env, token paths, and unknown shapes.
-- Supply-chain compromise: pin GitHub Actions by full SHA, use Renovate, run Gitleaks/govulncheck/OSV/CodeQL/gosec/staticcheck/Trunk, and keep release artifacts signed.
+- Supply-chain compromise: pin GitHub Actions by full SHA, use Renovate, run Gitleaks/govulncheck/OSV/CodeQL/gosec/staticcheck/Trunk, keep release artifacts signed, and keep the npm package as a no-postinstall launcher that verifies archive checksums.
 - Malformed config denial-of-service: keep parser/fuzz tests for MCP JSON/TOML/YAML and add size/symlink hardening as the scanner expands.
 
 ## Non-Goals
@@ -36,4 +36,4 @@ Nightward does not back up, restore, sync, push to Git, or mutate agent configs 
 
 ## Review Triggers
 
-Update this model before adding live config mutation, restore, encrypted sync, online provider execution, hosted dashboards, release publishing changes, or new writable integrations.
+Update this model before adding live config mutation, restore, encrypted sync, online provider execution, hosted dashboards, release/npm publishing changes, or new writable integrations.

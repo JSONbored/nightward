@@ -34,9 +34,12 @@
     },
     {
       "matchManagers": ["npm"],
-      "matchFileNames": ["integrations/raycast/package.json"],
-      "groupName": "raycast extension npm packages",
-      "labels": ["dependencies", "raycast", "npm"]
+      "matchFileNames": [
+        "integrations/raycast/package.json",
+        "packages/npm/package.json"
+      ],
+      "groupName": "npm packages",
+      "labels": ["dependencies", "npm"]
     },
     {
       "matchPackageNames": ["gotest.tools/gotestsum"],

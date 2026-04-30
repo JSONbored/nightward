@@ -4,11 +4,11 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 
 ## Workflows
 
-- `ci.yml`: Go tests, race tests, coverage gate, `go vet`, `staticcheck`, `gosec`, fuzz smoke tests, JUnit reports, local JUnit shape validation, gated Trunk Flaky Tests uploads, explicit Trunk Check CLI execution, Raycast extension tests/build/audit, Gitleaks, govulncheck, OSV dependency scanning, DCO checking, and GoReleaser snapshot validation.
+- `ci.yml`: Go tests, race tests, coverage gate, `go vet`, `staticcheck`, `gosec`, fuzz smoke tests, JUnit reports, local JUnit shape validation, gated Trunk Flaky Tests uploads, explicit Trunk Check CLI execution, Raycast extension tests/build/audit, npm launcher tests/audit/package dry-run, Gitleaks, govulncheck, OSV dependency scanning, DCO checking, and GoReleaser snapshot validation.
 - `nightward-policy.yml`: generates workspace Nightward SARIF and uploads it to GitHub code scanning without scanning synthetic risky fixture homes.
 - `plugin.yaml`: defines Trunk Check linters for workspace policy and analysis SARIF once release tags are available.
 - `scorecard.yml`: runs OpenSSF Scorecard on PRs, `main`, branch-protection changes, and a weekly schedule. PR runs do not publish results or upload SARIF; `main` and scheduled runs upload SARIF.
-- `release.yml`: publishes signed GoReleaser artifacts from strict `vX.Y.Z` tags.
+- `release.yml`: publishes signed GoReleaser artifacts from strict `vX.Y.Z` tags and can publish the npm launcher only when explicitly enabled.
 - `renovate.json`: manages Go modules, Raycast npm packages, pinned GitHub Actions, local tool pins, and release tooling updates.
 
 ## Action Policy
@@ -28,6 +28,7 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 - Keep Trunk Flaky Tests secrets scoped to the detection/upload steps only.
 - Keep composite action output/config paths relative to `GITHUB_WORKSPACE`; reject absolute paths, parent traversal, and newlines.
 - Require DCO sign-offs on pull request commits.
+- Keep the npm package free of `postinstall`; publish only from reviewed tags with provenance.
 
 ## Trunk Plugin Notes
 
@@ -45,6 +46,5 @@ trunk check enable nightward-policy
 
 ## Release Hardening Backlog
 
-- Validate GoReleaser on the first release candidate tag.
 - Add provenance once release artifact flow is stable.
 - Defer Homebrew tap automation until the first tagged release.

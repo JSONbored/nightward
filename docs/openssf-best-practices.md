@@ -13,7 +13,7 @@ Project badge: <https://www.bestpractices.dev/projects/12713>
 - Documentation basics and interface docs: README plus `docs/action.md`, `docs/analysis.md`, `docs/remediation.md`, `docs/privacy-model.md`, and `docs/adapters.md`.
 - Discussion and report archive: <https://github.com/JSONbored/nightward/issues>
 - Vulnerability reporting: <https://github.com/JSONbored/nightward/blob/main/SECURITY.md>
-- Build system: `Makefile`, `go.mod`, Raycast `package-lock.json`, and GitHub Actions.
+- Build system: `Makefile`, `go.mod`, Raycast and npm launcher `package-lock.json` files, and GitHub Actions.
 - Tests: `make test`, `make test-race`, `make test-junit`, `make coverage-check`, `make verify`.
 - CI: `.github/workflows/ci.yml`, `.github/workflows/nightward-policy.yml`, `.github/workflows/scorecard.yml`.
 - Static analysis: `go vet`, `staticcheck`, `gosec`, Trunk Check, CodeQL, Gitleaks, govulncheck, OSV, and Nightward SARIF.
@@ -35,7 +35,7 @@ The release pipeline uses external tools for signing release checksums and SBOM 
 - Architecture/security model: `docs/privacy-model.md`, `docs/threat-model.md`, `docs/ci-security.md`, and `docs/remediation.md`.
 - Dependency maintenance: <https://github.com/JSONbored/nightward/blob/main/docs/dependency-maintenance.md>
 - DCO: `CONTRIBUTING.md` and the CI DCO sign-off job.
-- Release readiness: `.goreleaser.yml`, `make release-snapshot`, signed checksum config, SBOM config, and release workflow.
+- Release readiness: `.goreleaser.yml`, `make release-snapshot`, signed checksum config, SBOM config, release workflow, and release-gated npm launcher package.
 
 ## Manual Badge Actions
 
