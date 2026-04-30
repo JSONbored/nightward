@@ -16,6 +16,7 @@ import (
 	"github.com/shadowbook/nightward/internal/inventory"
 	"github.com/shadowbook/nightward/internal/policy"
 	"github.com/shadowbook/nightward/internal/schedule"
+	"github.com/shadowbook/nightward/internal/snapshot"
 	"github.com/shadowbook/nightward/internal/tui"
 )
 
@@ -82,10 +83,65 @@ func RunWithName(commandName string, args []string, stdout, stderr io.Writer) in
 		return runFix(home, args[1:], stdout, stderr)
 	case "policy":
 		return runPolicy(home, args[1:], stdout, stderr)
+	case "snapshot":
+		return runSnapshot(home, args[1:], stdout, stderr)
 	case "schedule":
 		return runSchedule(home, args[1:], stdout, stderr)
 	default:
 		return fail(stderr, "unknown command %q\n\nRun `%s --help` for usage.", args[0], commandName)
+	}
+	return 0
+}
+
+func runSnapshot(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		return fail(stderr, "usage: nightward snapshot <plan|diff> [flags]")
+	}
+	switch args[0] {
+	case "plan":
+		fs := flag.NewFlagSet("snapshot plan", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		target := fs.String("target", "", "snapshot target root")
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if *target == "" {
+			return fail(stderr, "missing required --target")
+		}
+		report := inventory.NewScanner(home).Scan()
+		plan := snapshot.Build(report, expandHome(home, *target))
+		if *jsonOut {
+			return writeJSON(stdout, plan, stderr)
+		}
+		printSnapshotPlan(stdout, plan)
+	case "diff":
+		fs := flag.NewFlagSet("snapshot diff", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		fromPath := fs.String("from", "", "previous snapshot plan JSON")
+		toPath := fs.String("to", "", "new snapshot plan JSON")
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if *fromPath == "" || *toPath == "" {
+			return fail(stderr, "missing required --from and --to")
+		}
+		from, err := snapshot.Load(expandHome(home, *fromPath))
+		if err != nil {
+			return fail(stderr, "failed to load --from snapshot: %v", err)
+		}
+		to, err := snapshot.Load(expandHome(home, *toPath))
+		if err != nil {
+			return fail(stderr, "failed to load --to snapshot: %v", err)
+		}
+		diff := snapshot.Compare(*fromPath, *toPath, from, to)
+		if *jsonOut {
+			return writeJSON(stdout, diff, stderr)
+		}
+		printSnapshotDiff(stdout, diff)
+	default:
+		return fail(stderr, "usage: nightward snapshot <plan|diff> [flags]")
 	}
 	return 0
 }
@@ -218,7 +274,7 @@ func runFindings(home string, args []string, stdout, stderr io.Writer) int {
 
 func runFix(home string, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		return fail(stderr, "usage: nightward fix <plan|export> [flags]")
+		return fail(stderr, "usage: nightward fix <plan|preview|export> [flags]")
 	}
 	report := inventory.NewScanner(home).Scan()
 	switch args[0] {
@@ -241,6 +297,31 @@ func runFix(home string, args []string, stdout, stderr io.Writer) int {
 			return writeJSON(stdout, plan, stderr)
 		}
 		printFixPlan(stdout, plan)
+	case "preview":
+		fs := flag.NewFlagSet("fix preview", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		format := fs.String("format", "diff", "preview format: diff, markdown, or json")
+		findingID := fs.String("finding", "", "limit to a finding ID or unique prefix")
+		rule := fs.String("rule", "", "limit to a rule ID")
+		all := fs.Bool("all", false, "include all findings")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		selector, err := fixSelector(report, *findingID, *rule, *all)
+		if err != nil {
+			return fail(stderr, err.Error())
+		}
+		preview := fixplan.BuildPreview(report, selector)
+		switch *format {
+		case "json":
+			return writeJSON(stdout, preview, stderr)
+		case "markdown", "md":
+			fmt.Fprint(stdout, fixplan.PreviewMarkdown(preview))
+		case "diff":
+			fmt.Fprint(stdout, fixplan.PreviewDiff(preview))
+		default:
+			return fail(stderr, "unsupported fix preview format %q", *format)
+		}
 	case "export":
 		fs := flag.NewFlagSet("fix export", flag.ContinueOnError)
 		fs.SetOutput(stderr)
@@ -265,26 +346,49 @@ func runFix(home string, args []string, stdout, stderr io.Writer) int {
 			return fail(stderr, "unsupported fix export format %q", *format)
 		}
 	default:
-		return fail(stderr, "usage: nightward fix <plan|export> [flags]")
+		return fail(stderr, "usage: nightward fix <plan|preview|export> [flags]")
 	}
 	return 0
 }
 
 func runPolicy(home string, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		return fail(stderr, "usage: nightward policy <check|sarif> [flags]")
+		return fail(stderr, "usage: nightward policy <init|explain|check|sarif> [flags]")
 	}
-	report := inventory.NewScanner(home).Scan()
 	switch args[0] {
+	case "init":
+		fs := flag.NewFlagSet("policy init", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		dryRun := fs.Bool("dry-run", false, "print default policy config without writing")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if !*dryRun {
+			return fail(stderr, "policy init is dry-run only in this release; rerun with --dry-run")
+		}
+		fmt.Fprint(stdout, policy.DefaultConfigYAML())
+	case "explain":
+		fs := flag.NewFlagSet("policy explain", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		fmt.Fprint(stdout, policy.Explain())
 	case "check":
 		fs := flag.NewFlagSet("policy check", flag.ContinueOnError)
 		fs.SetOutput(stderr)
 		strict := fs.Bool("strict", false, "fail on medium or higher findings")
 		jsonOut := fs.Bool("json", false, "print JSON output")
+		configPath := fs.String("config", "", "optional .nightward.yml policy config")
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
-		policyReport := policy.Check(report, *strict)
+		config, err := policy.LoadConfig(expandConfigPath(home, *configPath))
+		if err != nil {
+			return fail(stderr, "failed to load policy config: %v", err)
+		}
+		report := inventory.NewScanner(home).Scan()
+		policyReport := policy.CheckWithOptions(report, policy.Options{Strict: *strict, Config: config})
 		if *jsonOut {
 			code := writeJSON(stdout, policyReport, stderr)
 			if code != 0 {
@@ -300,15 +404,21 @@ func runPolicy(home string, args []string, stdout, stderr io.Writer) int {
 		fs := flag.NewFlagSet("policy sarif", flag.ContinueOnError)
 		fs.SetOutput(stderr)
 		output := fs.String("output", "nightward.sarif", "write SARIF report to this path")
+		configPath := fs.String("config", "", "optional .nightward.yml policy config")
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
-		if err := policy.WriteSARIF(report, *output); err != nil {
+		config, err := policy.LoadConfig(expandConfigPath(home, *configPath))
+		if err != nil {
+			return fail(stderr, "failed to load policy config: %v", err)
+		}
+		report := inventory.NewScanner(home).Scan()
+		if err := policy.WriteSARIFWithConfig(report, *output, config); err != nil {
 			return fail(stderr, "failed to write SARIF: %v", err)
 		}
 		fmt.Fprintf(stdout, "Wrote SARIF policy report to %s\n", *output)
 	default:
-		return fail(stderr, "usage: nightward policy <check|sarif> [flags]")
+		return fail(stderr, "usage: nightward policy <init|explain|check|sarif> [flags]")
 	}
 	return 0
 }
@@ -478,9 +588,14 @@ Usage:
   %[1]s findings list [--json]
   %[1]s findings explain <finding-id> [--json]
   %[1]s fix plan [--finding <id>|--rule <rule>|--all] [--json]
+  %[1]s fix preview [--finding <id>|--rule <rule>|--all] [--format diff|json|markdown]
   %[1]s fix export --format markdown|json
-  %[1]s policy check [--strict] [--json]
-  %[1]s policy sarif --output nightward.sarif
+  %[1]s policy init --dry-run
+  %[1]s policy explain
+  %[1]s policy check [--config .nightward.yml] [--strict] [--json]
+  %[1]s policy sarif [--config .nightward.yml] --output nightward.sarif
+  %[1]s snapshot plan --target <dir> [--json]
+  %[1]s snapshot diff --from <plan.json> --to <plan.json> [--json]
   %[1]s schedule plan --preset nightly [--json]
   %[1]s schedule install --preset nightly --dry-run [--json]
   %[1]s schedule remove --dry-run [--json]
@@ -589,6 +704,27 @@ func printPolicy(w io.Writer, report policy.Report) {
 	}
 }
 
+func printSnapshotPlan(w io.Writer, plan snapshot.Plan) {
+	fmt.Fprintf(w, "Snapshot dry-run plan for %s\n", plan.TargetRoot)
+	fmt.Fprintf(w, "  total: %d  include: %d  review: %d  exclude: %d\n", plan.Summary.Total, plan.Summary.Include, plan.Summary.Review, plan.Summary.Excluded)
+	for _, entry := range plan.Entries {
+		fmt.Fprintf(w, "  %-7s %-12s %s -> %s\n", entry.Action, entry.Tool, entry.Source, entry.Target)
+	}
+}
+
+func printSnapshotDiff(w io.Writer, diff snapshot.Diff) {
+	fmt.Fprintf(w, "Snapshot diff: added=%d removed=%d changed=%d\n", diff.Summary.Added, diff.Summary.Removed, diff.Summary.Changed)
+	for _, entry := range diff.Added {
+		fmt.Fprintf(w, "  added   %-12s %s\n", entry.Tool, entry.Source)
+	}
+	for _, entry := range diff.Removed {
+		fmt.Fprintf(w, "  removed %-12s %s\n", entry.Tool, entry.Source)
+	}
+	for _, change := range diff.Changed {
+		fmt.Fprintf(w, "  changed %-12s %s (%s -> %s)\n", change.After.Tool, change.Source, change.Before.Action, change.After.Action)
+	}
+}
+
 func printSchedulePlan(w io.Writer, plan schedule.Plan) {
 	fmt.Fprintf(w, "Schedule preset: %s (%s)\n", plan.Preset, plan.Platform)
 	fmt.Fprintf(w, "Command: %s\n", strings.Join(plan.Command, " "))
@@ -656,6 +792,13 @@ func expandHome(home, path string) string {
 		return abs
 	}
 	return path
+}
+
+func expandConfigPath(home, path string) string {
+	if path == "" {
+		return ""
+	}
+	return expandHome(home, path)
 }
 
 func executablePath() string {

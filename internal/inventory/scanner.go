@@ -253,6 +253,103 @@ func adapters() []adapterSpec {
 			},
 		},
 		{
+			Name:        "JetBrains",
+			Description: "JetBrains IDE settings, plugins, and AI assistant state.",
+			Paths: []pathSpec{
+				machineLocal("JetBrains", "~/Library/Application Support/JetBrains", "JetBrains settings can mix portable IDE preferences with local paths, plugins, and account state."),
+				appOwned("JetBrains", "~/Library/Caches/JetBrains", "JetBrains caches are generated runtime state."),
+				appOwned("JetBrains", "~/Library/Logs/JetBrains", "JetBrains logs are app-owned runtime data."),
+			},
+		},
+		{
+			Name:        "Zed",
+			Description: "Zed editor settings, keymaps, snippets, and assistant state.",
+			Paths: []pathSpec{
+				portable("Zed", "~/.config/zed/settings.json", "Zed settings are potentially portable after reviewing local model/provider assumptions.", false),
+				portable("Zed", "~/.config/zed/keymap.json", "Zed keymaps are usually portable editor settings.", false),
+				portableDir("Zed", "~/.config/zed/snippets", "Zed snippets are usually portable."),
+				appOwned("Zed", "~/Library/Application Support/Zed", "Zed application support can include app-owned databases, sessions, and extension state."),
+			},
+		},
+		{
+			Name:        "Continue",
+			Description: "Continue.dev assistant configuration and local indexes.",
+			Paths: []pathSpec{
+				portable("Continue", "~/.continue/config.json", "Continue config is potentially portable after provider, model, and path review.", true),
+				portable("Continue", "~/.continue/config.yaml", "Continue config is potentially portable after provider, model, and path review.", true),
+				portable("Continue", "~/.continue/config.ts", "Continue TypeScript config may be portable, but executable config needs review.", false),
+				runtime("Continue", "~/.continue/index", "Continue local indexes are generated runtime data."),
+				appOwned("Continue", "~/.continue/sessions", "Continue session history is app-owned state."),
+			},
+		},
+		{
+			Name:        "Cline/Roo",
+			Description: "Cline and Roo Code extension storage inside VS Code-compatible editors.",
+			Paths: []pathSpec{
+				appOwned("Cline/Roo", "~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev", "Cline extension storage may contain prompts, secrets, and app-owned state."),
+				appOwned("Cline/Roo", "~/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline", "Roo Code extension storage may contain prompts, secrets, and app-owned state."),
+				appOwned("Cline/Roo", "~/Library/Application Support/Cursor/User/globalStorage/saoudrizwan.claude-dev", "Cursor Cline extension storage may contain prompts, secrets, and app-owned state."),
+				appOwned("Cline/Roo", "~/Library/Application Support/Cursor/User/globalStorage/rooveterinaryinc.roo-cline", "Cursor Roo Code extension storage may contain prompts, secrets, and app-owned state."),
+			},
+		},
+		{
+			Name:        "Aider",
+			Description: "Aider CLI preferences, model settings, and generated caches.",
+			Paths: []pathSpec{
+				portable("Aider", "~/.aider.conf.yml", "Aider config is potentially portable after provider and path review.", false),
+				portable("Aider", "~/.aider.model.settings.yml", "Aider model settings are potentially portable after provider review.", false),
+				appOwned("Aider", "~/.aider.chat.history.md", "Aider chat history is app-owned local session state."),
+				runtime("Aider", "~/.aider.tags.cache.v4", "Aider tag cache is generated runtime data."),
+			},
+		},
+		{
+			Name:        "OpenCode",
+			Description: "OpenCode configuration and local state.",
+			Paths: []pathSpec{
+				portable("OpenCode", "~/.opencode.json", "OpenCode config is potentially portable after provider and path review.", true),
+				portable("OpenCode", "~/.config/opencode/opencode.json", "OpenCode config is potentially portable after provider and path review.", true),
+				appOwned("OpenCode", "~/.local/share/opencode", "OpenCode local share data is app-owned state."),
+			},
+		},
+		{
+			Name:        "Goose",
+			Description: "Block Goose agent configuration and local state.",
+			Paths: []pathSpec{
+				portable("Goose", "~/.config/goose/config.yaml", "Goose config is potentially portable after provider and extension review.", true),
+				machineLocal("Goose", "~/.config/goose", "Goose config directories can include local extensions, paths, and provider assumptions."),
+				appOwned("Goose", "~/.local/share/goose", "Goose local share data is app-owned state."),
+			},
+		},
+		{
+			Name:        "LM Studio",
+			Description: "LM Studio model, server, and application state.",
+			Paths: []pathSpec{
+				machineLocal("LM Studio", "~/.lmstudio/config.json", "LM Studio config can include local model and server assumptions."),
+				appOwned("LM Studio", "~/.lmstudio/models", "LM Studio model files are app-owned heavy runtime assets."),
+				appOwned("LM Studio", "~/Library/Application Support/LM Studio", "LM Studio app support is app-owned runtime state."),
+			},
+		},
+		{
+			Name:        "Ollama/Open WebUI",
+			Description: "Local model runtime and Open WebUI state.",
+			Paths: []pathSpec{
+				machineLocal("Ollama/Open WebUI", "~/.ollama/config.json", "Ollama config can include local runtime assumptions."),
+				secret("Ollama/Open WebUI", "~/.ollama/id_ed25519", "Ollama identity material must not be copied to dotfiles."),
+				appOwned("Ollama/Open WebUI", "~/.ollama/models", "Ollama model blobs are app-owned heavy runtime assets."),
+				appOwned("Ollama/Open WebUI", "~/.open-webui", "Open WebUI local state can include databases, uploads, and credentials."),
+				machineLocal("Ollama/Open WebUI", "~/.config/open-webui", "Open WebUI config can include machine-local service assumptions."),
+			},
+		},
+		{
+			Name:        "Neovim",
+			Description: "Neovim configuration and AI plugin state.",
+			Paths: []pathSpec{
+				portableDir("Neovim", "~/.config/nvim", "Neovim config is usually portable, but plugin-managed AI credentials must stay external."),
+				appOwned("Neovim", "~/.local/share/nvim", "Neovim plugin state and package data are app-owned local state."),
+				runtime("Neovim", "~/.cache/nvim", "Neovim cache is generated runtime data."),
+			},
+		},
+		{
 			Name:        "Generic MCP",
 			Description: "Common standalone MCP config files.",
 			Paths: []pathSpec{

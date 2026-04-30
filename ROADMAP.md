@@ -8,26 +8,29 @@ Nightward is intentionally staged. The scanner and policy model need to stay tru
 - Redacted JSON scan and doctor output.
 - Read-only backup dry-run plans.
 - Read-only remediation plans for MCP/security findings.
+- Redacted fix previews for parseable MCP config changes.
+- Optional `.nightward.yml` policy config with reason-required ignores.
+- Read-only snapshot plan and diff commands.
 - SARIF and policy output for CI.
+- GitHub Action wrapper for repository policy checks.
 - User-level nightly schedule generation.
+- Trunk Check and Trunk Flaky Tests JUnit validation.
 
 ## Next
 
 - More MCP config shapes for Codex, Claude Code, and editor integrations.
 - Richer TUI actions with real clipboard/export/open-doc behavior behind explicit keypresses.
 - Golden SARIF snapshots and broader no-write tests.
-- GoReleaser config after CI proves stable.
-- Signed releases with Sigstore/Cosign.
+- Validate GoReleaser on the first release candidate tag.
 - Screenshot and GIF assets for the README.
+- Raycast extension after CLI output remains stable across one tagged release.
 
 ## Later
 
 - Encrypted local snapshots.
 - Cross-machine diff.
-- Raycast extension.
 - Private dotfiles integration.
 - Docker/Unraid dashboard.
-- GitHub Action wrapper for repository policy checks.
 - Restore workflow only after snapshot, preview, rollback, and secret-safety controls exist.
 
 ## Non-Goals For V1

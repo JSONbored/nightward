@@ -7,7 +7,7 @@
 
 Nightward is a local-first TUI and CLI for auditing AI agent and devtool state before it leaks into dotfiles.
 
-It scans common Codex, Claude, Cursor, Windsurf, VS Code, Raycast, and MCP config locations; classifies what is portable versus local-only or secret; highlights MCP security findings; and produces redacted fix plans, SARIF policy output, and dry-run backup plans.
+It scans common Codex, Claude, Cursor, Windsurf, VS Code, Raycast, JetBrains, Zed, Continue, Cline/Roo, Aider, OpenCode, Goose, LM Studio, Ollama/Open WebUI, Neovim, and MCP config locations; classifies what is portable versus local-only or secret; highlights MCP security findings; and produces redacted fix plans, fix previews, SARIF policy output, snapshot plans, and dry-run backup plans.
 
 Nightward does not mutate agent configs. It only writes explicit report/SARIF files when requested and user-level schedule files through explicit schedule install/remove commands.
 
@@ -32,6 +32,10 @@ Nightward answers the practical questions first:
 - MCP findings for unpinned package execution, shell wrappers, sensitive env keys, broad filesystem access, token paths, parse failures, and unknown server shapes.
 - Plan-only remediation metadata: fix kind, confidence, risk, review requirement, impact, and steps.
 - SARIF output for GitHub code scanning.
+- Optional `.nightward.yml` policy config with reason-required ignores.
+- Redacted patch previews for parseable MCP config fixes.
+- Read-only snapshot plan/diff commands.
+- Reusable GitHub Action for scan, policy, and SARIF modes.
 - User-level nightly scan scheduling for macOS launchd, Linux systemd user timers, and cron text fallback.
 - No telemetry, no cloud dashboard, no network calls from Nightward runtime, and no live config mutation.
 
@@ -78,13 +82,30 @@ Generate a plan-only fix report:
 ```sh
 nw fix plan --all --json
 nw fix plan --rule mcp_secret_env
+nw fix preview --rule mcp_secret_env --format diff
+nw fix preview --all --format markdown
 nw fix export --format markdown
+```
+
+Create or explain policy config:
+
+```sh
+nw policy init --dry-run
+nw policy explain
+nw policy check --config .nightward.yml --strict --json
 ```
 
 Generate a dry-run backup plan:
 
 ```sh
 nw plan backup --target ~/dotfiles
+```
+
+Generate read-only snapshot plans and compare them:
+
+```sh
+nw snapshot plan --target ~/nightward-snapshots --json
+nw snapshot diff --from before.json --to after.json --json
 ```
 
 Run policy checks or generate SARIF:
@@ -142,9 +163,25 @@ Keyboard shortcuts:
 
 - `1`-`5`: switch tabs
 - arrow keys or `h`/`j`/`k`/`l`: navigate
+- `/`: search findings
 - `s`, `t`, `r`: cycle finding severity, tool, and rule filters
+- `x`: clear finding filters
 - `c`, `e`, `o`: show copy/export/docs action hints
+- `?`: help
 - `q` or `esc`: quit
+
+## GitHub Action
+
+Nightward can run as a local GitHub Action in scan, policy, or SARIF mode:
+
+```yaml
+- uses: JSONbored/nightward@v0.1.0
+  with:
+    mode: sarif
+    output: nightward.sarif
+```
+
+See [docs/action.md](docs/action.md) for inputs, outputs, and SARIF upload examples.
 
 ## Scheduling
 
@@ -165,12 +202,18 @@ Scheduled scans never copy secrets, mutate dotfiles, restore files, or push to G
 ## Development
 
 ```sh
-go test ./...
+make test
+make test-race
+make test-junit
+make trunk-flaky-validate
+make trunk-check
+make verify
 go run ./cmd/nightward --help
 go run ./cmd/nw --help
 go run ./cmd/nw scan --json
 go run ./cmd/nw findings list --json
 go run ./cmd/nw fix plan --all --json
+go run ./cmd/nw fix preview --all --format markdown
 go run ./cmd/nw policy sarif --output /tmp/nightward.sarif
 go run ./cmd/nw schedule install --preset nightly --dry-run
 ```
@@ -178,7 +221,7 @@ go run ./cmd/nw schedule install --preset nightly --dry-run
 Local security checks used by maintainers:
 
 ```sh
-actionlint
+trunk check --show-existing --all
 gitleaks detect --source . --no-git --redact
 go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 ```
@@ -190,9 +233,22 @@ go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 - [Code of conduct](CODE_OF_CONDUCT.md)
 - [Support](SUPPORT.md)
 - [Roadmap](ROADMAP.md)
+- [Adapters](docs/adapters.md)
+- [Remediation](docs/remediation.md)
+- [Testing](docs/testing.md)
+- [Dependency maintenance](docs/dependency-maintenance.md)
+- [GitHub Action](docs/action.md)
 - [CI/security notes](docs/ci-security.md)
 - [Privacy model](docs/privacy-model.md)
 - [Screenshot/GIF capture plan](docs/screenshots.md)
+
+## Contributors
+
+[![Contributors](https://contrib.rocks/image?repo=JSONbored/nightward)](https://github.com/JSONbored/nightward/graphs/contributors)
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=JSONbored/nightward&type=Date)](https://www.star-history.com/#JSONbored/nightward&Date)
 
 ## License
 

@@ -12,6 +12,7 @@ import (
 func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 	home := t.TempDir()
 	writeTestFile(t, filepath.Join(home, ".mcp.json"), `{"mcpServers":{"demo":{"command":"node","args":["server.js"]}}}`)
+	outputDir := t.TempDir()
 	t.Setenv("NIGHTWARD_HOME", home)
 
 	before := listTestFiles(t, home)
@@ -20,8 +21,13 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 		{"doctor", "--json"},
 		{"findings", "list", "--json"},
 		{"fix", "plan", "--all", "--json"},
+		{"fix", "preview", "--all", "--format", "json"},
 		{"fix", "export", "--format", "markdown"},
 		{"policy", "check", "--json"},
+		{"policy", "init", "--dry-run"},
+		{"policy", "explain"},
+		{"snapshot", "plan", "--target", filepath.Join(home, "snapshot"), "--json"},
+		{"policy", "sarif", "--output", filepath.Join(outputDir, "nightward.sarif")},
 	}
 	for _, args := range commands {
 		var stdout, stderr bytes.Buffer
@@ -67,6 +73,23 @@ func TestFixPlanFindingSelectorRequiresUniquePrefix(t *testing.T) {
 	code = RunWithName("nw", []string{"fix", "plan", "--finding", findings[0].ID, "--json"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exact finding selector failed: %s", stderr.String())
+	}
+}
+
+func TestPolicyCheckUsesConfig(t *testing.T) {
+	home := t.TempDir()
+	writeTestFile(t, filepath.Join(home, ".mcp.json"), `{"mcpServers":{"demo":{"command":"npx","args":["@example/server"]}}}`)
+	config := filepath.Join(home, ".nightward.yml")
+	writeTestFile(t, config, "severity_threshold: medium\ntrusted_packages:\n  - '@example/server'\n")
+	t.Setenv("NIGHTWARD_HOME", home)
+
+	var stdout, stderr bytes.Buffer
+	code := RunWithName("nw", []string{"policy", "check", "--config", config, "--json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("policy check with config failed: stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"ignored": 1`) {
+		t.Fatalf("expected ignored finding in output: %s", stdout.String())
 	}
 }
 

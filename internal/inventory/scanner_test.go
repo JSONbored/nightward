@@ -115,6 +115,39 @@ func TestScannerDoesNotWriteToHome(t *testing.T) {
 	}
 }
 
+func TestScannerFindsExpandedAdaptersWithConservativeClassifications(t *testing.T) {
+	home := t.TempDir()
+	writeFile(t, filepath.Join(home, ".config", "zed", "settings.json"), `{}`)
+	writeFile(t, filepath.Join(home, ".continue", "config.json"), `{"mcpServers":{"demo":{"command":"node","args":["server.js"]}}}`)
+	writeFile(t, filepath.Join(home, ".aider.conf.yml"), "model: sonnet\n")
+	writeFile(t, filepath.Join(home, ".ollama", "id_ed25519"), "PRIVATE KEY")
+	writeFile(t, filepath.Join(home, ".config", "nvim", "init.lua"), "-- config\n")
+
+	report := NewScanner(home).Scan()
+	found := map[string]Item{}
+	for _, item := range report.Items {
+		found[item.Tool+":"+item.Path] = item
+	}
+
+	assertClass := func(tool, rel string, class Classification) {
+		t.Helper()
+		path := filepath.Join(home, rel)
+		item, ok := found[tool+":"+path]
+		if !ok {
+			t.Fatalf("missing %s item for %s", tool, path)
+		}
+		if item.Classification != class {
+			t.Fatalf("%s classified as %s, want %s", path, item.Classification, class)
+		}
+	}
+
+	assertClass("Zed", filepath.Join(".config", "zed", "settings.json"), Portable)
+	assertClass("Continue", filepath.Join(".continue", "config.json"), Portable)
+	assertClass("Aider", ".aider.conf.yml", Portable)
+	assertClass("Ollama/Open WebUI", filepath.Join(".ollama", "id_ed25519"), SecretAuth)
+	assertClass("Neovim", filepath.Join(".config", "nvim"), Portable)
+}
+
 func writeFile(t *testing.T, path, contents string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {

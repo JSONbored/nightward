@@ -14,16 +14,19 @@ import (
 )
 
 type model struct {
-	report   inventory.Report
-	schedule schedule.Plan
-	tab      int
-	cursor   int
-	width    int
-	height   int
-	severity string
-	tool     string
-	rule     string
-	status   string
+	report    inventory.Report
+	schedule  schedule.Plan
+	tab       int
+	cursor    int
+	width     int
+	height    int
+	severity  string
+	tool      string
+	rule      string
+	search    string
+	status    string
+	searching bool
+	showHelp  bool
 }
 
 var (
@@ -76,9 +79,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	case tea.KeyMsg:
+		if m.searching {
+			switch msg.String() {
+			case "enter":
+				m.searching = false
+				m.status = "search: " + filterLabel(m.search)
+			case "esc":
+				m.searching = false
+			case "backspace":
+				if len(m.search) > 0 {
+					m.search = m.search[:len(m.search)-1]
+					m.cursor = 0
+				}
+			case "ctrl+u":
+				m.search = ""
+				m.cursor = 0
+			default:
+				if len(msg.Runes) > 0 {
+					m.search += string(msg.Runes)
+					m.cursor = 0
+				}
+			}
+			return m, nil
+		}
 		switch msg.String() {
 		case "ctrl+c", "q", "esc":
 			return m, tea.Quit
+		case "?":
+			m.showHelp = !m.showHelp
 		case "tab", "right", "l":
 			m.tab = (m.tab + 1) % len(tabs)
 			m.cursor = 0
@@ -113,6 +141,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.rule = cycle(m.rule, ruleOptions(m.report.Findings))
 				m.cursor = 0
 			}
+		case "/":
+			if m.tab == 2 {
+				m.searching = true
+				m.status = "type search, enter to keep, esc to cancel"
+			}
+		case "x":
+			if m.tab == 2 {
+				m.search = ""
+				m.severity = ""
+				m.tool = ""
+				m.rule = ""
+				m.cursor = 0
+				m.status = "filters cleared"
+			}
 		case "c":
 			if finding, ok := m.currentFinding(); ok && len(finding.FixSteps) > 0 {
 				m.status = "copy: " + finding.FixSteps[0]
@@ -145,8 +187,15 @@ func (m model) View() string {
 	bodyHeight := max(12, m.height-7)
 
 	tabLine := lipgloss.JoinHorizontal(lipgloss.Top, titleStyle.Render("nightward"), m.renderTabs())
-	body := panelStyle.Width(bodyWidth).Height(bodyHeight).Render(m.renderBody(bodyWidth-6, bodyHeight-2))
-	footerText := "1-5 tabs  arrows/hjkl navigate  s/t/r filters  c/e/o actions  q quit"
+	bodyText := m.renderBody(bodyWidth-6, bodyHeight-2)
+	if m.showHelp {
+		bodyText = m.help(bodyWidth - 6)
+	}
+	body := panelStyle.Width(bodyWidth).Height(bodyHeight).Render(bodyText)
+	footerText := "1-5 tabs  arrows/hjkl navigate  / search  s/t/r filters  x clear  ? help  q quit"
+	if m.searching {
+		footerText = "search: " + m.search
+	}
 	if m.status != "" {
 		footerText += "  " + m.status
 	}
@@ -245,7 +294,7 @@ func (m model) findings(width, height int) string {
 	}
 	lines := []string{
 		section("Findings"),
-		fmt.Sprintf("severity=%s  tool=%s  rule=%s", filterLabel(m.severity), filterLabel(m.tool), filterLabel(m.rule)),
+		fmt.Sprintf("severity=%s  tool=%s  rule=%s  search=%s", filterLabel(m.severity), filterLabel(m.tool), filterLabel(m.rule), filterLabel(m.search)),
 		"",
 	}
 	visible := max(1, height-5)
@@ -332,9 +381,47 @@ func (m model) filteredFindings() []inventory.Finding {
 		if m.rule != "" && finding.Rule != m.rule {
 			continue
 		}
+		if m.search != "" && !findingMatchesSearch(finding, m.search) {
+			continue
+		}
 		filtered = append(filtered, finding)
 	}
 	return filtered
+}
+
+func findingMatchesSearch(finding inventory.Finding, query string) bool {
+	query = strings.ToLower(query)
+	haystack := strings.ToLower(strings.Join([]string{
+		finding.ID,
+		finding.Tool,
+		finding.Path,
+		finding.Server,
+		finding.Rule,
+		finding.Message,
+		finding.Evidence,
+		finding.Recommendation,
+		finding.FixSummary,
+	}, "\n"))
+	return strings.Contains(haystack, query)
+}
+
+func (m model) help(width int) string {
+	lines := []string{
+		section("Help"),
+		"1-5 or tab: switch tabs",
+		"arrows or h/j/k/l: navigate rows",
+		"s/t/r: cycle severity, tool, and rule filters in Findings",
+		"/: search findings",
+		"x: clear finding filters",
+		"c: show first suggested command or step for selected finding",
+		"e: show export command for fix plan",
+		"o: show docs URL for selected finding",
+		"?: toggle this help",
+		"q or esc: quit",
+		"",
+		"Nightward TUI actions do not mutate agent configs.",
+	}
+	return fitLines(lines, width)
 }
 
 func (m model) currentFinding() (inventory.Finding, bool) {

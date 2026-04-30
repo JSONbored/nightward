@@ -50,24 +50,35 @@ type Item struct {
 }
 
 type Finding struct {
-	ID             string    `json:"id"`
-	Tool           string    `json:"tool"`
-	Path           string    `json:"path"`
-	Severity       RiskLevel `json:"severity"`
-	Rule           string    `json:"rule"`
-	Message        string    `json:"message"`
-	Evidence       string    `json:"evidence,omitempty"`
-	Recommendation string    `json:"recommended_action"`
-	Impact         string    `json:"impact,omitempty"`
-	Why            string    `json:"why_this_matters,omitempty"`
-	DocsURL        string    `json:"docs_url,omitempty"`
-	FixAvailable   bool      `json:"fix_available"`
-	FixKind        FixKind   `json:"fix_kind,omitempty"`
-	Confidence     string    `json:"confidence,omitempty"`
-	Risk           RiskLevel `json:"risk,omitempty"`
-	RequiresReview bool      `json:"requires_review"`
-	FixSummary     string    `json:"fix_summary,omitempty"`
-	FixSteps       []string  `json:"fix_steps,omitempty"`
+	ID             string     `json:"id"`
+	Tool           string     `json:"tool"`
+	Path           string     `json:"path"`
+	Server         string     `json:"server,omitempty"`
+	Severity       RiskLevel  `json:"severity"`
+	Rule           string     `json:"rule"`
+	Message        string     `json:"message"`
+	Evidence       string     `json:"evidence,omitempty"`
+	Recommendation string     `json:"recommended_action"`
+	Impact         string     `json:"impact,omitempty"`
+	Why            string     `json:"why_this_matters,omitempty"`
+	DocsURL        string     `json:"docs_url,omitempty"`
+	FixAvailable   bool       `json:"fix_available"`
+	FixKind        FixKind    `json:"fix_kind,omitempty"`
+	Confidence     string     `json:"confidence,omitempty"`
+	Risk           RiskLevel  `json:"risk,omitempty"`
+	RequiresReview bool       `json:"requires_review"`
+	FixSummary     string     `json:"fix_summary,omitempty"`
+	FixSteps       []string   `json:"fix_steps,omitempty"`
+	PatchHint      *PatchHint `json:"patch_hint,omitempty"`
+}
+
+type PatchHint struct {
+	Kind          FixKind  `json:"kind,omitempty"`
+	Package       string   `json:"package,omitempty"`
+	EnvKey        string   `json:"env_key,omitempty"`
+	InlineSecret  bool     `json:"inline_secret,omitempty"`
+	DirectCommand string   `json:"direct_command,omitempty"`
+	DirectArgs    []string `json:"direct_args,omitempty"`
 }
 
 type AdapterStatus struct {

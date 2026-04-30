@@ -1,0 +1,79 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Nightward uses Renovate instead of Dependabot for Go modules, GitHub Actions, and pinned local tool versions.",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":semanticCommitTypeAll(chore)",
+    ":semanticCommitScope(deps)",
+    ":pinVersions",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "labels": ["dependencies"],
+  "dependencyDashboardLabels": ["dependencies"],
+  "dependencyDashboard": true,
+  "branchPrefix": "renovate/",
+  "timezone": "America/Denver",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "rangeStrategy": "bump",
+  "rebaseWhen": "conflicted",
+  "minimumReleaseAge": "3 days",
+  "automerge": false,
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "labels": ["dependencies", "github-actions"]
+    },
+    {
+      "matchManagers": ["gomod"],
+      "groupName": "go modules",
+      "labels": ["dependencies", "go"],
+      "postUpdateOptions": ["gomodTidy"]
+    },
+    {
+      "matchPackageNames": ["gotest.tools/gotestsum"],
+      "groupName": "go test tooling",
+      "labels": ["dependencies", "go", "test"]
+    },
+    {
+      "matchPackageNames": ["goreleaser/goreleaser"],
+      "groupName": "release tooling",
+      "labels": ["dependencies", "release"]
+    },
+    {
+      "matchPackageNames": ["trunk-io/plugins"],
+      "groupName": "trunk tooling",
+      "labels": ["dependencies", "trunk"]
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update gotestsum used by Makefile JUnit test reports.",
+      "managerFilePatterns": ["/^Makefile$/"],
+      "matchStrings": [
+        "GOTESTSUM_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "gotest.tools/gotestsum",
+      "datasourceTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "description": "Update the GoReleaser binary version used by the release workflow.",
+      "managerFilePatterns": ["/^\\.github/workflows/release\\.yml$/"],
+      "matchStrings": ["version:\\s*(?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "goreleaser/goreleaser",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "Update the Trunk plugin registry pin.",
+      "managerFilePatterns": ["/^\\.trunk/trunk\\.yaml$/"],
+      "matchStrings": ["ref:\\s*(?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "trunk-io/plugins",
+      "datasourceTemplate": "github-tags"
+    }
+  ]
+}

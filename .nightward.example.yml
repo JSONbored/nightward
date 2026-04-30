@@ -1,0 +1,18 @@
+severity_threshold: high
+
+ignore_findings: []
+ignore_rules:
+  - rule: mcp_server_review
+    reason: Advisory review findings are accepted for this fixture or repository.
+
+trusted_commands: []
+trusted_packages: []
+
+portable_allow_paths: []
+machine_local_deny_paths: []
+
+sarif:
+  tool_name: Nightward
+  category: nightward
+  information_uri: https://github.com/JSONbored/nightward
+  semantic_version: 0.1.0

@@ -143,6 +143,7 @@ func reviewFinding(item Item, server mcpServer) Finding {
 		ID:             findingID("mcp_server_review", item.Tool, item.Path, server.Name),
 		Tool:           item.Tool,
 		Path:           item.Path,
+		Server:         server.Name,
 		Severity:       RiskInfo,
 		Rule:           "mcp_server_review",
 		Message:        fmt.Sprintf("Review MCP server %q before syncing this config.", server.Name),
@@ -175,6 +176,7 @@ func commandFindings(item Item, server mcpServer) []Finding {
 				ID:             findingID("mcp_unpinned_package", item.Tool, item.Path, server.Name),
 				Tool:           item.Tool,
 				Path:           item.Path,
+				Server:         server.Name,
 				Severity:       RiskHigh,
 				Rule:           "mcp_unpinned_package",
 				Message:        fmt.Sprintf("MCP server %q runs a package executor without an obvious pinned package version.", server.Name),
@@ -198,6 +200,7 @@ func commandFindings(item Item, server mcpServer) []Finding {
 				finding.FixKind = FixPinPackage
 				finding.Confidence = "high"
 				finding.FixSummary = fmt.Sprintf("Pin %s to an explicit version before syncing this MCP config.", pkg)
+				finding.PatchHint = &PatchHint{Kind: FixPinPackage, Package: pkg}
 				finding.FixSteps = []string{
 					fmt.Sprintf("Choose a reviewed version for %s.", pkg),
 					fmt.Sprintf("Change the package arg from %q to %q.", pkg, pkg+"@<version>"),
@@ -214,6 +217,7 @@ func commandFindings(item Item, server mcpServer) []Finding {
 			ID:             findingID("mcp_shell_command", item.Tool, item.Path, server.Name),
 			Tool:           item.Tool,
 			Path:           item.Path,
+			Server:         server.Name,
 			Severity:       RiskHigh,
 			Rule:           "mcp_shell_command",
 			Message:        fmt.Sprintf("MCP server %q executes through a shell.", server.Name),
@@ -236,6 +240,7 @@ func commandFindings(item Item, server mcpServer) []Finding {
 		if simple {
 			finding.FixKind = FixReplaceShellWrapper
 			finding.Confidence = "high"
+			finding.PatchHint = &PatchHint{Kind: FixReplaceShellWrapper, DirectCommand: directCommand, DirectArgs: redactArgSlice(directArgs)}
 			finding.FixSummary = fmt.Sprintf("Replace the shell wrapper with direct command %q.", directCommand)
 			step := fmt.Sprintf("Set command to %q.", directCommand)
 			if len(directArgs) > 0 {
@@ -255,6 +260,7 @@ func commandFindings(item Item, server mcpServer) []Finding {
 			ID:             findingID("mcp_unknown_command", item.Tool, item.Path, server.Name),
 			Tool:           item.Tool,
 			Path:           item.Path,
+			Server:         server.Name,
 			Severity:       RiskMedium,
 			Rule:           "mcp_unknown_command",
 			Message:        fmt.Sprintf("MCP server %q does not declare a command Nightward can inspect.", server.Name),
@@ -315,6 +321,7 @@ func envFindings(item Item, server mcpServer) []Finding {
 				ID:             findingID("mcp_secret_env", item.Tool, item.Path, server.Name+key),
 				Tool:           item.Tool,
 				Path:           item.Path,
+				Server:         server.Name,
 				Severity:       severity,
 				Rule:           "mcp_secret_env",
 				Message:        message,
@@ -329,6 +336,7 @@ func envFindings(item Item, server mcpServer) []Finding {
 				RequiresReview: true,
 				FixSummary:     summary,
 				FixSteps:       steps,
+				PatchHint:      &PatchHint{Kind: FixExternalizeSecret, EnvKey: key, InlineSecret: !referenceOnly},
 			})
 		}
 	}
@@ -342,6 +350,7 @@ func argFindings(item Item, server mcpServer) []Finding {
 			ID:             findingID("mcp_broad_filesystem", item.Tool, item.Path, server.Name),
 			Tool:           item.Tool,
 			Path:           item.Path,
+			Server:         server.Name,
 			Severity:       RiskMedium,
 			Rule:           "mcp_broad_filesystem",
 			Message:        fmt.Sprintf("MCP server %q appears to reference broad filesystem access.", server.Name),
@@ -367,6 +376,7 @@ func argFindings(item Item, server mcpServer) []Finding {
 			ID:             findingID("mcp_local_token_path", item.Tool, item.Path, server.Name),
 			Tool:           item.Tool,
 			Path:           item.Path,
+			Server:         server.Name,
 			Severity:       RiskHigh,
 			Rule:           "mcp_local_token_path",
 			Message:        fmt.Sprintf("MCP server %q appears to reference local credential paths.", server.Name),

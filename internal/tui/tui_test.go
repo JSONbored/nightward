@@ -47,3 +47,19 @@ func TestFindingsAndFixPlanViewsRenderRedactedDetails(t *testing.T) {
 		t.Fatalf("fix plan view missing detail:\n%s", fixes)
 	}
 }
+
+func TestFindingSearchAndHelpRender(t *testing.T) {
+	report := inventory.Report{Findings: []inventory.Finding{
+		{ID: "one", Tool: "Codex", Rule: "mcp_secret_env", Message: "Sensitive key", Evidence: "env_key=API_TOKEN"},
+		{ID: "two", Tool: "Cursor", Rule: "mcp_server_review", Message: "Review server"},
+	}}
+	m := model{report: report, search: "api_token", width: 100, height: 30}
+	filtered := m.filteredFindings()
+	if len(filtered) != 1 || filtered[0].ID != "one" {
+		t.Fatalf("unexpected filtered findings: %#v", filtered)
+	}
+	help := m.help(90)
+	if !strings.Contains(help, "search findings") || !strings.Contains(help, "do not mutate") {
+		t.Fatalf("help text missing expected content:\n%s", help)
+	}
+}

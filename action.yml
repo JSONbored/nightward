@@ -1,0 +1,126 @@
+name: Nightward
+author: JSONbored
+description: Run Nightward scan, policy, or SARIF checks in GitHub Actions.
+
+inputs:
+  mode:
+    description: "Run mode: scan, policy, or sarif."
+    required: false
+    default: policy
+  config:
+    description: Optional .nightward.yml path.
+    required: false
+    default: ""
+  strict:
+    description: Fail policy checks on medium or higher findings.
+    required: false
+    default: "true"
+  output:
+    description: Output path for scan JSON or SARIF.
+    required: false
+    default: nightward.sarif
+  home:
+    description: HOME path Nightward should scan.
+    required: false
+    default: ""
+
+outputs:
+  findings-count:
+    description: Number of findings in the generated report.
+    value: ${{ steps.summary.outputs.findings-count }}
+  policy-passed:
+    description: Whether policy mode passed.
+    value: ${{ steps.summary.outputs.policy-passed }}
+  output:
+    description: Output path written by scan or sarif mode.
+    value: ${{ steps.run-nightward.outputs.output }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      with:
+        go-version-file: ${{ github.action_path }}/go.mod
+        cache: true
+
+    - name: Run Nightward
+      id: run-nightward
+      shell: bash
+      env:
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_STRICT: ${{ inputs.strict }}
+        INPUT_OUTPUT: ${{ inputs.output }}
+        INPUT_HOME: ${{ inputs.home }}
+      run: |
+        set -euo pipefail
+
+        mode="${INPUT_MODE}"
+        config="${INPUT_CONFIG}"
+        strict="${INPUT_STRICT}"
+        output="${INPUT_OUTPUT}"
+        scan_home="${INPUT_HOME}"
+
+        if [[ -n "${scan_home}" ]]; then
+          export NIGHTWARD_HOME="${scan_home}"
+        fi
+
+        config_args=()
+        if [[ -n "${config}" ]]; then
+          config_args+=(--config "${config}")
+        fi
+
+        cd "${GITHUB_ACTION_PATH}"
+        case "${mode}" in
+          scan)
+            go run ./cmd/nw scan --json --output "${GITHUB_WORKSPACE}/${output}"
+            echo "output=${output}" >>"${GITHUB_OUTPUT}"
+            ;;
+          policy)
+            args=(policy check "${config_args[@]}" --json)
+            if [[ "${strict}" == "true" ]]; then
+              args+=(--strict)
+            fi
+            set +e
+            go run ./cmd/nw "${args[@]}" >"${GITHUB_WORKSPACE}/nightward-policy.json"
+            policy_exit=$?
+            set -e
+            echo "policy-exit-code=${policy_exit}" >>"${GITHUB_OUTPUT}"
+            echo "output=nightward-policy.json" >>"${GITHUB_OUTPUT}"
+            ;;
+          sarif)
+            go run ./cmd/nw policy sarif "${config_args[@]}" --output "${GITHUB_WORKSPACE}/${output}"
+            echo "output=${output}" >>"${GITHUB_OUTPUT}"
+            ;;
+          *)
+            echo "unsupported mode: ${mode}" >&2
+            exit 2
+            ;;
+        esac
+
+    - name: Summarize Nightward output
+      id: summary
+      shell: bash
+      env:
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_OUTPUT: ${{ inputs.output }}
+      run: |
+        set -euo pipefail
+
+        case "${INPUT_MODE}" in
+          scan)
+            python3 -c 'import json, sys; data=json.load(open(sys.argv[1], encoding="utf-8")); print("findings-count=%s" % data.get("summary", {}).get("total_findings", 0)); print("policy-passed=")' "${GITHUB_WORKSPACE}/${INPUT_OUTPUT}" >>"${GITHUB_OUTPUT}"
+            ;;
+          policy)
+            python3 -c 'import json, sys; data=json.load(open(sys.argv[1], encoding="utf-8")); print("findings-count=%s" % data.get("summary", {}).get("total_findings", 0)); print("policy-passed=%s" % str(data.get("passed", False)).lower())' "${GITHUB_WORKSPACE}/nightward-policy.json" >>"${GITHUB_OUTPUT}"
+            ;;
+          sarif)
+            python3 -c 'import json, sys; data=json.load(open(sys.argv[1], encoding="utf-8")); count=sum(len(run.get("results", [])) for run in data.get("runs", [])); print(f"findings-count={count}"); print("policy-passed=")' "${GITHUB_WORKSPACE}/${INPUT_OUTPUT}" >>"${GITHUB_OUTPUT}"
+            ;;
+        esac
+
+    - name: Fail on Nightward policy violation
+      if: ${{ inputs.mode == 'policy' && steps.run-nightward.outputs.policy-exit-code != '0' }}
+      shell: bash
+      run: exit 1

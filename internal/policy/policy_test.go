@@ -2,6 +2,8 @@ package policy
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +29,49 @@ func TestCheckUsesStrictThreshold(t *testing.T) {
 	strict := Check(report, true)
 	if strict.Passed || len(strict.Violations) != 2 || strict.Threshold != inventory.RiskMedium {
 		t.Fatalf("unexpected strict policy report: %#v", strict)
+	}
+}
+
+func TestLoadConfigRejectsUnknownKeysAndReasonlessIgnores(t *testing.T) {
+	dir := t.TempDir()
+	unknown := filepath.Join(dir, ".nightward.yml")
+	if err := os.WriteFile(unknown, []byte("surprise: true\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadConfig(unknown); err == nil {
+		t.Fatal("expected unknown policy keys to fail")
+	}
+
+	reasonless := filepath.Join(dir, "reasonless.yml")
+	if err := os.WriteFile(reasonless, []byte("ignore_rules:\n  - rule: mcp_server_review\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadConfig(reasonless); err == nil || !strings.Contains(err.Error(), "requires reason") {
+		t.Fatalf("expected missing ignore reason to fail, got %v", err)
+	}
+}
+
+func TestCheckWithConfigIgnoresWithReasonAndOverridesThreshold(t *testing.T) {
+	report := inventory.Report{
+		GeneratedAt: time.Date(2026, 4, 30, 7, 0, 0, 0, time.UTC),
+		Findings: []inventory.Finding{
+			{ID: "review", Severity: inventory.RiskInfo, Rule: "mcp_server_review"},
+			{ID: "medium", Severity: inventory.RiskMedium, Rule: "mcp_broad_filesystem"},
+			{ID: "high", Severity: inventory.RiskHigh, Rule: "mcp_unpinned_package", Evidence: "args=@example/server"},
+		},
+	}
+
+	config := Config{
+		SeverityThreshold: inventory.RiskMedium,
+		IgnoreRules:       []IgnoreRule{{Rule: "mcp_broad_filesystem", Reason: "fixture path is intentionally broad"}},
+		TrustedPackages:   []string{"@example/server"},
+	}
+	checked := CheckWithOptions(report, Options{Config: config})
+	if !checked.Passed {
+		t.Fatalf("expected trusted/ignored config to pass: %#v", checked)
+	}
+	if checked.Summary.Ignored != 2 || len(checked.Ignored) != 2 {
+		t.Fatalf("expected two ignored findings: %#v", checked)
 	}
 }
 
@@ -64,5 +109,35 @@ func TestSARIFRedactsAndIncludesFixMetadata(t *testing.T) {
 	}
 	if strings.Contains(text, "super-secret-value") {
 		t.Fatal("SARIF leaked a secret value")
+	}
+}
+
+func TestSARIFUsesConfigMetadataAndIgnores(t *testing.T) {
+	report := inventory.Report{Findings: []inventory.Finding{
+		{ID: "ignored", Severity: inventory.RiskHigh, Rule: "mcp_server_review", Message: "ignored"},
+		{ID: "kept", Severity: inventory.RiskHigh, Rule: "mcp_unpinned_package", Message: "kept"},
+	}}
+	config := Config{
+		IgnoreFindings: []IgnoreFinding{{ID: "ignored", Reason: "accepted advisory"}},
+		SARIF: SARIFConfig{
+			ToolName:       "Nightward CI",
+			Category:       "nightward-fixture",
+			InformationURI: "https://example.invalid/nightward",
+		},
+	}
+
+	sarif := BuildSARIFWithConfig(report, config)
+	data, err := json.Marshal(sarif)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, want := range []string{"Nightward CI", "nightward-fixture", "kept"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("SARIF missing %q: %s", want, text)
+		}
+	}
+	if strings.Contains(text, "ignored") {
+		t.Fatalf("SARIF included ignored finding: %s", text)
 	}
 }
