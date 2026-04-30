@@ -75,6 +75,8 @@ var (
 )
 
 var tabs = []string{"Dashboard", "Inventory", "Findings", "Analysis", "Fix Plan", "Backup Plan"}
+var compactTabs = []string{"Dash", "Inv", "Find", "Analysis", "Fix", "Backup"}
+var tinyTabs = []string{"D", "I", "F", "A", "X", "B"}
 
 const remediationDocsURL = "https://github.com/JSONbored/nightward/blob/main/docs/remediation.md"
 const analysisDocsURL = "https://github.com/JSONbored/nightward/blob/main/docs/analysis.md"
@@ -215,7 +217,8 @@ func (m model) View() string {
 	bodyWidth := max(40, width-4)
 	bodyHeight := max(12, m.height-7)
 
-	tabLine := lipgloss.JoinHorizontal(lipgloss.Top, titleStyle.Render("nightward"), m.renderTabs())
+	tabLine := lipgloss.JoinHorizontal(lipgloss.Top, titleStyle.Render("nightward"), m.renderTabs(max(16, bodyWidth-12)))
+	tabLine = lipgloss.NewStyle().Width(bodyWidth).MaxWidth(bodyWidth).Render(tabLine)
 	bodyText := m.renderBody(bodyWidth-6, bodyHeight-2)
 	if m.showHelp {
 		bodyText = m.help(bodyWidth - 6)
@@ -228,13 +231,19 @@ func (m model) View() string {
 	if m.status != "" {
 		footerText += "  " + m.status
 	}
-	footer := footerStyle.Render(footerText)
+	footer := footerStyle.Width(bodyWidth).Render(truncate(footerText, bodyWidth-2))
 	return baseStyle.Render(lipgloss.JoinVertical(lipgloss.Left, tabLine, body, footer))
 }
 
-func (m model) renderTabs() string {
+func (m model) renderTabs(width int) string {
+	labels := tabs
+	if width < 44 {
+		labels = tinyTabs
+	} else if width < 84 {
+		labels = compactTabs
+	}
 	rendered := make([]string, 0, len(tabs))
-	for i, tab := range tabs {
+	for i, tab := range labels {
 		label := fmt.Sprintf("%d %s", i+1, tab)
 		if i == m.tab {
 			rendered = append(rendered, activeTabStyle.Render(label))
@@ -358,6 +367,12 @@ func (m model) findings(width, height int) string {
 
 func (m model) fixPlan(width, height int) string {
 	plan := fixplan.Build(m.report, fixplan.Selector{All: true})
+	listWidth := width
+	detailWidth := 0
+	if width >= 94 {
+		listWidth = width/2 - 1
+		detailWidth = width - listWidth - 3
+	}
 	lines := []string{
 		section("Fix Plan"),
 		fmt.Sprintf("Safe: %d  Review: %d  Blocked: %d", plan.Summary.Safe, plan.Summary.Review, plan.Summary.Blocked),
@@ -380,11 +395,22 @@ func (m model) fixPlan(width, height int) string {
 		lines = append(lines, fmt.Sprintf("%s%-7s %-20s %-22s %s", prefix, fix.Status, fix.FixKind, fix.Rule, fix.Summary))
 	}
 	lines = append(lines, "", "Use `nw fix plan --all --json` or `nw fix export --format markdown` for full steps.")
-	return fitLines(lines, width)
+	left := fitLines(lines, listWidth)
+	if detailWidth <= 0 {
+		return left
+	}
+	detail := fixDetail(plan.Fixes[m.cursor], detailWidth, height)
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, "  ", detail)
 }
 
 func (m model) analysis(width, height int) string {
 	report := analysis.Run(m.report, analysis.Options{Mode: m.report.ScanMode, Workspace: m.report.Workspace})
+	listWidth := width
+	detailWidth := 0
+	if width >= 94 {
+		listWidth = width/2 - 1
+		detailWidth = width - listWidth - 3
+	}
 	lines := []string{
 		section("Analysis"),
 		fmt.Sprintf("Signals: %d  Subjects: %d  Highest: %s  Provider warnings: %d", report.Summary.TotalSignals, report.Summary.TotalSubjects, report.Summary.HighestSeverity, report.Summary.ProviderWarnings),
@@ -408,7 +434,12 @@ func (m model) analysis(width, height int) string {
 		lines = append(lines, fmt.Sprintf("%s%-8s %-30s %s", prefix, signal.Severity, signal.Rule, signal.Message))
 	}
 	lines = append(lines, "", "Use `nw analyze --all --json` or `nw providers doctor --json` for full details.")
-	return fitLines(lines, width)
+	left := fitLines(lines, listWidth)
+	if detailWidth <= 0 {
+		return left
+	}
+	detail := signalDetail(report.Signals[m.cursor], detailWidth, height)
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, "  ", detail)
 }
 
 func (m model) backupPlan(width, height int) string {
@@ -633,22 +664,74 @@ func findingDetail(finding inventory.Finding, width, height int) string {
 		finding.ID,
 		fmt.Sprintf("%s / %s / %s", finding.Tool, finding.Severity, finding.Rule),
 		"",
-		finding.Message,
+		redactTUIText(finding.Message),
 	}
 	if finding.Evidence != "" {
-		lines = append(lines, "", section("Evidence"), finding.Evidence)
+		lines = append(lines, "", section("Evidence"), redactTUIText(finding.Evidence))
 	}
 	if finding.Impact != "" {
-		lines = append(lines, "", section("Impact"), finding.Impact)
+		lines = append(lines, "", section("Impact"), redactTUIText(finding.Impact))
 	}
 	if finding.FixAvailable {
-		lines = append(lines, "", section("Suggested Fix"), fmt.Sprintf("%s  confidence=%s  risk=%s", finding.FixKind, finding.Confidence, finding.Risk), finding.FixSummary)
+		lines = append(lines, "", section("Suggested Fix"), fmt.Sprintf("%s  confidence=%s  risk=%s", finding.FixKind, finding.Confidence, finding.Risk), redactTUIText(finding.FixSummary))
 		for i, step := range finding.FixSteps {
-			lines = append(lines, fmt.Sprintf("%d. %s", i+1, step))
+			lines = append(lines, fmt.Sprintf("%d. %s", i+1, redactTUIText(step)))
 		}
 	}
 	if finding.Why != "" {
-		lines = append(lines, "", section("Why"), finding.Why)
+		lines = append(lines, "", section("Why"), redactTUIText(finding.Why))
+	}
+	if len(lines) > height {
+		lines = lines[:height]
+	}
+	return fitLines(lines, width)
+}
+
+func signalDetail(signal analysis.Signal, width, height int) string {
+	lines := []string{
+		section("Signal Detail"),
+		signal.ID,
+		fmt.Sprintf("%s / %s / %s", signal.Provider, signal.Severity, signal.Rule),
+		"",
+		redactTUIText(signal.Message),
+	}
+	if signal.Evidence != "" {
+		lines = append(lines, "", section("Evidence"), redactTUIText(signal.Evidence))
+	}
+	lines = append(lines, "", section("Recommendation"), redactTUIText(signal.Recommendation))
+	lines = append(lines, "", section("Review"), fmt.Sprintf("confidence=%s  category=%s", signal.Confidence, signal.Category))
+	if signal.Why != "" {
+		lines = append(lines, "", section("Why"), redactTUIText(signal.Why))
+	}
+	if len(lines) > height {
+		lines = lines[:height]
+	}
+	return fitLines(lines, width)
+}
+
+func fixDetail(fix fixplan.Fix, width, height int) string {
+	lines := []string{
+		section("Fix Detail"),
+		fix.FindingID,
+		fmt.Sprintf("%s / %s / %s", fix.Tool, fix.Status, fix.Rule),
+		"",
+		redactTUIText(fix.Summary),
+	}
+	if fix.Evidence != "" {
+		lines = append(lines, "", section("Evidence"), redactTUIText(fix.Evidence))
+	}
+	if fix.Impact != "" {
+		lines = append(lines, "", section("Impact"), redactTUIText(fix.Impact))
+	}
+	lines = append(lines, "", section("Review"), fmt.Sprintf("kind=%s  confidence=%s  risk=%s  requires_review=%t", fix.FixKind, fix.Confidence, fix.Risk, fix.RequiresReview))
+	if len(fix.Steps) > 0 {
+		lines = append(lines, "", section("Steps"))
+		for i, step := range fix.Steps {
+			lines = append(lines, fmt.Sprintf("%d. %s", i+1, redactTUIText(step)))
+		}
+	}
+	if fix.Why != "" {
+		lines = append(lines, "", section("Why"), redactTUIText(fix.Why))
 	}
 	if len(lines) > height {
 		lines = lines[:height]
@@ -890,14 +973,25 @@ func fitLines(lines []string, width int) string {
 }
 
 func truncate(line string, width int) string {
-	if width <= 4 || lipgloss.Width(line) <= width {
+	if width <= 0 {
+		return ""
+	}
+	if lipgloss.Width(line) <= width {
 		return line
 	}
-	runes := []rune(line)
-	if len(runes) <= width-1 {
-		return line
+	suffix := "..."
+	if width <= len(suffix) {
+		suffix = ""
 	}
-	return string(runes[:width-1]) + "..."
+	var b strings.Builder
+	for _, r := range line {
+		next := b.String() + string(r)
+		if lipgloss.Width(next+suffix) > width {
+			break
+		}
+		b.WriteRune(r)
+	}
+	return b.String() + suffix
 }
 
 func clampCursor(cursor, total, visible int) int {

@@ -44,6 +44,14 @@
       "labels": ["dependencies", "go", "test"]
     },
     {
+      "matchPackageNames": [
+        "github.com/zricethezav/gitleaks/v8",
+        "golang.org/x/vuln"
+      ],
+      "groupName": "security scan tooling",
+      "labels": ["dependencies", "go", "security"]
+    },
+    {
       "matchPackageNames": ["goreleaser/goreleaser"],
       "groupName": "release tooling",
       "labels": ["dependencies", "release"]
@@ -63,6 +71,26 @@
         "GOTESTSUM_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
       ],
       "depNameTemplate": "gotest.tools/gotestsum",
+      "datasourceTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "description": "Update Gitleaks used by Makefile secret scanning.",
+      "fileMatch": ["^Makefile$"],
+      "matchStrings": [
+        "GITLEAKS_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "github.com/zricethezav/gitleaks/v8",
+      "datasourceTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "description": "Update govulncheck used by Makefile vulnerability scanning.",
+      "fileMatch": ["^Makefile$"],
+      "matchStrings": [
+        "GOVULNCHECK_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "golang.org/x/vuln",
       "datasourceTemplate": "go"
     },
     {

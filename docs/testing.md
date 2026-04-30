@@ -10,6 +10,9 @@ make test-race
 make vet
 make staticcheck
 make gosec
+make gitleaks
+make govulncheck
+make fuzz-smoke
 make test-junit
 make trunk-flaky-validate
 make trunk-check
@@ -33,8 +36,9 @@ make verify
 - MCP fixture tests should cover command servers, URL-shaped servers, sensitive headers, local endpoints, and unsupported shapes.
 - Scheduler tests verify generated launchd, systemd user timer, and cron text without installing schedules.
 - TUI action tests cover clipboard/open command construction and private redacted fix-plan exports.
+- TUI model tests cover tab switching, search, filters, help, cursor clamping, wide detail panes, compact terminal rendering, and redaction.
 - Raycast extension tests cover pure redaction/formatting helpers and safe command execution wrappers.
-- `go vet`, `staticcheck`, and `gosec` are part of the local verification bar. `#nosec` comments must include a narrow reason tied to an intentional local CLI behavior.
+- `go vet`, `staticcheck`, `gosec`, `gitleaks`, `govulncheck`, and fuzz smoke tests are part of the local verification bar. `#nosec` comments must include a narrow reason tied to an intentional local CLI behavior.
 - Raycast dependency audits run with `npm audit --audit-level=moderate`.
 
 ## Trunk Flaky Tests

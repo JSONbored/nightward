@@ -4,10 +4,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/jsonbored/nightward/internal/inventory"
 )
 
@@ -46,8 +49,13 @@ func TestFindingsAndFixPlanViewsRenderRedactedDetails(t *testing.T) {
 	}
 
 	fixes := m.fixPlan(116, 32)
-	if !strings.Contains(fixes, "Fix Plan") || !strings.Contains(fixes, "externalize-secret") {
+	if !strings.Contains(fixes, "Fix Plan") || !strings.Contains(fixes, "Fix Detail") || !strings.Contains(fixes, "externalize-secret") {
 		t.Fatalf("fix plan view missing detail:\n%s", fixes)
+	}
+
+	analysis := m.analysis(116, 32)
+	if !strings.Contains(analysis, "Analysis") || !strings.Contains(analysis, "Signal Detail") || !strings.Contains(analysis, "secrets-exposure") {
+		t.Fatalf("analysis view missing detail:\n%s", analysis)
 	}
 }
 
@@ -107,6 +115,100 @@ func TestTUIActionSelectionAndDocsURL(t *testing.T) {
 	}
 }
 
+func TestTUIUpdateFiltersSearchAndHelp(t *testing.T) {
+	report := inventory.Report{Findings: []inventory.Finding{
+		{ID: "one", Tool: "Codex", Rule: "mcp_secret_env", Severity: inventory.RiskCritical, Message: "Sensitive key", Evidence: "env_key=API_TOKEN"},
+		{ID: "two", Tool: "Cursor", Rule: "mcp_server_review", Severity: inventory.RiskInfo, Message: "Review server"},
+	}}
+	m := model{report: report, width: 100, height: 30}
+
+	updated, _ := m.Update(key("3"))
+	m = updated.(model)
+	if m.tab != 2 {
+		t.Fatalf("expected findings tab, got %d", m.tab)
+	}
+	updated, _ = m.Update(key("s"))
+	m = updated.(model)
+	if m.severity != string(inventory.RiskCritical) {
+		t.Fatalf("expected severity filter, got %q", m.severity)
+	}
+	updated, _ = m.Update(key("/"))
+	m = updated.(model)
+	if !m.searching {
+		t.Fatal("expected search mode")
+	}
+	for _, r := range "api_token" {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = updated.(model)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+	if m.searching || m.search != "api_token" || len(m.filteredFindings()) != 1 {
+		t.Fatalf("unexpected search state: searching=%t search=%q filtered=%d", m.searching, m.search, len(m.filteredFindings()))
+	}
+	updated, _ = m.Update(key("?"))
+	m = updated.(model)
+	if !m.showHelp || !strings.Contains(m.View(), "Help") {
+		t.Fatal("expected help view")
+	}
+	updated, _ = m.Update(key("x"))
+	m = updated.(model)
+	if m.severity != "" || m.search != "" {
+		t.Fatalf("expected filters cleared, severity=%q search=%q", m.severity, m.search)
+	}
+}
+
+func TestTUIViewResponsiveWidths(t *testing.T) {
+	report := inventory.Report{
+		GeneratedAt: time.Date(2026, 4, 30, 7, 0, 0, 0, time.UTC),
+		Home:        "/tmp/nightward-home-with-a-long-path",
+		Hostname:    "host.example",
+		Items: []inventory.Item{
+			{Tool: "Codex", Classification: inventory.Portable, Risk: inventory.RiskLow, Path: "/tmp/nightward-home-with-a-long-path/.codex/config.toml"},
+		},
+		Findings: []inventory.Finding{
+			{
+				ID:             "mcp_secret_env-111111111111",
+				Tool:           "Codex",
+				Path:           "/tmp/nightward-home-with-a-long-path/.codex/config.toml",
+				Severity:       inventory.RiskCritical,
+				Rule:           "mcp_secret_env",
+				Message:        "MCP server stores a sensitive environment key with a long explanatory message.",
+				Evidence:       "env_key=API_TOKEN",
+				FixAvailable:   true,
+				FixKind:        inventory.FixExternalizeSecret,
+				Confidence:     "high",
+				Risk:           inventory.RiskHigh,
+				RequiresReview: true,
+				FixSummary:     "Move API_TOKEN out of this config.",
+				FixSteps:       []string{"Remove API_TOKEN=super-" + "secret-value from the MCP config."},
+			},
+		},
+	}
+	for _, size := range []struct {
+		width  int
+		height int
+	}{
+		{80, 24},
+		{120, 40},
+		{160, 50},
+	} {
+		m := model{report: report, width: size.width, height: size.height}
+		for tab := range tabs {
+			m.tab = tab
+			rendered := stripANSI(m.View())
+			if strings.Contains(rendered, "super-secret-value") {
+				t.Fatalf("view leaked secret at width %d tab %d:\n%s", size.width, tab, rendered)
+			}
+			for _, line := range strings.Split(rendered, "\n") {
+				if got := lipgloss.Width(line); got > size.width {
+					t.Fatalf("line width %d exceeds terminal width %d on tab %d:\n%s", got, size.width, tab, line)
+				}
+			}
+		}
+	}
+}
+
 func TestExportFixPlanWritesRedactedMarkdown(t *testing.T) {
 	home := t.TempDir()
 	secretValue := "super-" + "secret-value"
@@ -161,6 +263,16 @@ func TestExportFixPlanWritesRedactedMarkdown(t *testing.T) {
 		t.Fatalf("expected private export mode 0600, got %s", got)
 	}
 }
+
+func key(value string) tea.KeyMsg {
+	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(value)}
+}
+
+func stripANSI(value string) string {
+	return ansiPattern.ReplaceAllString(value, "")
+}
+
+var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
 
 func TestClipboardAndOpenCommandBuilders(t *testing.T) {
 	lookup := func(name string) (string, error) {

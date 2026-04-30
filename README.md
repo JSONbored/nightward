@@ -11,6 +11,32 @@ It scans common Codex, Claude, Cursor, Windsurf, VS Code, Raycast, JetBrains, Ze
 
 Nightward does not mutate agent configs. It only writes explicit report/SARIF files when requested and user-level schedule files through explicit schedule install/remove commands.
 
+> [!IMPORTANT]
+> Nightward is local-first by design: no telemetry, no default network calls, no cloud dashboard, and no live agent-config mutation.
+
+## At A Glance
+
+| Surface | What it does | Default write behavior |
+| --- | --- | --- |
+| TUI | Dashboard, inventory, findings, analysis, fix plan, backup preview | Read-only except explicit redacted export |
+| CLI | Scriptable scan, doctor, policy, SARIF, snapshot, schedule commands | Read-only unless output/schedule flags are explicit |
+| Raycast | macOS read-only companion commands | Clipboard/report-folder actions only |
+| GitHub Action | Workspace policy and SARIF checks | Writes only requested CI outputs |
+| Trunk plugin | Local workspace policy/analyze linters | Emits SARIF to stdout |
+
+```mermaid
+flowchart LR
+  configs["AI agent/devtool config"] --> scan["nw scan"]
+  scan --> classify["classify paths"]
+  scan --> mcp["review MCP trust boundaries"]
+  classify --> tui["TUI"]
+  classify --> json["redacted JSON"]
+  mcp --> findings["findings + analysis signals"]
+  findings --> fix["plan-only fix previews"]
+  findings --> sarif["policy SARIF"]
+  classify --> backup["dry-run backup plan"]
+```
+
 ## Why
 
 AI coding tools scatter useful state across config files, MCP server definitions, skills, rules, commands, extension settings, credentials, caches, and app-owned databases. Blindly syncing all of it is fragile and unsafe.
@@ -44,6 +70,9 @@ Nightward answers the practical questions first:
 - Read-only Raycast extension for Dashboard, Findings, Analysis, Provider Doctor, Explain Finding/Signal, Fix Plan/Analysis export, and report-folder access.
 - User-level nightly scan scheduling for macOS launchd, Linux systemd user timers, and cron text fallback.
 - No telemetry, no cloud dashboard, no network calls from Nightward runtime, and no live config mutation.
+
+> [!TIP]
+> A practical first pass is `nw doctor --json`, then `nw scan --json`, then `nw fix plan --all --json`.
 
 ## Install
 
@@ -167,6 +196,19 @@ Nightward classifies discovered state as:
 
 Backup plans include portable items, mark machine-local/unknown items for review, and exclude secret/auth, runtime-cache, and app-owned state by default.
 
+```mermaid
+flowchart TD
+  found["Discovered path"] --> class{"Classification"}
+  class -->|portable| include["include in private backup plan"]
+  class -->|machine-local or unknown| review["review before syncing"]
+  class -->|secret-auth| excludeSecret["exclude by default"]
+  class -->|runtime-cache| excludeCache["exclude by default"]
+  class -->|app-owned| export["prefer app-supported export"]
+```
+
+> [!WARNING]
+> Do not blindly sync `secret-auth`, `runtime-cache`, or `app-owned` paths. Nightward excludes them by default because those files often contain credentials, generated state, or app-private databases.
+
 ## Fix Plan Model
 
 Nightward does not apply fixes yet. "Autofix" currently means structured, reviewable fix plans:
@@ -189,6 +231,19 @@ Secret values are never emitted in scan JSON, findings output, fix-plan JSON, Ma
 Default analysis is offline and built in. Optional providers such as `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, and `socket` are discovered by `providers doctor`; Nightward does not install them or call online services unless a user explicitly selects providers and opts into network-capable behavior.
 
 Policy config can enable analysis and selected provider posture with `include_analysis`, `analysis_threshold`, `analysis_providers`, and `allow_online_providers`.
+
+```mermaid
+sequenceDiagram
+  participant User
+  participant Nightward
+  participant LocalTool as Optional local provider
+  User->>Nightward: nw analyze --all
+  Nightward-->>User: offline built-in signals
+  User->>Nightward: nw providers doctor --with socket --online
+  Nightward->>LocalTool: run only after explicit provider + online opt-in
+  LocalTool-->>Nightward: provider signals
+  Nightward-->>User: redacted analysis report
+```
 
 ## TUI
 
@@ -311,8 +366,9 @@ Local security checks used by maintainers:
 
 ```sh
 trunk check --show-existing --all
-gitleaks detect --source . --no-git --redact
-go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+make gitleaks
+make govulncheck
+make fuzz-smoke
 ```
 
 ## Project Docs

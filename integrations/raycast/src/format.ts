@@ -108,7 +108,7 @@ export function findingMarkdown(finding: Finding): string {
     "",
     "## Evidence",
     finding.evidence
-      ? `\`${escapeCode(redactText(finding.evidence))}\``
+      ? markdownCode(redactText(finding.evidence))
       : "No redacted evidence was emitted for this finding.",
     "",
     "## Impact",
@@ -159,7 +159,7 @@ export function signalMarkdown(signal: AnalysisSignal): string {
     "",
     "## Evidence",
     signal.evidence
-      ? `\`${escapeCode(redactText(signal.evidence))}\``
+      ? markdownCode(redactText(signal.evidence))
       : "No redacted evidence was emitted for this signal.",
     "",
     "## Recommended Action",
@@ -170,7 +170,7 @@ export function signalMarkdown(signal: AnalysisSignal): string {
     `Category: \`${signal.category}\``,
     `Severity: \`${signal.severity}\``,
     `Confidence: \`${signal.confidence}\``,
-    signal.path ? `Path: \`${escapeCode(signal.path)}\`` : "",
+    signal.path ? `Path: ${markdownCode(signal.path)}` : "",
     signal.why_this_matters ? "" : "",
     signal.why_this_matters ? "## Why This Matters" : "",
     signal.why_this_matters ? redactText(signal.why_this_matters) : "",
@@ -263,10 +263,56 @@ export function truncate(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength - 3)}...`;
 }
 
-function escapeCode(value: string): string {
-  return value.replace(/`/g, "\\`");
+function markdownCode(value: string): string {
+  const longestRun = maxBacktickRun(value);
+  const delimiter = "`".repeat(longestRun + 1);
+  const padded =
+    value.startsWith("`") || value.endsWith("`") ? ` ${value} ` : value;
+  return `${delimiter}${padded}${delimiter}`;
 }
 
 function escapeMarkdown(value: string): string {
-  return value.replace(/([*_#[\]])/g, "\\$1");
+  const escaped: string[] = [];
+  for (const char of value) {
+    if (markdownSpecialChars.has(char)) {
+      escaped.push("\\");
+    }
+    escaped.push(char);
+  }
+  return escaped.join("");
 }
+
+function maxBacktickRun(value: string): number {
+  let max = 0;
+  let current = 0;
+  for (const char of value) {
+    if (char === "`") {
+      current += 1;
+      if (current > max) max = current;
+    } else {
+      current = 0;
+    }
+  }
+  return max;
+}
+
+const markdownSpecialChars = new Set([
+  "\\",
+  "`",
+  "*",
+  "_",
+  "{",
+  "}",
+  "[",
+  "]",
+  "(",
+  ")",
+  "#",
+  "+",
+  "-",
+  ".",
+  "!",
+  "|",
+  ">",
+  "~",
+]);
