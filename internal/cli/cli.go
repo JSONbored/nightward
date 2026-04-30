@@ -232,7 +232,7 @@ func runFix(home string, args []string, stdout, stderr io.Writer) int {
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
-		selector, err := fixSelector(*findingID, *rule, *all)
+		selector, err := fixSelector(report, *findingID, *rule, *all)
 		if err != nil {
 			return fail(stderr, err.Error())
 		}
@@ -251,7 +251,7 @@ func runFix(home string, args []string, stdout, stderr io.Writer) int {
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
-		selector, err := fixSelector(*findingID, *rule, *all)
+		selector, err := fixSelector(report, *findingID, *rule, *all)
 		if err != nil {
 			return fail(stderr, err.Error())
 		}
@@ -485,7 +485,7 @@ Usage:
   %[1]s schedule install --preset nightly --dry-run [--json]
   %[1]s schedule remove --dry-run [--json]
 
-V1 is read-only except explicit schedule install/remove commands.
+Nightward does not mutate agent configs. It only writes explicit report/SARIF outputs and schedule install/remove files.
 
 Canonical command: nightward
 Short alias: nw
@@ -604,7 +604,7 @@ func printSchedulePlan(w io.Writer, plan schedule.Plan) {
 	}
 }
 
-func fixSelector(findingID, rule string, all bool) (fixplan.Selector, error) {
+func fixSelector(report inventory.Report, findingID, rule string, all bool) (fixplan.Selector, error) {
 	selected := 0
 	if findingID != "" {
 		selected++
@@ -620,6 +620,13 @@ func fixSelector(findingID, rule string, all bool) (fixplan.Selector, error) {
 	}
 	if selected == 0 {
 		all = true
+	}
+	if findingID != "" {
+		finding, ok := fixplan.Find(report, findingID)
+		if !ok {
+			return fixplan.Selector{}, fmt.Errorf("finding not found or ambiguous: %s", findingID)
+		}
+		findingID = finding.ID
 	}
 	return fixplan.Selector{FindingID: findingID, Rule: rule, All: all}, nil
 }

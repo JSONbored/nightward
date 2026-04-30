@@ -1,24 +1,39 @@
 # Nightward
 
-Nightward is a local-first TUI and CLI for watching AI agent/devtool state before it leaks into dotfiles.
+[![CI](https://github.com/JSONbored/nightward/actions/workflows/ci.yml/badge.svg)](https://github.com/JSONbored/nightward/actions/workflows/ci.yml)
+[![Nightward Policy](https://github.com/JSONbored/nightward/actions/workflows/nightward-policy.yml/badge.svg)](https://github.com/JSONbored/nightward/actions/workflows/nightward-policy.yml)
+[![OpenSSF Scorecard](https://github.com/JSONbored/nightward/actions/workflows/scorecard.yml/badge.svg)](https://github.com/JSONbored/nightward/actions/workflows/scorecard.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-It scans common Codex, Claude, Cursor, Windsurf, VS Code, Raycast, and MCP config locations; classifies what is portable versus local-only or secret; and builds dry-run backup plans for private dotfiles repos.
+Nightward is a local-first TUI and CLI for auditing AI agent and devtool state before it leaks into dotfiles.
 
-V1 is read-only except explicit schedule install/remove commands.
+It scans common Codex, Claude, Cursor, Windsurf, VS Code, Raycast, and MCP config locations; classifies what is portable versus local-only or secret; highlights MCP security findings; and produces redacted fix plans, SARIF policy output, and dry-run backup plans.
+
+Nightward does not mutate agent configs. It only writes explicit report/SARIF files when requested and user-level schedule files through explicit schedule install/remove commands.
 
 ## Why
 
-AI coding tools scatter useful state across config files, MCP server definitions, skills, rules, commands, extension settings, credentials, caches, and app-owned databases. Syncing all of that blindly is fragile and unsafe.
+AI coding tools scatter useful state across config files, MCP server definitions, skills, rules, commands, extension settings, credentials, caches, and app-owned databases. Blindly syncing all of it is fragile and unsafe.
 
-Nightward gives you a local inventory first:
+Nightward answers the practical questions first:
 
-- what exists
-- what is safe to sync
-- what needs review
-- what should never be committed
-- which MCP configs deserve security attention
-- what exact remediation plan is safe to consider
-- what a backup plan would do before it writes anything
+- What exists on this machine?
+- What is portable enough for a private dotfiles repo?
+- What is machine-local, app-owned, runtime cache, or credential material?
+- Which MCP configs deserve security review?
+- What exact remediation plan should I consider before syncing?
+- What would a backup plan include, review, or exclude before it writes anything?
+
+## Highlights
+
+- Bubble Tea TUI with dashboard, inventory, findings, fix plan, and backup preview tabs.
+- `nightward` canonical command plus `nw` short alias.
+- Redacted JSON for automation and CI.
+- MCP findings for unpinned package execution, shell wrappers, sensitive env keys, broad filesystem access, token paths, parse failures, and unknown server shapes.
+- Plan-only remediation metadata: fix kind, confidence, risk, review requirement, impact, and steps.
+- SARIF output for GitHub code scanning.
+- User-level nightly scan scheduling for macOS launchd, Linux systemd user timers, and cron text fallback.
+- No telemetry, no cloud dashboard, no network calls from Nightward runtime, and no live config mutation.
 
 ## Install
 
@@ -26,73 +41,50 @@ Nightward gives you a local inventory first:
 make install-local
 ```
 
-This installs both commands:
+This installs:
 
 - `nightward`: canonical project command
 - `nw`: short alias for frequent terminal/TUI use
 
-## Usage
+## Quick Start
 
 Open the TUI:
 
 ```sh
-nightward
-# or
 nw
 ```
 
 Scan and emit redacted JSON:
 
 ```sh
-nightward scan --json
-# or
 nw scan --json
 ```
 
 Check local assumptions:
 
 ```sh
-nightward doctor --json
-# or
 nw doctor --json
 ```
 
-Generate a dry-run backup plan:
+List and explain findings:
 
 ```sh
-nightward plan backup --target ~/dotfiles
-# or
-nw plan backup --target ~/dotfiles
-```
-
-List supported adapters:
-
-```sh
-nightward adapters list
-# or
-nw adapters list
-```
-
-List findings:
-
-```sh
-nightward findings list
-# or
-nw findings list --json
-```
-
-Explain a finding:
-
-```sh
+nw findings list
 nw findings explain mcp_unpinned_package-abc123
 ```
 
-Generate a read-only fix plan:
+Generate a plan-only fix report:
 
 ```sh
 nw fix plan --all --json
 nw fix plan --rule mcp_secret_env
 nw fix export --format markdown
+```
+
+Generate a dry-run backup plan:
+
+```sh
+nw plan backup --target ~/dotfiles
 ```
 
 Run policy checks or generate SARIF:
@@ -102,27 +94,11 @@ nw policy check --strict --json
 nw policy sarif --output nightward.sarif
 ```
 
-Generate a nightly schedule plan:
+Preview scheduled nightly scans:
 
 ```sh
-nightward schedule plan --preset nightly
-# or
 nw schedule plan --preset nightly
-```
-
-Preview schedule install without writing:
-
-```sh
-nightward schedule install --preset nightly --dry-run
-# or
 nw schedule install --preset nightly --dry-run
-```
-
-Preview schedule removal without writing:
-
-```sh
-nightward schedule remove --dry-run
-# or
 nw schedule remove --dry-run
 ```
 
@@ -139,22 +115,9 @@ Nightward classifies discovered state as:
 
 Backup plans include portable items, mark machine-local/unknown items for review, and exclude secret/auth, runtime-cache, and app-owned state by default.
 
-## MCP/Security Checks
+## Fix Plan Model
 
-Nightward inspects JSON and TOML MCP config shapes where possible and flags:
-
-- unpinned package execution through tools such as `npx`, `uvx`, or `pipx`
-- shell-mediated MCP commands
-- sensitive environment key references
-- broad filesystem access
-- local credential path references
-- MCP servers that need manual review
-
-Reports redact values and expose only path, tool, classification, risk, reason, and recommended action.
-
-## Fix Plans
-
-Nightward does not mutate agent configs in this release. "Autofix" means structured, reviewable fix plans:
+Nightward does not apply fixes yet. "Autofix" currently means structured, reviewable fix plans:
 
 - `pin-package`: pin `npx`, `uvx`, or `pipx` package execution when the package name is parseable
 - `externalize-secret`: move inline secret values out of agent config and keep only env key names or setup docs
@@ -163,18 +126,25 @@ Nightward does not mutate agent configs in this release. "Autofix" means structu
 - `manual-review`: inspect unsupported, ambiguous, or high-risk config manually
 - `ignore-with-reason`: keep an advisory finding only after documenting why it is expected
 
-Every fix plan includes confidence, risk, review requirements, redacted evidence, impact, and steps. Secret values are never emitted in scan JSON, fix-plan JSON, Markdown exports, SARIF, or TUI detail text.
+Secret values are never emitted in scan JSON, findings output, fix-plan JSON, Markdown exports, SARIF, or TUI detail text.
 
 ## TUI
 
-The default `nightward` / `nw` command opens a Bubble Tea TUI with:
+The default `nightward` / `nw` command opens the TUI:
 
-- dashboard metrics and schedule status
-- inventory by tool/classification
-- findings list with severity/tool/rule filters
-- selected-finding detail with evidence, impact, fix plan, and why it matters
-- fix-plan summary grouped as safe, review, and blocked
-- backup plan preview
+- Dashboard: scan counts and schedule status
+- Inventory: discovered paths by tool, classification, and risk
+- Findings: severity/tool/rule filters with a selected-finding detail pane
+- Fix Plan: safe/review/blocked remediation groups
+- Backup Plan: private-dotfiles dry-run preview
+
+Keyboard shortcuts:
+
+- `1`-`5`: switch tabs
+- arrow keys or `h`/`j`/`k`/`l`: navigate
+- `s`, `t`, `r`: cycle finding severity, tool, and rule filters
+- `c`, `e`, `o`: show copy/export/docs action hints
+- `q` or `esc`: quit
 
 ## Scheduling
 
@@ -198,17 +168,32 @@ Scheduled scans never copy secrets, mutate dotfiles, restore files, or push to G
 go test ./...
 go run ./cmd/nightward --help
 go run ./cmd/nw --help
-go run ./cmd/nightward scan --json
+go run ./cmd/nw scan --json
 go run ./cmd/nw findings list --json
 go run ./cmd/nw fix plan --all --json
 go run ./cmd/nw policy sarif --output /tmp/nightward.sarif
-go run ./cmd/nightward schedule install --preset nightly --dry-run
+go run ./cmd/nw schedule install --preset nightly --dry-run
+```
+
+Local security checks used by maintainers:
+
+```sh
+actionlint
+gitleaks detect --source . --no-git --redact
+go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 ```
 
 ## Project Docs
 
 - [Security policy](SECURITY.md)
 - [Contributing guide](CONTRIBUTING.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Support](SUPPORT.md)
 - [Roadmap](ROADMAP.md)
 - [CI/security notes](docs/ci-security.md)
+- [Privacy model](docs/privacy-model.md)
 - [Screenshot/GIF capture plan](docs/screenshots.md)
+
+## License
+
+MIT

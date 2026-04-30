@@ -15,7 +15,8 @@ Use fixtures with temporary homes for adapter and policy tests. Do not add real 
 
 ## Design Rules
 
-- Scanner, doctor, findings, fix, policy, and backup-plan commands are read-only.
+- Scanner, doctor, findings, fix, policy, and backup-plan commands must not mutate agent configs.
+- Explicit output flags may write redacted report or SARIF artifacts.
 - Fix plans recommend steps; they do not edit agent configs.
 - Any new output surface must preserve redaction.
 - New adapters need classification, risk rationale, and no-write tests when practical.

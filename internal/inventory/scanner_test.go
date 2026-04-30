@@ -74,6 +74,33 @@ GITHUB_TOKEN = "${GITHUB_TOKEN}"
 	}
 }
 
+func TestScannerRedactsSecretArgumentValues(t *testing.T) {
+	home := t.TempDir()
+	writeFile(t, filepath.Join(home, ".mcp.json"), `{
+  "mcpServers": {
+    "leaky": {
+      "command": "bash",
+      "args": ["-c", "node server.js --api-key super-secret-value --token=another-secret"]
+    }
+  }
+}`)
+
+	report := NewScanner(home).Scan()
+	data, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, leaked := range []string{"super-secret-value", "another-secret"} {
+		if strings.Contains(text, leaked) {
+			t.Fatalf("scan report leaked secret argument value %q: %s", leaked, text)
+		}
+	}
+	if !strings.Contains(text, "[redacted]") {
+		t.Fatalf("expected redacted evidence in scan report: %s", text)
+	}
+}
+
 func TestScannerDoesNotWriteToHome(t *testing.T) {
 	home := t.TempDir()
 	path := filepath.Join(home, ".mcp.json")

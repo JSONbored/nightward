@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,6 +32,41 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 	after := listTestFiles(t, home)
 	if strings.Join(before, "\n") != strings.Join(after, "\n") {
 		t.Fatalf("read-only commands mutated home\nbefore=%v\nafter=%v", before, after)
+	}
+}
+
+func TestFixPlanFindingSelectorRequiresUniquePrefix(t *testing.T) {
+	home := t.TempDir()
+	writeTestFile(t, filepath.Join(home, ".mcp.json"), `{"mcpServers":{"one":{"command":"node","args":["one.js"]},"two":{"command":"node","args":["two.js"]}}}`)
+	t.Setenv("NIGHTWARD_HOME", home)
+
+	var stdout, stderr bytes.Buffer
+	code := RunWithName("nw", []string{"fix", "plan", "--finding", "mcp_server_review", "--json"}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected ambiguous finding prefix to fail, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = RunWithName("nw", []string{"findings", "list", "--json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("findings list failed: %s", stderr.String())
+	}
+	var findings []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &findings); err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) == 0 {
+		t.Fatal("expected findings")
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = RunWithName("nw", []string{"fix", "plan", "--finding", findings[0].ID, "--json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exact finding selector failed: %s", stderr.String())
 	}
 }
 

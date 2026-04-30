@@ -178,7 +178,7 @@ func commandFindings(item Item, server mcpServer) []Finding {
 				Severity:       RiskHigh,
 				Rule:           "mcp_unpinned_package",
 				Message:        fmt.Sprintf("MCP server %q runs a package executor without an obvious pinned package version.", server.Name),
-				Evidence:       fmt.Sprintf("command=%s args=%s", redact(server.Command), redact(strings.Join(server.Args, " "))),
+				Evidence:       fmt.Sprintf("command=%s args=%s", redact(server.Command), redactArgs(server.Args)),
 				Recommendation: "Pin package versions or replace with a trusted local binary before syncing.",
 				Impact:         "A future package publish or dependency change can alter code that the AI client executes locally.",
 				Why:            "Unpinned package execution makes config restores non-reproducible and widens the supply-chain attack surface.",
@@ -217,7 +217,7 @@ func commandFindings(item Item, server mcpServer) []Finding {
 			Severity:       RiskHigh,
 			Rule:           "mcp_shell_command",
 			Message:        fmt.Sprintf("MCP server %q executes through a shell.", server.Name),
-			Evidence:       fmt.Sprintf("command=%s args=%s", redact(server.Command), redact(strings.Join(server.Args, " "))),
+			Evidence:       fmt.Sprintf("command=%s args=%s", redact(server.Command), redactArgs(server.Args)),
 			Recommendation: "Prefer direct executable invocation and review the command before syncing.",
 			Impact:         "Shell wrappers can hide compound commands, environment expansion, and shell-specific behavior.",
 			Why:            "Direct executable invocation is easier to audit and less likely to preserve unsafe local shell assumptions in dotfiles.",
@@ -239,7 +239,7 @@ func commandFindings(item Item, server mcpServer) []Finding {
 			finding.FixSummary = fmt.Sprintf("Replace the shell wrapper with direct command %q.", directCommand)
 			step := fmt.Sprintf("Set command to %q.", directCommand)
 			if len(directArgs) > 0 {
-				step = fmt.Sprintf("Set command to %q and args to [%s].", directCommand, quoteList(directArgs))
+				step = fmt.Sprintf("Set command to %q and args to [%s].", directCommand, quoteList(redactArgSlice(directArgs)))
 			}
 			finding.FixSteps = []string{
 				step,
@@ -336,7 +336,6 @@ func envFindings(item Item, server mcpServer) []Finding {
 }
 
 func argFindings(item Item, server mcpServer) []Finding {
-	joined := strings.Join(server.Args, " ")
 	var findings []Finding
 	if referencesBroadPath(server.Args) {
 		findings = append(findings, Finding{
@@ -346,7 +345,7 @@ func argFindings(item Item, server mcpServer) []Finding {
 			Severity:       RiskMedium,
 			Rule:           "mcp_broad_filesystem",
 			Message:        fmt.Sprintf("MCP server %q appears to reference broad filesystem access.", server.Name),
-			Evidence:       redact(joined),
+			Evidence:       redactArgs(server.Args),
 			Recommendation: "Narrow filesystem access to explicit project/config paths where possible.",
 			Impact:         "A broad mount can expose unrelated personal files or credentials to an MCP server.",
 			Why:            "Least-privilege filesystem scope reduces accidental disclosure and makes portable configs easier to review.",
@@ -371,7 +370,7 @@ func argFindings(item Item, server mcpServer) []Finding {
 			Severity:       RiskHigh,
 			Rule:           "mcp_local_token_path",
 			Message:        fmt.Sprintf("MCP server %q appears to reference local credential paths.", server.Name),
-			Evidence:       redact(joined),
+			Evidence:       redactArgs(server.Args),
 			Recommendation: "Keep credential paths local-only and avoid committing them to dotfiles.",
 			Impact:         "Credential file paths are machine-local assumptions and can reveal where sensitive material is stored.",
 			Why:            "Portable dotfiles should not encode local credential locations unless they are intentionally templated and ignored.",
@@ -399,6 +398,10 @@ func packageName(args []string) (string, bool) {
 		}
 		if strings.HasPrefix(arg, "-") {
 			if flagLikelyHasValue(arg) && i+1 < len(args) {
+				value := strings.TrimSpace(args[i+1])
+				if value != "" && !hasPinnedPackage([]string{value}) {
+					return packageBaseName(value), true
+				}
 				i++
 			}
 			continue
@@ -565,14 +568,55 @@ func redact(value string) string {
 	if value == "" {
 		return value
 	}
-	parts := strings.Fields(value)
-	for i, part := range parts {
-		if secretKeyPattern.MatchString(part) || strings.Contains(part, "=") && secretKeyPattern.MatchString(strings.SplitN(part, "=", 2)[0]) {
-			parts[i] = "[redacted]"
-		}
-	}
+	parts := redactArgSlice(strings.Fields(value))
 	if len(parts) > 0 {
 		return strings.Join(parts, " ")
 	}
 	return value
+}
+
+func redactArgs(args []string) string {
+	return strings.Join(redactArgSlice(args), " ")
+}
+
+func redactArgSlice(parts []string) []string {
+	out := append([]string(nil), parts...)
+	redactNext := false
+	for i, part := range parts {
+		if redactNext {
+			out[i] = "[redacted]"
+			redactNext = false
+			continue
+		}
+		if key, ok := secretAssignmentKey(part); ok && secretKeyPattern.MatchString(key) {
+			out[i] = "[redacted]"
+			continue
+		}
+		if secretFlag(part) {
+			out[i] = "[redacted]"
+			redactNext = true
+			continue
+		}
+		if secretKeyPattern.MatchString(part) {
+			out[i] = "[redacted]"
+		}
+	}
+	return out
+}
+
+func secretAssignmentKey(part string) (string, bool) {
+	if !strings.Contains(part, "=") {
+		return "", false
+	}
+	key := strings.SplitN(part, "=", 2)[0]
+	key = strings.TrimLeft(key, "-")
+	return key, true
+}
+
+func secretFlag(part string) bool {
+	if strings.Contains(part, "=") {
+		return false
+	}
+	trimmed := strings.TrimLeft(part, "-")
+	return trimmed != "" && secretKeyPattern.MatchString(trimmed)
 }
