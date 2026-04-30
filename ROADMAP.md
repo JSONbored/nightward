@@ -22,6 +22,10 @@ Nightward is intentionally staged. The scanner and policy model need to stay tru
 - More MCP config shapes for Codex, Claude Code, and editor integrations.
 - Raycast screenshots, store metadata, and manual development-mode smoke after the first release candidate.
 - Golden SARIF snapshots and broader no-write tests.
+- Bubble Tea/Bubbles TUI upgrade with list, table, viewport, textinput, help, filter modal, command palette, report history, and mouse-wheel support.
+- Optional provider execution for local scanners with timeouts, file-size caps, redaction, and explicit online-provider opt-in.
+- Fuzz coverage for MCP JSON/TOML/YAML parsing, URL/header redaction, symlink traversal, huge files, and malformed configs.
+- Threat model documentation for provider execution, report exports, scheduler behavior, and SARIF uploads.
 - Validate GoReleaser on the first release candidate tag.
 - Screenshot and GIF assets for the README.
 

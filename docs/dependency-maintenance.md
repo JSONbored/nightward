@@ -7,7 +7,7 @@ Nightward uses Renovate instead of Dependabot.
 - Go modules in `go.mod` and `go.sum`.
 - Raycast extension packages in `integrations/raycast/package.json` and `package-lock.json`.
 - GitHub Actions versions and pinned action digests.
-- `gotestsum` in `Makefile`.
+- `gotestsum`, `gitleaks`, and `govulncheck` pins in `Makefile`.
 - GoReleaser binary version in `.github/workflows/release.yml`.
 - Trunk plugin registry pin in `.trunk/trunk.yaml`.
 

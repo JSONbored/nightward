@@ -36,6 +36,9 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 		{"snapshot", "plan", "--target", filepath.Join(home, "snapshot"), "--json"},
 		{"policy", "sarif", "--output", filepath.Join(outputDir, "nightward.sarif")},
 		{"policy", "sarif", "--include-analysis", "--output", "-"},
+		{"schedule", "plan", "--preset", "nightly", "--json"},
+		{"schedule", "install", "--preset", "nightly", "--dry-run", "--json"},
+		{"schedule", "remove", "--dry-run", "--json"},
 	}
 	for _, args := range commands {
 		var stdout, stderr bytes.Buffer
@@ -54,6 +57,146 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 	targetAfter := listOptionalTestFiles(t, targetDir)
 	if strings.Join(targetBefore, "\n") != strings.Join(targetAfter, "\n") {
 		t.Fatalf("read-only backup plan mutated target\nbefore=%v\nafter=%v", targetBefore, targetAfter)
+	}
+}
+
+func TestPublicCommandMatrixAndRedaction(t *testing.T) {
+	home := t.TempDir()
+	secretValue := "super-" + "secret-value"
+	writeTestFile(t, filepath.Join(home, ".codex", "config.toml"), `[mcp_servers.demo]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem", "/"]
+
+[mcp_servers.demo.env]
+API_TOKEN = "`+secretValue+`"
+`)
+	t.Setenv("NIGHTWARD_HOME", home)
+
+	findingID := firstFindingID(t, []string{"findings", "list", "--json"})
+	jsonCommands := [][]string{
+		{"scan", "--json"},
+		{"doctor", "--json"},
+		{"adapters", "list", "--json"},
+		{"findings", "list", "--json"},
+		{"findings", "explain", "--json", findingID},
+		{"fix", "plan", "--all", "--json"},
+		{"fix", "preview", "--all", "--format", "json"},
+		{"analyze", "--all", "--json"},
+		{"analyze", "finding", "--json", findingID},
+		{"trust", "explain", "--json", findingID},
+		{"providers", "list", "--json"},
+		{"providers", "doctor", "--json"},
+		{"policy", "check", "--json"},
+		{"policy", "sarif", "--output", "-"},
+		{"snapshot", "plan", "--target", filepath.Join(home, "snapshots"), "--json"},
+		{"schedule", "plan", "--json"},
+		{"schedule", "install", "--dry-run", "--json"},
+		{"schedule", "remove", "--dry-run", "--json"},
+	}
+	for _, args := range jsonCommands {
+		stdout, stderr, code := runCLI(args)
+		if args[0] == "policy" && args[1] == "check" {
+			if code != 1 {
+				t.Fatalf("%s expected policy violation exit 1, got %d stderr=%s", strings.Join(args, " "), code, stderr)
+			}
+		} else if code != 0 {
+			t.Fatalf("%s failed with %d: %s", strings.Join(args, " "), code, stderr)
+		}
+		if !json.Valid([]byte(stdout)) {
+			t.Fatalf("%s did not emit valid JSON:\n%s\nstderr=%s", strings.Join(args, " "), stdout, stderr)
+		}
+		assertNoSecret(t, stdout, secretValue)
+	}
+
+	textCommands := [][]string{
+		{"scan"},
+		{"doctor"},
+		{"plan", "backup", "--target", filepath.Join(home, "backup")},
+		{"findings", "list"},
+		{"findings", "explain", findingID},
+		{"fix", "plan", "--all"},
+		{"fix", "preview", "--all", "--format", "markdown"},
+		{"fix", "export", "--all", "--format", "markdown"},
+		{"analyze", "--all"},
+		{"trust", "explain", findingID},
+		{"policy", "init", "--dry-run"},
+		{"policy", "explain"},
+		{"schedule", "install", "--dry-run"},
+	}
+	for _, args := range textCommands {
+		stdout, stderr, code := runCLI(args)
+		if code != 0 {
+			t.Fatalf("%s failed with %d: %s", strings.Join(args, " "), code, stderr)
+		}
+		if stdout == "" {
+			t.Fatalf("%s produced no stdout", strings.Join(args, " "))
+		}
+		assertNoSecret(t, stdout, secretValue)
+	}
+
+	failures := [][]string{
+		{"plan", "backup", "--json"},
+		{"fix", "preview", "--all", "--format", "xml"},
+		{"policy", "init"},
+		{"snapshot", "diff", "--from", "missing.json"},
+		{"schedule", "install", "--preset", "bogus", "--dry-run"},
+	}
+	for _, args := range failures {
+		_, _, code := runCLI(args)
+		if code == 0 {
+			t.Fatalf("%s unexpectedly succeeded", strings.Join(args, " "))
+		}
+	}
+}
+
+func TestScanOutputModesHaveEquivalentSummaries(t *testing.T) {
+	home := t.TempDir()
+	writeTestFile(t, filepath.Join(home, ".mcp.json"), `{"mcpServers":{"demo":{"command":"node","args":["server.js"]}}}`)
+	t.Setenv("NIGHTWARD_HOME", home)
+	outputFile := filepath.Join(t.TempDir(), "scan.json")
+	outputDir := t.TempDir()
+
+	stdoutJSON, stderr, code := runCLI([]string{"scan", "--json"})
+	if code != 0 {
+		t.Fatalf("scan --json failed: %s", stderr)
+	}
+	stdoutDash, stderr, code := runCLI([]string{"scan", "--output", "-"})
+	if code != 0 {
+		t.Fatalf("scan --output - failed: %s", stderr)
+	}
+	_, stderr, code = runCLI([]string{"scan", "--output", outputFile})
+	if code != 0 {
+		t.Fatalf("scan --output file failed: %s", stderr)
+	}
+	_, stderr, code = runCLI([]string{"scan", "--output-dir", outputDir})
+	if code != 0 {
+		t.Fatalf("scan --output-dir failed: %s", stderr)
+	}
+
+	want := scanSummary(t, stdoutJSON)
+	if got := scanSummary(t, stdoutDash); got != want {
+		t.Fatalf("stdout summary mismatch: got=%s want=%s", got, want)
+	}
+	fileData, err := os.ReadFile(outputFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := scanSummary(t, string(fileData)); got != want {
+		t.Fatalf("file summary mismatch: got=%s want=%s", got, want)
+	}
+	matches, err := filepath.Glob(filepath.Join(outputDir, "nightward-scan-*.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected one output-dir report, got %v", matches)
+	}
+	dirData, err := os.ReadFile(matches[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := scanSummary(t, string(dirData)); got != want {
+		t.Fatalf("output-dir summary mismatch: got=%s want=%s", got, want)
 	}
 }
 
@@ -86,6 +229,28 @@ func TestWorkspaceCommandsAreReadOnlyAndSupportStdoutSARIF(t *testing.T) {
 	after := listTestFiles(t, workspace)
 	if strings.Join(before, "\n") != strings.Join(after, "\n") {
 		t.Fatalf("workspace commands mutated files\nbefore=%v\nafter=%v", before, after)
+	}
+}
+
+func TestWorkspaceScanDoesNotReadHomeFixtures(t *testing.T) {
+	home := t.TempDir()
+	workspace := t.TempDir()
+	writeTestFile(t, filepath.Join(home, ".codex", "config.toml"), `[mcp_servers.home_only]
+command = "npx"
+args = ["-y", "@example/home-only"]
+`)
+	writeTestFile(t, filepath.Join(workspace, ".cursor", "mcp.json"), `{"mcpServers":{"workspaceOnly":{"url":"https://mcp.example.test/server"}}}`)
+	t.Setenv("NIGHTWARD_HOME", home)
+
+	stdout, stderr, code := runCLI([]string{"scan", "--workspace", workspace, "--json"})
+	if code != 0 {
+		t.Fatalf("workspace scan failed: %s", stderr)
+	}
+	if strings.Contains(stdout, "home_only") || strings.Contains(stdout, filepath.Join(home, ".codex")) {
+		t.Fatalf("workspace scan included HOME-only config:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "workspaceOnly") {
+		t.Fatalf("workspace scan missed workspace config:\n%s", stdout)
 	}
 }
 
@@ -180,4 +345,49 @@ func listOptionalTestFiles(t *testing.T, root string) []string {
 		return nil
 	}
 	return listTestFiles(t, root)
+}
+
+func runCLI(args []string) (string, string, int) {
+	var stdout, stderr bytes.Buffer
+	code := RunWithName("nw", args, &stdout, &stderr)
+	return stdout.String(), stderr.String(), code
+}
+
+func firstFindingID(t *testing.T, args []string) string {
+	t.Helper()
+	stdout, stderr, code := runCLI(args)
+	if code != 0 {
+		t.Fatalf("%s failed: %s", strings.Join(args, " "), stderr)
+	}
+	var findings []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &findings); err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) == 0 {
+		t.Fatal("expected at least one finding")
+	}
+	return findings[0].ID
+}
+
+func assertNoSecret(t *testing.T, output, secret string) {
+	t.Helper()
+	if strings.Contains(output, secret) {
+		t.Fatalf("output leaked secret %q:\n%s", secret, output)
+	}
+}
+
+func scanSummary(t *testing.T, data string) string {
+	t.Helper()
+	var decoded struct {
+		Summary json.RawMessage `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(data), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.Summary) == 0 {
+		t.Fatalf("missing summary in %s", data)
+	}
+	return string(decoded.Summary)
 }

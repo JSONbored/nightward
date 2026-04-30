@@ -21,8 +21,9 @@
 - [ ] `make test-junit`
 - [ ] `make trunk-flaky-validate`
 - [ ] `trunk check --show-existing --all`
-- [ ] `gitleaks detect --source . --no-git --redact`
-- [ ] `go run golang.org/x/vuln/cmd/govulncheck@latest ./...`
+- [ ] `make gitleaks`
+- [ ] `make govulncheck`
+- [ ] `make fuzz-smoke`
 
 ## Notes
 

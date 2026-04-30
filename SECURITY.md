@@ -19,7 +19,7 @@ Nightward is pre-1.0. Security fixes target `main` until tagged releases exist.
 
 ## Reporting a Vulnerability
 
-Open a private security advisory on GitHub if available. If not, open a public issue with sensitive details removed and say that you need a private disclosure channel.
+Open a private security advisory through [GitHub Security Advisories](https://github.com/JSONbored/nightward/security/advisories/new) if available. If that path is unavailable, open a public issue with sensitive details removed and say that you need a private disclosure channel.
 
 Do not include real tokens, auth files, private MCP configs, or personal paths in reports. Redact values and keep only the minimum config shape needed to reproduce the issue.
 

@@ -59,6 +59,25 @@ test("finding markdown keeps guidance while avoiding secret values", () => {
   assert.doesNotMatch(markdown, /1234567890abcdef/);
 });
 
+test("markdown helpers preserve escaped evidence without leaking formatting", () => {
+  const finding: Finding = {
+    id: "mcp_review-escaping",
+    tool: "Codex",
+    path: "/tmp/config.toml",
+    severity: "medium",
+    rule: "mcp_[review]\\path",
+    message: "Review `server` path.",
+    evidence: "command=`node` path=C:\\Users\\example",
+    recommended_action: "Review manually.",
+    fix_available: false,
+    requires_review: true,
+  };
+
+  const markdown = findingMarkdown(finding);
+  assert.match(markdown, /^# mcp\\_\\\[review\\\]\\\\path/m);
+  assert.match(markdown, /``command=`node` path=C:\\Users\\example``/);
+});
+
 test("findings sort by severity then stable identity", () => {
   const findings: Finding[] = [
     baseFinding("b", "low", "Cursor"),

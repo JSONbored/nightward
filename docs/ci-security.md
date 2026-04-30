@@ -4,8 +4,8 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 
 ## Workflows
 
-- `ci.yml`: Go tests, race tests, `go vet`, `staticcheck`, `gosec`, JUnit reports, local JUnit shape validation, gated Trunk Flaky Tests uploads, Trunk Check, Raycast extension tests/build/audit, Gitleaks, govulncheck, and OSV dependency scanning.
-- `nightward-policy.yml`: generates Nightward SARIF from a fixture home and uploads it to GitHub code scanning.
+- `ci.yml`: Go tests, race tests, `go vet`, `staticcheck`, `gosec`, fuzz smoke tests, JUnit reports, local JUnit shape validation, gated Trunk Flaky Tests uploads, explicit Trunk Check CLI execution, Raycast extension tests/build/audit, Gitleaks, govulncheck, and OSV dependency scanning.
+- `nightward-policy.yml`: generates workspace Nightward SARIF and uploads it to GitHub code scanning without scanning synthetic risky fixture homes.
 - `plugin.yaml`: defines Trunk Check linters for workspace policy and analysis SARIF once release tags are available.
 - `scorecard.yml`: runs OpenSSF Scorecard and uploads SARIF.
 - `release.yml`: publishes signed GoReleaser artifacts from strict `vX.Y.Z` tags.
@@ -18,10 +18,12 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 - Use least-privilege workflow and job permissions.
 - Prefer read-only `contents: read` unless a job needs SARIF upload or OIDC.
 - Keep OpenSSF Scorecard publish permissions job-scoped; global `id-token: write` fails Scorecard workflow verification.
+- Keep release publish permissions job-scoped; top-level workflow permissions should stay read-only unless every job truly needs write access.
 - Keep Trunk Flaky Tests uploads gated on `TRUNK_ORG_URL_SLUG` and `TRUNK_API_TOKEN`.
 - Never make flaky-test quarantining a default CI behavior.
 - Use Renovate instead of Dependabot whenever possible.
 - Keep dependency PRs reviewed; do not enable broad automerge by default.
+- Use repo-controlled `make gitleaks` and `make govulncheck` targets in CI so local and remote behavior match.
 
 ## Trunk Plugin Notes
 
