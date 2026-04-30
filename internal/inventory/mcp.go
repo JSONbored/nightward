@@ -3,6 +3,8 @@ package inventory
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,11 +15,15 @@ import (
 )
 
 type mcpServer struct {
-	Name    string
-	Command string
-	Args    []string
-	Env     map[string]string
-	Raw     map[string]any
+	Name      string
+	Command   string
+	Args      []string
+	Env       map[string]string
+	URL       string
+	Type      string
+	Transport string
+	Headers   map[string]string
+	Raw       map[string]any
 }
 
 var secretKeyPattern = regexp.MustCompile(`(?i)(token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)`)
@@ -59,13 +65,15 @@ func inspectMCP(item Item, spec pathSpec) []Finding {
 		findings = append(findings, reviewFinding(item, server))
 		findings = append(findings, commandFindings(item, server)...)
 		findings = append(findings, envFindings(item, server)...)
+		findings = append(findings, headerFindings(item, server)...)
+		findings = append(findings, urlFindings(item, server)...)
 		findings = append(findings, argFindings(item, server)...)
 	}
 	return findings
 }
 
 func readMCPServers(path string) ([]mcpServer, error) {
-	contents, err := os.ReadFile(path)
+	contents, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- MCP config path comes from Nightward's local adapter inventory.
 	if err != nil {
 		return nil, err
 	}
@@ -121,14 +129,14 @@ func mapServers(group map[string]any) []mcpServer {
 		if !ok {
 			continue
 		}
-		server := mcpServer{Name: name, Raw: serverMap, Env: map[string]string{}}
+		server := mcpServer{Name: name, Raw: serverMap, Env: map[string]string{}, Headers: map[string]string{}}
 		server.Command = stringValue(serverMap["command"])
 		server.Args = stringSlice(serverMap["args"])
-		if env, ok := serverMap["env"].(map[string]any); ok {
-			for key, value := range env {
-				server.Env[key] = stringValue(value)
-			}
-		}
+		server.URL = stringValue(serverMap["url"])
+		server.Type = stringValue(serverMap["type"])
+		server.Transport = stringValue(serverMap["transport"])
+		server.Env = stringMap(serverMap["env"])
+		server.Headers = stringMap(serverMap["headers"])
 		servers = append(servers, server)
 	}
 	return servers
@@ -139,14 +147,19 @@ func reviewFinding(item Item, server mcpServer) Finding {
 	if command == "" {
 		command = "unknown"
 	}
+	evidence := fmt.Sprintf("command=%s", redact(command))
+	if server.URL != "" && server.Command == "" {
+		evidence = remoteEvidence(server)
+	}
 	return Finding{
 		ID:             findingID("mcp_server_review", item.Tool, item.Path, server.Name),
 		Tool:           item.Tool,
 		Path:           item.Path,
+		Server:         server.Name,
 		Severity:       RiskInfo,
 		Rule:           "mcp_server_review",
 		Message:        fmt.Sprintf("Review MCP server %q before syncing this config.", server.Name),
-		Evidence:       fmt.Sprintf("command=%s", redact(command)),
+		Evidence:       evidence,
 		Recommendation: "Confirm the server source, permissions, and local path assumptions.",
 		Impact:         "This server may execute local code or expose local files when an AI client invokes it.",
 		Why:            "MCP configs are executable trust boundaries, so portable backups should preserve intent without hiding local-only risk.",
@@ -175,6 +188,7 @@ func commandFindings(item Item, server mcpServer) []Finding {
 				ID:             findingID("mcp_unpinned_package", item.Tool, item.Path, server.Name),
 				Tool:           item.Tool,
 				Path:           item.Path,
+				Server:         server.Name,
 				Severity:       RiskHigh,
 				Rule:           "mcp_unpinned_package",
 				Message:        fmt.Sprintf("MCP server %q runs a package executor without an obvious pinned package version.", server.Name),
@@ -198,6 +212,7 @@ func commandFindings(item Item, server mcpServer) []Finding {
 				finding.FixKind = FixPinPackage
 				finding.Confidence = "high"
 				finding.FixSummary = fmt.Sprintf("Pin %s to an explicit version before syncing this MCP config.", pkg)
+				finding.PatchHint = &PatchHint{Kind: FixPinPackage, Package: pkg}
 				finding.FixSteps = []string{
 					fmt.Sprintf("Choose a reviewed version for %s.", pkg),
 					fmt.Sprintf("Change the package arg from %q to %q.", pkg, pkg+"@<version>"),
@@ -214,6 +229,7 @@ func commandFindings(item Item, server mcpServer) []Finding {
 			ID:             findingID("mcp_shell_command", item.Tool, item.Path, server.Name),
 			Tool:           item.Tool,
 			Path:           item.Path,
+			Server:         server.Name,
 			Severity:       RiskHigh,
 			Rule:           "mcp_shell_command",
 			Message:        fmt.Sprintf("MCP server %q executes through a shell.", server.Name),
@@ -236,6 +252,7 @@ func commandFindings(item Item, server mcpServer) []Finding {
 		if simple {
 			finding.FixKind = FixReplaceShellWrapper
 			finding.Confidence = "high"
+			finding.PatchHint = &PatchHint{Kind: FixReplaceShellWrapper, DirectCommand: directCommand, DirectArgs: redactArgSlice(directArgs)}
 			finding.FixSummary = fmt.Sprintf("Replace the shell wrapper with direct command %q.", directCommand)
 			step := fmt.Sprintf("Set command to %q.", directCommand)
 			if len(directArgs) > 0 {
@@ -250,14 +267,16 @@ func commandFindings(item Item, server mcpServer) []Finding {
 		findings = append(findings, finding)
 	}
 
-	if server.Command == "" {
+	if server.Command == "" && server.URL == "" {
 		findings = append(findings, Finding{
 			ID:             findingID("mcp_unknown_command", item.Tool, item.Path, server.Name),
 			Tool:           item.Tool,
 			Path:           item.Path,
+			Server:         server.Name,
 			Severity:       RiskMedium,
 			Rule:           "mcp_unknown_command",
 			Message:        fmt.Sprintf("MCP server %q does not declare a command Nightward can inspect.", server.Name),
+			Evidence:       structuralEvidence(server),
 			Recommendation: "Review this server manually before syncing.",
 			Impact:         "Nightward cannot determine what executable would run for this MCP server.",
 			Why:            "Missing or unsupported server shapes block reliable policy checks and backup decisions.",
@@ -315,6 +334,7 @@ func envFindings(item Item, server mcpServer) []Finding {
 				ID:             findingID("mcp_secret_env", item.Tool, item.Path, server.Name+key),
 				Tool:           item.Tool,
 				Path:           item.Path,
+				Server:         server.Name,
 				Severity:       severity,
 				Rule:           "mcp_secret_env",
 				Message:        message,
@@ -329,10 +349,101 @@ func envFindings(item Item, server mcpServer) []Finding {
 				RequiresReview: true,
 				FixSummary:     summary,
 				FixSteps:       steps,
+				PatchHint:      &PatchHint{Kind: FixExternalizeSecret, EnvKey: key, InlineSecret: !referenceOnly},
 			})
 		}
 	}
 	return findings
+}
+
+func headerFindings(item Item, server mcpServer) []Finding {
+	var findings []Finding
+	keys := make([]string, 0, len(server.Headers))
+	for key := range server.Headers {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if !secretKeyPattern.MatchString(key) {
+			continue
+		}
+		value := server.Headers[key]
+		referenceOnly := value == "" || looksEnvReference(value)
+		severity := RiskCritical
+		risk := RiskHigh
+		message := fmt.Sprintf("MCP server %q stores a sensitive header.", server.Name)
+		summary := fmt.Sprintf("Move the %s header value out of this config and into a local secret source.", key)
+		steps := []string{
+			fmt.Sprintf("Remove the inline value for the %s header from the MCP config.", key),
+			fmt.Sprintf("Set %s in your shell profile, launchd environment, password manager CLI, or another local secret source.", envNameForHeader(key)),
+			"Keep only the header name or documented local setup prerequisite in portable dotfiles.",
+		}
+		confidence := "high"
+		if referenceOnly {
+			severity = RiskMedium
+			risk = RiskLow
+			message = fmt.Sprintf("MCP server %q references a sensitive header.", server.Name)
+			summary = fmt.Sprintf("Document the %s header as a local prerequisite without committing its value.", key)
+			steps = []string{
+				fmt.Sprintf("Confirm the %s header is only referenced by name or environment interpolation.", key),
+				"Document how to provide the secret locally without adding the value to dotfiles.",
+				"Keep the real value in a password manager, OS keychain, or machine-local env file excluded from Git.",
+			}
+			confidence = "medium"
+		}
+		findings = append(findings, Finding{
+			ID:             findingID("mcp_secret_header", item.Tool, item.Path, server.Name+key),
+			Tool:           item.Tool,
+			Path:           item.Path,
+			Server:         server.Name,
+			Severity:       severity,
+			Rule:           "mcp_secret_header",
+			Message:        message,
+			Evidence:       fmt.Sprintf("header_key=%s", key),
+			Recommendation: "Keep sensitive header values outside dotfiles and document required header names only.",
+			Impact:         "Credential-bearing headers in agent config can leak through dotfiles, backups, screenshots, or support bundles.",
+			Why:            "Remote MCP servers often use headers for authentication, so values should stay in dedicated local secret stores.",
+			FixAvailable:   true,
+			FixKind:        FixExternalizeSecret,
+			Confidence:     confidence,
+			Risk:           risk,
+			RequiresReview: true,
+			FixSummary:     summary,
+			FixSteps:       steps,
+			PatchHint:      &PatchHint{Kind: FixExternalizeSecret, EnvKey: envNameForHeader(key), InlineSecret: !referenceOnly},
+		})
+	}
+	return findings
+}
+
+func urlFindings(item Item, server mcpServer) []Finding {
+	if server.URL == "" || !isLocalEndpoint(server.URL) {
+		return nil
+	}
+	return []Finding{{
+		ID:             findingID("mcp_local_endpoint", item.Tool, item.Path, server.Name),
+		Tool:           item.Tool,
+		Path:           item.Path,
+		Server:         server.Name,
+		Severity:       RiskMedium,
+		Rule:           "mcp_local_endpoint",
+		Message:        fmt.Sprintf("MCP server %q points at a local or private endpoint.", server.Name),
+		Evidence:       remoteEvidence(server),
+		Recommendation: "Keep local endpoint assumptions machine-local unless intentionally templated.",
+		Impact:         "Local or private MCP endpoints may not exist on another machine and can reveal local network assumptions.",
+		Why:            "Portable dotfiles should distinguish remote service configuration from machine-local development endpoints.",
+		FixAvailable:   true,
+		FixKind:        FixManualReview,
+		Confidence:     "medium",
+		Risk:           RiskLow,
+		RequiresReview: true,
+		FixSummary:     "Move local endpoint assumptions into a machine-local overlay or document them as setup prerequisites.",
+		FixSteps: []string{
+			"Confirm whether this MCP endpoint is intentionally machine-local.",
+			"Keep the URL in an ignored local overlay if it is not portable.",
+			"Document the expected local service when the endpoint is required for this machine.",
+		},
+	}}
 }
 
 func argFindings(item Item, server mcpServer) []Finding {
@@ -342,6 +453,7 @@ func argFindings(item Item, server mcpServer) []Finding {
 			ID:             findingID("mcp_broad_filesystem", item.Tool, item.Path, server.Name),
 			Tool:           item.Tool,
 			Path:           item.Path,
+			Server:         server.Name,
 			Severity:       RiskMedium,
 			Rule:           "mcp_broad_filesystem",
 			Message:        fmt.Sprintf("MCP server %q appears to reference broad filesystem access.", server.Name),
@@ -367,6 +479,7 @@ func argFindings(item Item, server mcpServer) []Finding {
 			ID:             findingID("mcp_local_token_path", item.Tool, item.Path, server.Name),
 			Tool:           item.Tool,
 			Path:           item.Path,
+			Server:         server.Name,
 			Severity:       RiskHigh,
 			Rule:           "mcp_local_token_path",
 			Message:        fmt.Sprintf("MCP server %q appears to reference local credential paths.", server.Name),
@@ -543,11 +656,89 @@ func referencesTokenPath(args []string) bool {
 	return false
 }
 
+func remoteEvidence(server mcpServer) string {
+	transport := "remote-url"
+	if server.Transport != "" {
+		transport = server.Transport
+	}
+	serverType := server.Type
+	if serverType == "" {
+		serverType = "unknown"
+	}
+	return fmt.Sprintf("transport=%s type=%s url=%s", transport, serverType, redactURL(server.URL))
+}
+
+func redactURL(raw string) string {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed == nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "[redacted-url]"
+	}
+	return parsed.Scheme + "://" + parsed.Host
+}
+
+func structuralEvidence(server mcpServer) string {
+	keys := make([]string, 0, len(server.Raw))
+	for key := range server.Raw {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	if len(keys) == 0 {
+		return "keys=[]"
+	}
+	return "keys=[" + strings.Join(keys, ",") + "]"
+}
+
+func isLocalEndpoint(raw string) bool {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed == nil || parsed.Host == "" {
+		return false
+	}
+	host := parsed.Hostname()
+	if host == "" {
+		host = parsed.Host
+		if splitHost, _, err := net.SplitHostPort(parsed.Host); err == nil {
+			host = splitHost
+		}
+	}
+	host = strings.Trim(strings.ToLower(host), "[]")
+	if host == "localhost" || host == "0.0.0.0" || strings.HasSuffix(host, ".local") || strings.HasSuffix(host, ".localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified()
+}
+
+func envNameForHeader(header string) string {
+	name := strings.ToUpper(header)
+	replacer := strings.NewReplacer("-", "_", " ", "_", ".", "_")
+	name = replacer.Replace(name)
+	name = strings.Trim(name, "_")
+	if name == "" {
+		return "MCP_HEADER_VALUE"
+	}
+	return name
+}
+
 func stringValue(v any) string {
 	if s, ok := v.(string); ok {
 		return s
 	}
 	return ""
+}
+
+func stringMap(v any) map[string]string {
+	out := map[string]string{}
+	values, ok := v.(map[string]any)
+	if !ok {
+		return out
+	}
+	for key, value := range values {
+		out[key] = stringValue(value)
+	}
+	return out
 }
 
 func stringSlice(v any) []string {

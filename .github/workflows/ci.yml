@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+env:
+  TRUNK_ORG_URL_SLUG: ${{ secrets.TRUNK_ORG_URL_SLUG }}
+  TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -27,8 +31,127 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Test
-        run: go test ./...
+      - name: Run tests with JUnit
+        id: go-tests
+        continue-on-error: true
+        run: make clean-reports go-test-junit
+
+      - name: Upload test report artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: go-test-junit
+          path: reports/go-tests.xml
+          if-no-files-found: error
+
+      - name: Validate JUnit report shape
+        if: ${{ always() }}
+        run: |
+          python3 -c 'import pathlib, sys, xml.etree.ElementTree as ET; report=pathlib.Path("reports/go-tests.xml"); (report.exists() or (print("missing reports/go-tests.xml", file=sys.stderr), sys.exit(1))); root=ET.parse(report).getroot(); (root.tag in {"testsuite", "testsuites"} or (print(f"unexpected JUnit root: {root.tag}", file=sys.stderr), sys.exit(1))); cases=root.findall(".//testcase"); (cases or (print("JUnit report contains no test cases", file=sys.stderr), sys.exit(1))); print(f"validated {len(cases)} JUnit test cases")'
+
+      - name: Upload Trunk Flaky Tests report
+        if: ${{ always() && env.TRUNK_ORG_URL_SLUG != '' && env.TRUNK_API_TOKEN != '' }}
+        uses: trunk-io/analytics-uploader@95a0fb8b29e45b6068304261fb518644b426a803 # v2.0.8
+        with:
+          junit-paths: reports/go-tests.xml
+          org-slug: ${{ env.TRUNK_ORG_URL_SLUG }}
+          token: ${{ env.TRUNK_API_TOKEN }}
+          variant: go
+          use-cache: true
+          previous-step-outcome: ${{ steps.go-tests.outcome }}
+
+      - name: Fail on test failure
+        if: ${{ steps.go-tests.outcome != 'success' }}
+        run: exit 1
+
+      - name: Race tests
+        run: make test-race
+
+      - name: Go vet
+        run: make vet
+
+      - name: Staticcheck
+        run: make staticcheck
+
+      - name: Gosec static analysis
+        run: make gosec
+
+  trunk:
+    name: Trunk Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run Trunk Check
+        uses: trunk-io/trunk-action@75699af9e26881e564e9d832ef7dc3af25ec031b # v1.2.4
+        with:
+          check-mode: all
+          arguments: --show-existing --no-fix
+
+  raycast:
+    name: Raycast extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: integrations/raycast/package-lock.json
+
+      - name: Install Raycast extension dependencies
+        run: npm ci --ignore-scripts --no-audit
+        working-directory: integrations/raycast
+
+      - name: Run Raycast extension tests with JUnit
+        id: raycast-tests
+        continue-on-error: true
+        run: npm run test:junit
+        working-directory: integrations/raycast
+
+      - name: Upload Raycast test report artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: raycast-test-junit
+          path: reports/junit/raycast.xml
+          if-no-files-found: error
+
+      - name: Validate Raycast JUnit report shape
+        if: ${{ always() }}
+        run: |
+          python3 -c 'import pathlib, sys, xml.etree.ElementTree as ET; report=pathlib.Path("reports/junit/raycast.xml"); (report.exists() or (print("missing reports/junit/raycast.xml", file=sys.stderr), sys.exit(1))); root=ET.parse(report).getroot(); (root.tag in {"testsuite", "testsuites"} or (print(f"unexpected JUnit root: {root.tag}", file=sys.stderr), sys.exit(1))); cases=root.findall(".//testcase"); (cases or (print("JUnit report contains no test cases", file=sys.stderr), sys.exit(1))); print(f"validated {len(cases)} JUnit test cases")'
+
+      - name: Upload Raycast Trunk Flaky Tests report
+        if: ${{ always() && env.TRUNK_ORG_URL_SLUG != '' && env.TRUNK_API_TOKEN != '' }}
+        uses: trunk-io/analytics-uploader@95a0fb8b29e45b6068304261fb518644b426a803 # v2.0.8
+        with:
+          junit-paths: reports/junit/raycast.xml
+          org-slug: ${{ env.TRUNK_ORG_URL_SLUG }}
+          token: ${{ env.TRUNK_API_TOKEN }}
+          variant: raycast
+          use-cache: true
+          previous-step-outcome: ${{ steps.raycast-tests.outcome }}
+
+      - name: Fail on Raycast test failure
+        if: ${{ steps.raycast-tests.outcome != 'success' }}
+        run: exit 1
+
+      - name: Audit Raycast dependencies
+        run: npm audit --audit-level=moderate
+        working-directory: integrations/raycast
+
+      - name: Lint Raycast extension
+        run: npm run lint
+        working-directory: integrations/raycast
+
+      - name: Build Raycast extension
+        run: npm run build
+        working-directory: integrations/raycast
 
   gitleaks:
     name: Secret scan
