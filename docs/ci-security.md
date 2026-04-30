@@ -4,7 +4,7 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 
 ## Workflows
 
-- `ci.yml`: Go tests, JUnit reports, local JUnit shape validation, gated Trunk Flaky Tests uploads, Trunk Check, Raycast extension tests/build, Gitleaks, govulncheck, and OSV dependency scanning.
+- `ci.yml`: Go tests, race tests, `go vet`, `staticcheck`, `gosec`, JUnit reports, local JUnit shape validation, gated Trunk Flaky Tests uploads, Trunk Check, Raycast extension tests/build/audit, Gitleaks, govulncheck, and OSV dependency scanning.
 - `nightward-policy.yml`: generates Nightward SARIF from a fixture home and uploads it to GitHub code scanning.
 - `plugin.yaml`: defines Trunk Check linters for workspace policy and analysis SARIF once release tags are available.
 - `scorecard.yml`: runs OpenSSF Scorecard and uploads SARIF.

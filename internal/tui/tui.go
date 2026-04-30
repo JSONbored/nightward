@@ -709,11 +709,11 @@ func clipboardCommandFor(goos, value string, lookPath func(string) (string, erro
 		cmd = exec.Command("pbcopy")
 	case "linux":
 		if path, err := lookPath("wl-copy"); err == nil {
-			cmd = exec.Command(path)
+			cmd = exec.Command(path) // #nosec G204 -- clipboard helper resolved by PATH and invoked without a shell.
 		} else if path, err := lookPath("xclip"); err == nil {
-			cmd = exec.Command(path, "-selection", "clipboard")
+			cmd = exec.Command(path, "-selection", "clipboard") // #nosec G204 -- clipboard helper resolved by PATH and invoked without a shell.
 		} else if path, err := lookPath("xsel"); err == nil {
-			cmd = exec.Command(path, "--clipboard", "--input")
+			cmd = exec.Command(path, "--clipboard", "--input") // #nosec G204 -- clipboard helper resolved by PATH and invoked without a shell.
 		} else {
 			return nil, errors.New("no clipboard command found: install wl-copy, xclip, or xsel")
 		}
@@ -740,11 +740,11 @@ func openURLCommandFor(goos, target string) (*exec.Cmd, error) {
 	}
 	switch goos {
 	case "darwin":
-		return exec.Command("open", target), nil
+		return exec.Command("open", target), nil // #nosec G204 -- validated http(s) documentation URL, invoked without a shell.
 	case "linux":
-		return exec.Command("xdg-open", target), nil
+		return exec.Command("xdg-open", target), nil // #nosec G204 -- validated http(s) documentation URL, invoked without a shell.
 	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", target), nil
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", target), nil // #nosec G204 -- validated http(s) documentation URL, invoked without a shell.
 	default:
 		return nil, fmt.Errorf("opening URLs unsupported on %s", goos)
 	}

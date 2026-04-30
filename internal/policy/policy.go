@@ -165,7 +165,9 @@ func WriteSARIFObject(sarif map[string]any, path string) error {
 		return err
 	}
 	data = append(data, '\n')
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil && filepath.Dir(path) != "." {
+	path = filepath.Clean(path)
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil && dir != "." {
 		return err
 	}
 	return os.WriteFile(path, data, 0600)
@@ -284,7 +286,7 @@ func LoadConfig(path string) (Config, error) {
 	if path == "" {
 		return Config{}, nil
 	}
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- policy config path is an explicit local CLI input.
 	if err != nil {
 		return Config{}, err
 	}

@@ -73,7 +73,7 @@ func inspectMCP(item Item, spec pathSpec) []Finding {
 }
 
 func readMCPServers(path string) ([]mcpServer, error) {
-	contents, err := os.ReadFile(path)
+	contents, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- MCP config path comes from Nightward's local adapter inventory.
 	if err != nil {
 		return nil, err
 	}

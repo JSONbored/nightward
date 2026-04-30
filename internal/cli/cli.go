@@ -713,23 +713,29 @@ func commandCheck(name, detail string) Check {
 }
 
 func pathCheck(id, path string, required bool) Check {
-	info, err := os.Stat(path)
+	cleanPath := filepath.Clean(path)
+	info, err := os.Stat(cleanPath) // #nosec G703 -- doctor checks expected local filesystem prerequisites, not web/user content.
 	if err != nil {
 		status := "info"
 		if required {
 			status = "warn"
 		}
-		return Check{ID: id, Status: status, Message: "path missing", Detail: path}
+		return Check{ID: id, Status: status, Message: "path missing", Detail: cleanPath}
 	}
 	if !info.IsDir() {
-		return Check{ID: id, Status: "warn", Message: "path is not a directory", Detail: path}
+		return Check{ID: id, Status: "warn", Message: "path is not a directory", Detail: cleanPath}
 	}
-	return Check{ID: id, Status: "ok", Message: "path available", Detail: path}
+	return Check{ID: id, Status: "ok", Message: "path available", Detail: cleanPath}
 }
 
 func maybeWriteReport(report inventory.Report, output, outputDir string) error {
 	if outputDir != "" {
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
+		var err error
+		outputDir, err = filepath.Abs(filepath.Clean(outputDir))
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(outputDir, 0700); err != nil {
 			return err
 		}
 		output = filepath.Join(outputDir, "nightward-scan-"+report.GeneratedAt.Format("20060102-150405Z")+".json")
@@ -737,7 +743,12 @@ func maybeWriteReport(report inventory.Report, output, outputDir string) error {
 	if output == "" {
 		return nil
 	}
-	if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+	var err error
+	output, err = filepath.Abs(filepath.Clean(output))
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(output), 0700); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(report, "", "  ")
@@ -745,7 +756,7 @@ func maybeWriteReport(report inventory.Report, output, outputDir string) error {
 		return err
 	}
 	data = append(data, '\n')
-	return os.WriteFile(output, data, 0600)
+	return os.WriteFile(output, data, 0600) // #nosec G703 -- explicit user-selected report output path, normalized and private.
 }
 
 func printHelp(w io.Writer, commandName string) {

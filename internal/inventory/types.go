@@ -26,7 +26,8 @@ const (
 type FixKind string
 
 const (
-	FixPinPackage          FixKind = "pin-package"
+	FixPinPackage FixKind = "pin-package"
+	// #nosec G101 -- user-facing remediation kind name, not a credential.
 	FixExternalizeSecret   FixKind = "externalize-secret"
 	FixReplaceShellWrapper FixKind = "replace-shell-wrapper"
 	FixNarrowFilesystem    FixKind = "narrow-filesystem"
