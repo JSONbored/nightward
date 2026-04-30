@@ -1,6 +1,6 @@
 module github.com/shadowbook/nightward
 
-go 1.24.0
+go 1.25.9
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
