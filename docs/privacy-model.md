@@ -10,6 +10,7 @@ Nightward is designed around local custody. The scanner inspects local file meta
 - No network calls from Nightward runtime.
 - No live backup, restore, Git push, or secret copy.
 - No agent config mutation in scan, doctor, findings, fix, policy, or backup-plan commands.
+- The TUI can copy text, export redacted fix-plan Markdown, and open docs only after explicit keypresses.
 - The Raycast extension calls only read-only Nightward commands and explicit clipboard/report-folder actions.
 
 ## Write Paths
@@ -19,10 +20,13 @@ Nightward writes only when explicitly asked:
 - `scan --output FILE`
 - `scan --output-dir DIR`
 - `policy sarif --output FILE`
+- TUI `e` key: redacted fix-plan export under `~/.local/state/nightward/exports`
 - `schedule install`
 - `schedule remove`
 
 Schedule install/remove writes only user-level scheduler files. It does not copy configs, secrets, dotfiles, or reports into Git.
+
+The TUI docs action opens an http(s) documentation URL through the OS default opener after the user presses `o`; Nightward itself does not fetch docs content.
 
 The Raycast extension does not add a Nightward config write path. `Export Nightward Fix Plan` copies redacted Markdown to the clipboard after the user invokes that command. `Open Nightward Reports` opens the existing reports folder and does not create it.
 
@@ -36,6 +40,7 @@ Nightward must not emit secret values in:
 - Markdown fix exports
 - SARIF output
 - TUI detail views
+- TUI fix-plan exports
 
 Secret env handling distinguishes:
 

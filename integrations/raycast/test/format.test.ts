@@ -1,15 +1,28 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findingMarkdown, maxSeverity, redactText, sortedFindings } from "../src/format";
+import {
+  findingMarkdown,
+  maxSeverity,
+  redactText,
+  sortedFindings,
+} from "../src/format";
 import type { Finding } from "../src/types";
 
 test("redacts obvious secret assignments and long token-like values", () => {
   const keyName = "API_" + "KEY";
   const token = "sk-" + "1234567890abcdef";
   const longValue = "abcdefghijklmno" + "pqrstuvwxyz123456";
-  const output = redactText(`${keyName}=${token} secret: ${longValue}`);
+  const path =
+    "/Users/example/Library/Application Support/Claude/claude_desktop_config.json";
+  const output = redactText(
+    `${keyName}=${token} secret: ${longValue} path: ${path}`,
+  );
   assert.match(output, /API_KEY=\[redacted\]/);
   assert.match(output, /secret: \[redacted\]/);
+  assert.match(
+    output,
+    /Library\/Application Support\/Claude\/claude_desktop_config\.json/,
+  );
   assert.doesNotMatch(output, /1234567890abcdef/);
   assert.doesNotMatch(output, /abcdefghijklmnopqrstuvwxyz123456/);
 });
@@ -57,7 +70,11 @@ test("findings sort by severity then stable identity", () => {
   );
 });
 
-function baseFinding(id: string, severity: Finding["severity"], tool: string): Finding {
+function baseFinding(
+  id: string,
+  severity: Finding["severity"],
+  tool: string,
+): Finding {
   return {
     id,
     tool,

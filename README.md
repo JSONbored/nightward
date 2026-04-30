@@ -167,7 +167,9 @@ Keyboard shortcuts:
 - `/`: search findings
 - `s`, `t`, `r`: cycle finding severity, tool, and rule filters
 - `x`: clear finding filters
-- `c`, `e`, `o`: show copy/export/docs action hints
+- `c`: copy the selected path, recommendation, or fix step to the clipboard
+- `e`: export a redacted fix plan to `~/.local/state/nightward/exports`
+- `o`: open remediation docs for the selected finding or fix
 - `?`: help
 - `q` or `esc`: quit
 

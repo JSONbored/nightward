@@ -9,8 +9,7 @@ import type {
 
 const secretAssignmentPattern =
   /((?:token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)[^"',\s}]+/gi;
-const longSecretLikePattern =
-  /\b(?:sk-[A-Za-z0-9_-]{12,}|[A-Za-z0-9_./+=-]{32,})\b/g;
+const longSecretLikePattern = /\bsk-[A-Za-z0-9_-]{12,}\b/g;
 
 const riskRank: Record<RiskLevel, number> = {
   info: 0,

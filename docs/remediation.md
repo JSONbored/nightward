@@ -17,6 +17,28 @@ Nightward remediation is plan-only. It recommends changes, explains risk, and ca
 
 Package pinning does not guess versions. Choose a reviewed version from the upstream registry or release notes, then edit the package token manually.
 
+## Rule Guidance
+
+### mcp_secret_env
+
+Move inline secret values out of agent config. Keep only env key names, setup prerequisites, or environment interpolation references in portable files.
+
+### mcp_unpinned_package
+
+Pin package-executor commands such as `npx`, `uvx`, or `pipx` to reviewed package versions before syncing MCP config.
+
+### mcp_shell_command
+
+Replace simple shell passthrough wrappers with direct executable invocation. Review compound shell commands manually because they may depend on local shell startup files or expand secrets.
+
+### mcp_broad_filesystem
+
+Replace broad filesystem mounts with explicit project or data paths after confirming the server's real access requirement.
+
+### mcp_unknown_command
+
+Review unsupported MCP server shapes manually. Add an explicit command where the client supports it, or open an adapter issue with a redacted config example.
+
 ## Policy Ignores
 
 Policy ignores must include a reason:

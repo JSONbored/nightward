@@ -20,7 +20,6 @@ Nightward is intentionally staged. The scanner and policy model need to stay tru
 ## Next
 
 - More MCP config shapes for Codex, Claude Code, and editor integrations.
-- Richer TUI actions with real clipboard/export/open-doc behavior behind explicit keypresses.
 - Raycast screenshots, store metadata, and manual development-mode smoke after the first release candidate.
 - Golden SARIF snapshots and broader no-write tests.
 - Validate GoReleaser on the first release candidate tag.
