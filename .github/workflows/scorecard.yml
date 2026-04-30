@@ -11,8 +11,6 @@ on:
 permissions:
   actions: read
   contents: read
-  id-token: write
-  security-events: write
 
 concurrency:
   group: scorecard-${{ github.ref }}
@@ -22,6 +20,13 @@ jobs:
   scorecard:
     name: Scorecard
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      id-token: write
+      pull-requests: read
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
