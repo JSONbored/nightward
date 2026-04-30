@@ -5,10 +5,14 @@ GITLEAKS_VERSION ?= v8.30.1
 GOVULNCHECK_VERSION ?= v1.3.0
 GOSEC_VERSION ?= v2.26.1
 STATICCHECK_VERSION ?= v0.7.0
+GORELEASER_VERSION ?= v2.9.0
+SYFT_VERSION ?= v1.43.0
+COVERAGE_THRESHOLD ?= 80.0
 RAYCAST_DIR ?= integrations/raycast
 GO_PACKAGES ?= $(shell go list ./cmd/... ./internal/... ./tools/...)
+COVERAGE_PACKAGES ?= ./internal/...
 
-.PHONY: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-verify verify build install-local clean-reports
+.PHONY: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage coverage-check go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-verify tool-syft release-snapshot verify build install-local clean-reports
 
 test:
 	go test $(GO_PACKAGES)
@@ -34,6 +38,17 @@ govulncheck:
 fuzz-smoke:
 	go test ./internal/inventory -run=^$$ -fuzz=FuzzMCPConfigParsing -fuzztime=10s
 
+coverage:
+	mkdir -p $(REPORTS_DIR)
+	go test $(COVERAGE_PACKAGES) -coverprofile=$(REPORTS_DIR)/coverage.out
+	go tool cover -func=$(REPORTS_DIR)/coverage.out | tee $(REPORTS_DIR)/coverage.txt
+
+coverage-check:
+	mkdir -p $(REPORTS_DIR)
+	go test $(COVERAGE_PACKAGES) -coverprofile=$(REPORTS_DIR)/coverage.out
+	go tool cover -func=$(REPORTS_DIR)/coverage.out | tee $(REPORTS_DIR)/coverage.txt
+	python3 -c 'import pathlib, re, sys; text=pathlib.Path("$(REPORTS_DIR)/coverage.txt").read_text(); match=re.search(r"total:\s+\(statements\)\s+([0-9.]+)%", text); pct=float(match.group(1)) if match else -1; threshold=float("$(COVERAGE_THRESHOLD)"); print(f"coverage {pct:.1f}% / threshold {threshold:.1f}%"); sys.exit(0 if pct >= threshold else 1)'
+
 go-test-junit:
 	mkdir -p $(REPORTS_DIR)
 	go run gotest.tools/gotestsum@$(GOTESTSUM_VERSION) --format testname --junitfile $(REPORTS_DIR)/go-tests.raw.xml -- $(GO_PACKAGES)
@@ -50,6 +65,10 @@ trunk-fix:
 
 trunk-flaky-validate:
 	trunk flakytests validate --junit-paths $(REPORTS_DIR)/go-tests.xml,$(REPORTS_DIR)/junit/raycast.xml
+
+ci-scripts-test:
+	bash scripts/test-dco.sh
+	bash scripts/test-action-paths.sh
 
 raycast-install:
 	cd $(RAYCAST_DIR) && npm ci --ignore-scripts --no-audit
@@ -71,7 +90,13 @@ raycast-build:
 
 raycast-verify: raycast-install raycast-test raycast-audit raycast-lint raycast-build
 
-verify: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke test-junit trunk-flaky-validate trunk-check raycast-audit raycast-lint raycast-build
+tool-syft:
+	go install github.com/anchore/syft/cmd/syft@$(SYFT_VERSION)
+
+release-snapshot: tool-syft
+	PATH="$$(go env GOPATH)/bin:$$PATH" go run github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION) release --snapshot --clean --skip=publish,sign
+
+verify: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage-check test-junit trunk-flaky-validate trunk-check ci-scripts-test raycast-audit raycast-lint raycast-build
 
 build:
 	go build -o bin/nightward ./cmd/nightward

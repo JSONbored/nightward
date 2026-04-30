@@ -52,7 +52,15 @@
       "labels": ["dependencies", "go", "security"]
     },
     {
-      "matchPackageNames": ["goreleaser/goreleaser"],
+      "matchPackageNames": [
+        "github.com/securego/gosec/v2",
+        "honnef.co/go/tools"
+      ],
+      "groupName": "go static analysis tooling",
+      "labels": ["dependencies", "go", "security"]
+    },
+    {
+      "matchPackageNames": ["goreleaser/goreleaser", "github.com/anchore/syft"],
       "groupName": "release tooling",
       "labels": ["dependencies", "release"]
     },
@@ -91,6 +99,46 @@
         "GOVULNCHECK_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
       ],
       "depNameTemplate": "golang.org/x/vuln",
+      "datasourceTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "description": "Update gosec used by Makefile static analysis.",
+      "fileMatch": ["^Makefile$"],
+      "matchStrings": [
+        "GOSEC_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "github.com/securego/gosec/v2",
+      "datasourceTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "description": "Update staticcheck used by Makefile static analysis.",
+      "fileMatch": ["^Makefile$"],
+      "matchStrings": [
+        "STATICCHECK_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "honnef.co/go/tools",
+      "datasourceTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "description": "Update GoReleaser used by Makefile release snapshots.",
+      "fileMatch": ["^Makefile$"],
+      "matchStrings": [
+        "GORELEASER_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "goreleaser/goreleaser",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "Update Syft used by Makefile release SBOM snapshots.",
+      "fileMatch": ["^Makefile$"],
+      "matchStrings": [
+        "SYFT_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "github.com/anchore/syft",
       "datasourceTemplate": "go"
     },
     {

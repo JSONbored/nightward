@@ -1,7 +1,7 @@
 package inventory
 
 import (
-	"crypto/sha1" // #nosec G505 -- used only for short deterministic non-security IDs.
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -260,7 +260,7 @@ func inspectPath(path string, spec pathSpec) (Item, bool) {
 }
 
 func stableID(parts ...string) string {
-	hash := sha1.Sum([]byte(strings.Join(parts, "\x00"))) // #nosec G401 -- stable label only, not a cryptographic control.
+	hash := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
 	return hex.EncodeToString(hash[:])[:12]
 }
 

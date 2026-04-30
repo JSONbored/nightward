@@ -35,6 +35,8 @@ Outputs:
 
 The action runs Nightward locally. It does not upload findings unless your workflow separately uploads artifacts or SARIF.
 
+`config` and `output` must be relative paths inside `GITHUB_WORKSPACE`. The action rejects absolute paths, parent traversal, backslashes, and newline characters before invoking Nightward.
+
 For repository CI, prefer workspace mode:
 
 ```yaml

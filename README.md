@@ -71,6 +71,7 @@ Nightward answers the practical questions first:
 - Read-only Raycast extension for Dashboard, Findings, Analysis, Provider Doctor, Explain Finding/Signal, Fix Plan/Analysis export, and report-folder access.
 - User-level nightly scan scheduling for macOS launchd, Linux systemd user timers, and cron text fallback.
 - No telemetry, no cloud dashboard, no network calls from Nightward runtime, and no live config mutation.
+- OpenSSF-oriented project hygiene: DCO, governance docs, threat model, coverage gate, pinned CI actions, release snapshot checks, signed release configuration, and security reporting policy.
 
 > [!TIP]
 > A practical first pass is `nw doctor --json`, then `nw scan --json`, then `nw fix plan --all --json`.
@@ -343,9 +344,12 @@ Scheduled scans never copy secrets, mutate dotfiles, restore files, or push to G
 make test
 make test-race
 make test-junit
+make coverage-check
 make trunk-flaky-validate
 make trunk-check
+make ci-scripts-test
 make raycast-verify
+make release-snapshot
 make verify
 go run ./cmd/nightward --help
 go run ./cmd/nw --help
@@ -370,11 +374,15 @@ trunk check --show-existing --all
 make gitleaks
 make govulncheck
 make fuzz-smoke
+make coverage-check
+make release-snapshot
 ```
 
 ## Project Docs
 
 - [Security policy](SECURITY.md)
+- [Governance](GOVERNANCE.md)
+- [Maintainers](MAINTAINERS.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Code of conduct](CODE_OF_CONDUCT.md)
 - [Support](SUPPORT.md)
@@ -387,6 +395,8 @@ make fuzz-smoke
 - [GitHub Action](docs/action.md)
 - [Raycast extension](docs/raycast-extension.md)
 - [CI/security notes](docs/ci-security.md)
+- [Threat model](docs/threat-model.md)
+- [OpenSSF evidence](docs/openssf-best-practices.md)
 - [Privacy model](docs/privacy-model.md)
 - [Screenshot/GIF capture plan](docs/screenshots.md)
 

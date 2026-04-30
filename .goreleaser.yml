@@ -34,7 +34,7 @@ builds:
 
 archives:
   - id: default
-    builds:
+    ids:
       - nightward
       - nw
     formats:

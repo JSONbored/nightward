@@ -13,10 +13,13 @@ make gosec
 make gitleaks
 make govulncheck
 make fuzz-smoke
+make coverage-check
 make test-junit
 make trunk-flaky-validate
 make trunk-check
+make ci-scripts-test
 make raycast-verify
+make release-snapshot
 make verify
 ```
 
@@ -39,6 +42,8 @@ make verify
 - TUI model tests cover tab switching, search, filters, help, cursor clamping, wide detail panes, compact terminal rendering, and redaction.
 - Raycast extension tests cover pure redaction/formatting helpers and safe command execution wrappers.
 - `go vet`, `staticcheck`, `gosec`, `gitleaks`, `govulncheck`, and fuzz smoke tests are part of the local verification bar. `#nosec` comments must include a narrow reason tied to an intentional local CLI behavior.
+- `make coverage-check` enforces at least 80% combined statement coverage for `./internal/...`.
+- `make ci-scripts-test` verifies repository-maintained CI helper scripts such as DCO checking.
 - Raycast dependency audits run with `npm audit --audit-level=moderate`.
 
 ## Trunk Flaky Tests
@@ -55,6 +60,10 @@ trunk flakytests validate --junit-paths reports/go-tests.xml,reports/junit/rayca
 ```
 
 CI validates that the JUnit report is parseable for every pull request. Trunk uploads are gated on `TRUNK_ORG_URL_SLUG` and `TRUNK_API_TOKEN`, so contributors do not need Trunk credentials.
+
+## Release Snapshot
+
+`make release-snapshot` installs the pinned Syft SBOM tool into the local Go bin directory, then runs GoReleaser in snapshot mode. It verifies archive, checksum, and SBOM configuration without publishing, signing, or creating a tag. Real release signing remains restricted to the tag-driven release workflow.
 
 ## Raycast Extension
 

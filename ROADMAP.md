@@ -25,8 +25,8 @@ Nightward is intentionally staged. The scanner and policy model need to stay tru
 - Bubble Tea/Bubbles TUI upgrade with list, table, viewport, textinput, help, filter modal, command palette, report history, and mouse-wheel support.
 - Optional provider execution for local scanners with timeouts, file-size caps, redaction, and explicit online-provider opt-in.
 - Fuzz coverage for MCP JSON/TOML/YAML parsing, URL/header redaction, symlink traversal, huge files, and malformed configs.
-- Threat model documentation for provider execution, report exports, scheduler behavior, and SARIF uploads.
 - Validate GoReleaser on the first release candidate tag.
+- Add SLSA provenance/attestation after the first release snapshot and signed checksum flow are stable.
 - Screenshot and GIF assets for the README.
 
 ## Later

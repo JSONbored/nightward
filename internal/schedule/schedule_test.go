@@ -1,8 +1,11 @@
 package schedule
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBuildPlanForDarwin(t *testing.T) {
@@ -44,5 +47,57 @@ func TestBuildPlanForUnsupportedOSReturnsCronTextOnly(t *testing.T) {
 	}
 	if len(plan.Notes) == 0 {
 		t.Fatal("expected cron mutation warning note")
+	}
+}
+
+func TestBuildPlanRejectsUnsupportedPreset(t *testing.T) {
+	if _, err := BuildPlanForOS("linux", "/home/test", "nightward", "hourly"); err == nil {
+		t.Fatal("expected unsupported preset error")
+	}
+}
+
+func TestStatusReadsLatestReportAndFindingCount(t *testing.T) {
+	home := t.TempDir()
+	reportDir := filepath.Join(home, ".local", "state", "nightward", "reports")
+	if err := os.MkdirAll(reportDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	oldReport := filepath.Join(reportDir, "old.json")
+	newReport := filepath.Join(reportDir, "new.json")
+	if err := os.WriteFile(oldReport, []byte(`{"findings":[{"severity":"low"}]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(newReport, []byte(`{"findings":[{"severity":"medium"},{"severity":"high"}]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Date(2026, 4, 30, 1, 0, 0, 0, time.UTC)
+	newTime := time.Date(2026, 4, 30, 2, 0, 0, 0, time.UTC)
+	if err := os.Chtimes(oldReport, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(newReport, newTime, newTime); err != nil {
+		t.Fatal(err)
+	}
+
+	status := Status(home)
+	if status.LastReport != newReport || status.LastRun == nil || !status.LastRun.Equal(newTime) {
+		t.Fatalf("unexpected latest report status: %#v", status)
+	}
+	if status.LastFindings != 2 {
+		t.Fatalf("expected two findings, got %d", status.LastFindings)
+	}
+}
+
+func TestEscapingHelpers(t *testing.T) {
+	joined := shellJoin([]string{"nightward", "scan", "--path", "/tmp/has space/it's"})
+	if !strings.Contains(joined, `'/tmp/has space/it'\''s'`) {
+		t.Fatalf("unexpected shell join: %s", joined)
+	}
+	escaped, err := xmlEscape(`a&b"c`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if escaped != `a&amp;b&#34;c` {
+		t.Fatalf("unexpected xml escape: %s", escaped)
 	}
 }
