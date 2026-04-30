@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest a Nightward feature or integration.
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user risk or workflow gap would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should Nightward do?
+    validations:
+      required: true
+  - type: dropdown
+    id: write_path
+    attributes:
+      label: Write behavior
+      options:
+        - Read-only
+        - Explicit output file
+        - Explicit config mutation
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety considerations
+      description: What could leak, break portability, or mutate private state?

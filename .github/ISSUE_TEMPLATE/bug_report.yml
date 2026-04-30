@@ -1,0 +1,37 @@
+name: Bug report
+description: Report incorrect behavior without sharing private state.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Use a fixture or redacted config shape. Do not paste secrets.
+      value: |
+        ```sh
+        nw scan --json
+        ```
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: redaction
+    attributes:
+      label: Redaction check
+      description: Confirm you removed tokens, auth material, private paths, and personal config values.
+    validations:
+      required: true

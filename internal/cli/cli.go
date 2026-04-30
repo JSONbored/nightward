@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"github.com/shadowbook/nightward/internal/backupplan"
+	"github.com/shadowbook/nightward/internal/fixplan"
 	"github.com/shadowbook/nightward/internal/inventory"
+	"github.com/shadowbook/nightward/internal/policy"
 	"github.com/shadowbook/nightward/internal/schedule"
 	"github.com/shadowbook/nightward/internal/tui"
 )
@@ -44,9 +46,13 @@ func RunWithName(commandName string, args []string, stdout, stderr io.Writer) in
 	if commandName == "" {
 		commandName = "nightward"
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fail(stderr, "cannot determine home directory: %v", err)
+	home := os.Getenv("NIGHTWARD_HOME")
+	if home == "" {
+		var err error
+		home, err = os.UserHomeDir()
+		if err != nil {
+			return fail(stderr, "cannot determine home directory: %v", err)
+		}
 	}
 
 	if len(args) == 0 {
@@ -70,6 +76,12 @@ func RunWithName(commandName string, args []string, stdout, stderr io.Writer) in
 		return runPlan(home, args[1:], stdout, stderr)
 	case "adapters":
 		return runAdapters(home, args[1:], stdout, stderr)
+	case "findings":
+		return runFindings(home, args[1:], stdout, stderr)
+	case "fix":
+		return runFix(home, args[1:], stdout, stderr)
+	case "policy":
+		return runPolicy(home, args[1:], stdout, stderr)
 	case "schedule":
 		return runSchedule(home, args[1:], stdout, stderr)
 	default:
@@ -158,6 +170,145 @@ func runAdapters(home string, args []string, stdout, stderr io.Writer) int {
 			status = "found"
 		}
 		fmt.Fprintf(stdout, "%-12s %s - %s\n", adapter.Name, status, adapter.Description)
+	}
+	return 0
+}
+
+func runFindings(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		return fail(stderr, "usage: nightward findings <list|explain> [flags]")
+	}
+	report := inventory.NewScanner(home).Scan()
+	switch args[0] {
+	case "list":
+		fs := flag.NewFlagSet("findings list", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if *jsonOut {
+			return writeJSON(stdout, report.Findings, stderr)
+		}
+		printFindingsList(stdout, report.Findings)
+	case "explain":
+		fs := flag.NewFlagSet("findings explain", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		remaining := fs.Args()
+		if len(remaining) != 1 {
+			return fail(stderr, "usage: nightward findings explain <finding-id> [--json]")
+		}
+		finding, ok := fixplan.Find(report, remaining[0])
+		if !ok {
+			return fail(stderr, "finding not found: %s", remaining[0])
+		}
+		if *jsonOut {
+			return writeJSON(stdout, finding, stderr)
+		}
+		printFindingExplain(stdout, finding)
+	default:
+		return fail(stderr, "usage: nightward findings <list|explain> [flags]")
+	}
+	return 0
+}
+
+func runFix(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		return fail(stderr, "usage: nightward fix <plan|export> [flags]")
+	}
+	report := inventory.NewScanner(home).Scan()
+	switch args[0] {
+	case "plan":
+		fs := flag.NewFlagSet("fix plan", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		findingID := fs.String("finding", "", "limit to a finding ID or unique prefix")
+		rule := fs.String("rule", "", "limit to a rule ID")
+		all := fs.Bool("all", false, "include all findings")
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		selector, err := fixSelector(*findingID, *rule, *all)
+		if err != nil {
+			return fail(stderr, err.Error())
+		}
+		plan := fixplan.Build(report, selector)
+		if *jsonOut {
+			return writeJSON(stdout, plan, stderr)
+		}
+		printFixPlan(stdout, plan)
+	case "export":
+		fs := flag.NewFlagSet("fix export", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		format := fs.String("format", "markdown", "export format: markdown or json")
+		findingID := fs.String("finding", "", "limit to a finding ID or unique prefix")
+		rule := fs.String("rule", "", "limit to a rule ID")
+		all := fs.Bool("all", false, "include all findings")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		selector, err := fixSelector(*findingID, *rule, *all)
+		if err != nil {
+			return fail(stderr, err.Error())
+		}
+		plan := fixplan.Build(report, selector)
+		switch *format {
+		case "json":
+			return writeJSON(stdout, plan, stderr)
+		case "markdown", "md":
+			fmt.Fprint(stdout, fixplan.Markdown(plan))
+		default:
+			return fail(stderr, "unsupported fix export format %q", *format)
+		}
+	default:
+		return fail(stderr, "usage: nightward fix <plan|export> [flags]")
+	}
+	return 0
+}
+
+func runPolicy(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		return fail(stderr, "usage: nightward policy <check|sarif> [flags]")
+	}
+	report := inventory.NewScanner(home).Scan()
+	switch args[0] {
+	case "check":
+		fs := flag.NewFlagSet("policy check", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		strict := fs.Bool("strict", false, "fail on medium or higher findings")
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		policyReport := policy.Check(report, *strict)
+		if *jsonOut {
+			code := writeJSON(stdout, policyReport, stderr)
+			if code != 0 {
+				return code
+			}
+		} else {
+			printPolicy(stdout, policyReport)
+		}
+		if !policyReport.Passed {
+			return 1
+		}
+	case "sarif":
+		fs := flag.NewFlagSet("policy sarif", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		output := fs.String("output", "nightward.sarif", "write SARIF report to this path")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if err := policy.WriteSARIF(report, *output); err != nil {
+			return fail(stderr, "failed to write SARIF: %v", err)
+		}
+		fmt.Fprintf(stdout, "Wrote SARIF policy report to %s\n", *output)
+	default:
+		return fail(stderr, "usage: nightward policy <check|sarif> [flags]")
 	}
 	return 0
 }
@@ -324,6 +475,12 @@ Usage:
   %[1]s doctor [--json]
   %[1]s plan backup --target <repo> [--json]
   %[1]s adapters list [--json]
+  %[1]s findings list [--json]
+  %[1]s findings explain <finding-id> [--json]
+  %[1]s fix plan [--finding <id>|--rule <rule>|--all] [--json]
+  %[1]s fix export --format markdown|json
+  %[1]s policy check [--strict] [--json]
+  %[1]s policy sarif --output nightward.sarif
   %[1]s schedule plan --preset nightly [--json]
   %[1]s schedule install --preset nightly --dry-run [--json]
   %[1]s schedule remove --dry-run [--json]
@@ -371,6 +528,67 @@ func printBackupPlan(w io.Writer, plan backupplan.Plan) {
 	}
 }
 
+func printFindingsList(w io.Writer, findings []inventory.Finding) {
+	if len(findings) == 0 {
+		fmt.Fprintln(w, "No findings.")
+		return
+	}
+	for _, finding := range findings {
+		fmt.Fprintf(w, "%s  %-8s %-22s %-12s %s\n", finding.ID, finding.Severity, finding.Rule, finding.Tool, finding.Message)
+	}
+}
+
+func printFindingExplain(w io.Writer, finding inventory.Finding) {
+	fmt.Fprintf(w, "%s\n", finding.ID)
+	fmt.Fprintf(w, "  rule:      %s\n", finding.Rule)
+	fmt.Fprintf(w, "  severity:  %s\n", finding.Severity)
+	fmt.Fprintf(w, "  tool:      %s\n", finding.Tool)
+	fmt.Fprintf(w, "  path:      %s\n", finding.Path)
+	fmt.Fprintf(w, "  message:   %s\n", finding.Message)
+	if finding.Evidence != "" {
+		fmt.Fprintf(w, "  evidence:  %s\n", finding.Evidence)
+	}
+	if finding.Impact != "" {
+		fmt.Fprintf(w, "\nImpact: %s\n", finding.Impact)
+	}
+	if finding.Why != "" {
+		fmt.Fprintf(w, "Why this matters: %s\n", finding.Why)
+	}
+	if finding.FixAvailable {
+		fmt.Fprintf(w, "\nSuggested fix (%s, confidence=%s, risk=%s):\n", finding.FixKind, finding.Confidence, finding.Risk)
+		fmt.Fprintf(w, "  %s\n", finding.FixSummary)
+		for i, step := range finding.FixSteps {
+			fmt.Fprintf(w, "  %d. %s\n", i+1, step)
+		}
+		if finding.RequiresReview {
+			fmt.Fprintln(w, "  review: required before applying manually")
+		}
+	} else {
+		fmt.Fprintf(w, "\nRecommendation: %s\n", finding.Recommendation)
+	}
+}
+
+func printFixPlan(w io.Writer, plan fixplan.Plan) {
+	fmt.Fprintf(w, "Fix plan: total=%d safe=%d review=%d blocked=%d\n", plan.Summary.Total, plan.Summary.Safe, plan.Summary.Review, plan.Summary.Blocked)
+	for _, fix := range plan.Fixes {
+		fmt.Fprintf(w, "  %-7s %-20s %-22s %s\n", fix.Status, fix.FixKind, fix.Rule, fix.FindingID)
+		if fix.Summary != "" {
+			fmt.Fprintf(w, "    %s\n", fix.Summary)
+		}
+	}
+}
+
+func printPolicy(w io.Writer, report policy.Report) {
+	status := "passed"
+	if !report.Passed {
+		status = "failed"
+	}
+	fmt.Fprintf(w, "Nightward policy %s: threshold=%s violations=%d total_findings=%d\n", status, report.Threshold, report.Summary.Violations, report.Summary.TotalFindings)
+	for _, finding := range report.Violations {
+		fmt.Fprintf(w, "  [%s] %s %s\n", finding.Severity, finding.Rule, finding.ID)
+	}
+}
+
 func printSchedulePlan(w io.Writer, plan schedule.Plan) {
 	fmt.Fprintf(w, "Schedule preset: %s (%s)\n", plan.Preset, plan.Platform)
 	fmt.Fprintf(w, "Command: %s\n", strings.Join(plan.Command, " "))
@@ -384,6 +602,26 @@ func printSchedulePlan(w io.Writer, plan schedule.Plan) {
 	for _, note := range plan.Notes {
 		fmt.Fprintf(w, "\nNote: %s\n", note)
 	}
+}
+
+func fixSelector(findingID, rule string, all bool) (fixplan.Selector, error) {
+	selected := 0
+	if findingID != "" {
+		selected++
+	}
+	if rule != "" {
+		selected++
+	}
+	if all {
+		selected++
+	}
+	if selected > 1 {
+		return fixplan.Selector{}, fmt.Errorf("choose only one of --finding, --rule, or --all")
+	}
+	if selected == 0 {
+		all = true
+	}
+	return fixplan.Selector{FindingID: findingID, Rule: rule, All: all}, nil
 }
 
 func writeJSON(w io.Writer, value any, stderr io.Writer) int {

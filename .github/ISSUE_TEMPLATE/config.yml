@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/JSONbored/nightward/security/advisories/new
+    about: Report secret disclosure or unsafe mutation issues privately when possible.

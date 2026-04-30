@@ -1,0 +1,42 @@
+name: Adapter request
+description: Request support for another AI agent, editor, MCP client, or devtool.
+title: "adapter: "
+labels:
+  - adapter
+body:
+  - type: input
+    id: tool
+    attributes:
+      label: Tool name
+      placeholder: "Example: Codex, Claude Code, Cursor"
+    validations:
+      required: true
+  - type: textarea
+    id: paths
+    attributes:
+      label: Expected paths
+      description: List paths with private usernames, project names, and secrets redacted.
+      placeholder: |
+        ~/.example/config.json
+        ~/Library/Application Support/Example/User/settings.json
+    validations:
+      required: true
+  - type: textarea
+    id: config_shape
+    attributes:
+      label: Redacted config shape
+      description: Include key names and structure only. Do not include real values.
+      render: json
+  - type: dropdown
+    id: classification
+    attributes:
+      label: Likely classification
+      options:
+        - portable
+        - machine-local
+        - secret-auth
+        - runtime-cache
+        - app-owned
+        - unknown
+    validations:
+      required: true

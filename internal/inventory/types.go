@@ -23,6 +23,17 @@ const (
 	RiskCritical RiskLevel = "critical"
 )
 
+type FixKind string
+
+const (
+	FixPinPackage          FixKind = "pin-package"
+	FixExternalizeSecret   FixKind = "externalize-secret"
+	FixReplaceShellWrapper FixKind = "replace-shell-wrapper"
+	FixNarrowFilesystem    FixKind = "narrow-filesystem"
+	FixManualReview        FixKind = "manual-review"
+	FixIgnoreWithReason    FixKind = "ignore-with-reason"
+)
+
 type Item struct {
 	ID             string            `json:"id"`
 	Tool           string            `json:"tool"`
@@ -47,6 +58,16 @@ type Finding struct {
 	Message        string    `json:"message"`
 	Evidence       string    `json:"evidence,omitempty"`
 	Recommendation string    `json:"recommended_action"`
+	Impact         string    `json:"impact,omitempty"`
+	Why            string    `json:"why_this_matters,omitempty"`
+	DocsURL        string    `json:"docs_url,omitempty"`
+	FixAvailable   bool      `json:"fix_available"`
+	FixKind        FixKind   `json:"fix_kind,omitempty"`
+	Confidence     string    `json:"confidence,omitempty"`
+	Risk           RiskLevel `json:"risk,omitempty"`
+	RequiresReview bool      `json:"requires_review"`
+	FixSummary     string    `json:"fix_summary,omitempty"`
+	FixSteps       []string  `json:"fix_steps,omitempty"`
 }
 
 type AdapterStatus struct {

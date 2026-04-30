@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/shadowbook/nightward/internal/backupplan"
+	"github.com/shadowbook/nightward/internal/fixplan"
 	"github.com/shadowbook/nightward/internal/inventory"
 	"github.com/shadowbook/nightward/internal/schedule"
 )
@@ -19,6 +20,10 @@ type model struct {
 	cursor   int
 	width    int
 	height   int
+	severity string
+	tool     string
+	rule     string
+	status   string
 }
 
 var (
@@ -54,7 +59,7 @@ var (
 			Padding(0, 1)
 )
 
-var tabs = []string{"Dashboard", "Inventory", "MCP/Security", "Backup Plan"}
+var tabs = []string{"Dashboard", "Inventory", "Findings", "Fix Plan", "Backup Plan"}
 
 func Run(report inventory.Report, scheduleStatus schedule.Plan) error {
 	_, err := tea.NewProgram(model{report: report, schedule: scheduleStatus}, tea.WithAltScreen()).Run()
@@ -91,6 +96,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tab = 2
 		case "4":
 			m.tab = 3
+		case "5":
+			m.tab = 4
+		case "s":
+			if m.tab == 2 {
+				m.severity = cycle(m.severity, riskOptions(m.report.Findings))
+				m.cursor = 0
+			}
+		case "t":
+			if m.tab == 2 {
+				m.tool = cycle(m.tool, toolOptions(m.report.Findings))
+				m.cursor = 0
+			}
+		case "r":
+			if m.tab == 2 {
+				m.rule = cycle(m.rule, ruleOptions(m.report.Findings))
+				m.cursor = 0
+			}
+		case "c":
+			if finding, ok := m.currentFinding(); ok && len(finding.FixSteps) > 0 {
+				m.status = "copy: " + finding.FixSteps[0]
+			}
+		case "e":
+			m.status = "export: nw fix export --format markdown"
+		case "o":
+			if finding, ok := m.currentFinding(); ok && finding.DocsURL != "" {
+				m.status = "open docs: " + finding.DocsURL
+			} else {
+				m.status = "open docs: no docs URL for selected finding"
+			}
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
@@ -112,7 +146,11 @@ func (m model) View() string {
 
 	tabLine := lipgloss.JoinHorizontal(lipgloss.Top, titleStyle.Render("nightward"), m.renderTabs())
 	body := panelStyle.Width(bodyWidth).Height(bodyHeight).Render(m.renderBody(bodyWidth-6, bodyHeight-2))
-	footer := footerStyle.Render("1-4 tabs  arrows/hjkl navigate  q quit")
+	footerText := "1-5 tabs  arrows/hjkl navigate  s/t/r filters  c/e/o actions  q quit"
+	if m.status != "" {
+		footerText += "  " + m.status
+	}
+	footer := footerStyle.Render(footerText)
 	return baseStyle.Render(lipgloss.JoinVertical(lipgloss.Left, tabLine, body, footer))
 }
 
@@ -137,6 +175,8 @@ func (m model) renderBody(width, height int) string {
 		return m.inventory(width, height)
 	case 2:
 		return m.findings(width, height)
+	case 3:
+		return m.fixPlan(width, height)
 	default:
 		return m.backupPlan(width, height)
 	}
@@ -193,12 +233,25 @@ func (m model) inventory(width, height int) string {
 }
 
 func (m model) findings(width, height int) string {
-	lines := []string{section("MCP/Security Findings"), ""}
-	findings := m.report.Findings
+	findings := m.filteredFindings()
 	if len(findings) == 0 {
-		return "No MCP/security findings found in discovered configs."
+		return "No findings match the current filters."
 	}
-	visible := max(1, height-4)
+	listWidth := width
+	detailWidth := 0
+	if width >= 94 {
+		listWidth = width/2 - 1
+		detailWidth = width - listWidth - 3
+	}
+	lines := []string{
+		section("Findings"),
+		fmt.Sprintf("severity=%s  tool=%s  rule=%s", filterLabel(m.severity), filterLabel(m.tool), filterLabel(m.rule)),
+		"",
+	}
+	visible := max(1, height-5)
+	if m.cursor >= len(findings) {
+		m.cursor = len(findings) - 1
+	}
 	start := clampCursor(m.cursor, len(findings), visible)
 	for i := start; i < len(findings) && len(lines) < visible+2; i++ {
 		finding := findings[i]
@@ -209,6 +262,38 @@ func (m model) findings(width, height int) string {
 		line := fmt.Sprintf("%s%-8s %-22s %s", prefix, finding.Severity, finding.Rule, finding.Message)
 		lines = append(lines, line)
 	}
+	left := fitLines(lines, listWidth)
+	if detailWidth <= 0 {
+		return left
+	}
+	detail := findingDetail(findings[m.cursor], detailWidth, height)
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, "  ", detail)
+}
+
+func (m model) fixPlan(width, height int) string {
+	plan := fixplan.Build(m.report, fixplan.Selector{All: true})
+	lines := []string{
+		section("Fix Plan"),
+		fmt.Sprintf("Safe: %d  Review: %d  Blocked: %d", plan.Summary.Safe, plan.Summary.Review, plan.Summary.Blocked),
+		"",
+	}
+	if len(plan.Fixes) == 0 {
+		return "No fix plans available."
+	}
+	visible := max(1, height-5)
+	if m.cursor >= len(plan.Fixes) {
+		m.cursor = len(plan.Fixes) - 1
+	}
+	start := clampCursor(m.cursor, len(plan.Fixes), visible)
+	for i := start; i < len(plan.Fixes) && len(lines) < visible+3; i++ {
+		fix := plan.Fixes[i]
+		prefix := "  "
+		if i == m.cursor {
+			prefix = "> "
+		}
+		lines = append(lines, fmt.Sprintf("%s%-7s %-20s %-22s %s", prefix, fix.Status, fix.FixKind, fix.Rule, fix.Summary))
+	}
+	lines = append(lines, "", "Use `nw fix plan --all --json` or `nw fix export --format markdown` for full steps.")
 	return fitLines(lines, width)
 }
 
@@ -233,6 +318,126 @@ func (m model) backupPlan(width, height int) string {
 	}
 	lines = append(lines, "", "Use `nightward plan backup --target <repo>` for exact JSON or shell output.")
 	return fitLines(lines, width)
+}
+
+func (m model) filteredFindings() []inventory.Finding {
+	filtered := make([]inventory.Finding, 0, len(m.report.Findings))
+	for _, finding := range m.report.Findings {
+		if m.severity != "" && string(finding.Severity) != m.severity {
+			continue
+		}
+		if m.tool != "" && finding.Tool != m.tool {
+			continue
+		}
+		if m.rule != "" && finding.Rule != m.rule {
+			continue
+		}
+		filtered = append(filtered, finding)
+	}
+	return filtered
+}
+
+func (m model) currentFinding() (inventory.Finding, bool) {
+	findings := m.filteredFindings()
+	if len(findings) == 0 {
+		return inventory.Finding{}, false
+	}
+	cursor := m.cursor
+	if cursor >= len(findings) {
+		cursor = len(findings) - 1
+	}
+	return findings[cursor], true
+}
+
+func findingDetail(finding inventory.Finding, width, height int) string {
+	lines := []string{
+		section("Detail"),
+		finding.ID,
+		fmt.Sprintf("%s / %s / %s", finding.Tool, finding.Severity, finding.Rule),
+		"",
+		finding.Message,
+	}
+	if finding.Evidence != "" {
+		lines = append(lines, "", section("Evidence"), finding.Evidence)
+	}
+	if finding.Impact != "" {
+		lines = append(lines, "", section("Impact"), finding.Impact)
+	}
+	if finding.FixAvailable {
+		lines = append(lines, "", section("Suggested Fix"), fmt.Sprintf("%s  confidence=%s  risk=%s", finding.FixKind, finding.Confidence, finding.Risk), finding.FixSummary)
+		for i, step := range finding.FixSteps {
+			lines = append(lines, fmt.Sprintf("%d. %s", i+1, step))
+		}
+	}
+	if finding.Why != "" {
+		lines = append(lines, "", section("Why"), finding.Why)
+	}
+	if len(lines) > height {
+		lines = lines[:height]
+	}
+	return fitLines(lines, width)
+}
+
+func riskOptions(findings []inventory.Finding) []string {
+	values := make([]string, 0, len(findings))
+	for _, finding := range findings {
+		values = append(values, string(finding.Severity))
+	}
+	return unique(values)
+}
+
+func toolOptions(findings []inventory.Finding) []string {
+	values := make([]string, 0, len(findings))
+	for _, finding := range findings {
+		values = append(values, finding.Tool)
+	}
+	return unique(values)
+}
+
+func ruleOptions(findings []inventory.Finding) []string {
+	values := make([]string, 0, len(findings))
+	for _, finding := range findings {
+		values = append(values, finding.Rule)
+	}
+	return unique(values)
+}
+
+func unique(values []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, value := range values {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
+}
+
+func cycle(current string, options []string) string {
+	if len(options) == 0 {
+		return ""
+	}
+	if current == "" {
+		return options[0]
+	}
+	for i, option := range options {
+		if option == current {
+			if i == len(options)-1 {
+				return ""
+			}
+			return options[i+1]
+		}
+	}
+	return ""
+}
+
+func filterLabel(value string) string {
+	if value == "" {
+		return "all"
+	}
+	return value
 }
 
 func section(label string) string {

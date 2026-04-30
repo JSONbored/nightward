@@ -17,6 +17,7 @@ Nightward gives you a local inventory first:
 - what needs review
 - what should never be committed
 - which MCP configs deserve security attention
+- what exact remediation plan is safe to consider
 - what a backup plan would do before it writes anything
 
 ## Install
@@ -72,6 +73,35 @@ nightward adapters list
 nw adapters list
 ```
 
+List findings:
+
+```sh
+nightward findings list
+# or
+nw findings list --json
+```
+
+Explain a finding:
+
+```sh
+nw findings explain mcp_unpinned_package-abc123
+```
+
+Generate a read-only fix plan:
+
+```sh
+nw fix plan --all --json
+nw fix plan --rule mcp_secret_env
+nw fix export --format markdown
+```
+
+Run policy checks or generate SARIF:
+
+```sh
+nw policy check --strict --json
+nw policy sarif --output nightward.sarif
+```
+
 Generate a nightly schedule plan:
 
 ```sh
@@ -122,6 +152,30 @@ Nightward inspects JSON and TOML MCP config shapes where possible and flags:
 
 Reports redact values and expose only path, tool, classification, risk, reason, and recommended action.
 
+## Fix Plans
+
+Nightward does not mutate agent configs in this release. "Autofix" means structured, reviewable fix plans:
+
+- `pin-package`: pin `npx`, `uvx`, or `pipx` package execution when the package name is parseable
+- `externalize-secret`: move inline secret values out of agent config and keep only env key names or setup docs
+- `replace-shell-wrapper`: replace simple shell passthroughs with direct executable invocation
+- `narrow-filesystem`: replace broad filesystem access with explicit paths after human review
+- `manual-review`: inspect unsupported, ambiguous, or high-risk config manually
+- `ignore-with-reason`: keep an advisory finding only after documenting why it is expected
+
+Every fix plan includes confidence, risk, review requirements, redacted evidence, impact, and steps. Secret values are never emitted in scan JSON, fix-plan JSON, Markdown exports, SARIF, or TUI detail text.
+
+## TUI
+
+The default `nightward` / `nw` command opens a Bubble Tea TUI with:
+
+- dashboard metrics and schedule status
+- inventory by tool/classification
+- findings list with severity/tool/rule filters
+- selected-finding detail with evidence, impact, fix plan, and why it matters
+- fix-plan summary grouped as safe, review, and blocked
+- backup plan preview
+
 ## Scheduling
 
 The `nightly` preset runs:
@@ -145,15 +199,16 @@ go test ./...
 go run ./cmd/nightward --help
 go run ./cmd/nw --help
 go run ./cmd/nightward scan --json
+go run ./cmd/nw findings list --json
+go run ./cmd/nw fix plan --all --json
+go run ./cmd/nw policy sarif --output /tmp/nightward.sarif
 go run ./cmd/nightward schedule install --preset nightly --dry-run
 ```
 
-## Roadmap
+## Project Docs
 
-- encrypted snapshots
-- cross-machine diff
-- Raycast extension
-- GitHub Action policy checks
-- Docker and Unraid dashboard
-- live backup after stronger policy gates
-- restore only after snapshot/rollback safety exists
+- [Security policy](SECURITY.md)
+- [Contributing guide](CONTRIBUTING.md)
+- [Roadmap](ROADMAP.md)
+- [CI/security notes](docs/ci-security.md)
+- [Screenshot/GIF capture plan](docs/screenshots.md)

@@ -1,0 +1,6 @@
+[mcp_servers.demo]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem", "$HOME"]
+
+[mcp_servers.demo.env]
+API_TOKEN = "${API_TOKEN}"

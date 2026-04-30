@@ -18,6 +18,9 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "/Users/example"]
 
 [mcp_servers.filesystem.env]
 API_TOKEN = "super-secret-value"
+
+[mcp_servers.reference.env]
+GITHUB_TOKEN = "${GITHUB_TOKEN}"
 `)
 
 	scanner := NewScanner(home)
@@ -39,6 +42,27 @@ API_TOKEN = "super-secret-value"
 		if !rules[rule] {
 			t.Fatalf("expected finding rule %s in %#v", rule, rules)
 		}
+	}
+	var inlineSecret, envReference bool
+	for _, finding := range report.Findings {
+		if finding.Rule != "mcp_secret_env" {
+			continue
+		}
+		if !finding.FixAvailable || finding.FixKind != FixExternalizeSecret {
+			t.Fatalf("secret finding missing externalize-secret plan: %#v", finding)
+		}
+		if strings.Contains(finding.Evidence, "API_TOKEN") && finding.Severity == RiskCritical {
+			inlineSecret = true
+		}
+		if strings.Contains(finding.Evidence, "GITHUB_TOKEN") && finding.Severity == RiskMedium {
+			envReference = true
+		}
+	}
+	if !inlineSecret {
+		t.Fatal("expected inline secret env to be critical")
+	}
+	if !envReference {
+		t.Fatal("expected env reference to be medium guidance")
 	}
 
 	data, err := json.Marshal(report)
