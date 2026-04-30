@@ -1,0 +1,5 @@
+.DS_Store
+/bin/
+/dist/
+/nightward
+coverage.out

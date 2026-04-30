@@ -1,0 +1,293 @@
+package schedule
+
+import (
+	"bytes"
+	"encoding/xml"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+	"time"
+)
+
+const Label = "dev.nightward.scan"
+
+type Plan struct {
+	Preset       string          `json:"preset"`
+	Platform     string          `json:"platform"`
+	ReportDir    string          `json:"report_dir"`
+	LogDir       string          `json:"log_dir"`
+	Command      []string        `json:"command"`
+	Files        []GeneratedFile `json:"files"`
+	Notes        []string        `json:"notes,omitempty"`
+	Installed    bool            `json:"installed"`
+	LastReport   string          `json:"last_report,omitempty"`
+	LastRun      *time.Time      `json:"last_run,omitempty"`
+	LastFindings int             `json:"last_findings,omitempty"`
+}
+
+type GeneratedFile struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+	Mode    uint32 `json:"mode"`
+}
+
+func BuildPlan(home, executable, preset string) (Plan, error) {
+	return BuildPlanForOS(runtime.GOOS, home, executable, preset)
+}
+
+func BuildPlanForOS(goos, home, executable, preset string) (Plan, error) {
+	if preset == "" {
+		preset = "nightly"
+	}
+	if preset != "nightly" {
+		return Plan{}, fmt.Errorf("unsupported preset %q", preset)
+	}
+	if executable == "" {
+		executable = "nightward"
+	}
+
+	reportDir := filepath.Join(home, ".local", "state", "nightward", "reports")
+	logDir := filepath.Join(home, ".local", "state", "nightward", "logs")
+	command := []string{executable, "scan", "--json", "--output-dir", reportDir}
+	plan := Plan{
+		Preset:    preset,
+		Platform:  goos,
+		ReportDir: reportDir,
+		LogDir:    logDir,
+		Command:   command,
+	}
+
+	switch goos {
+	case "darwin":
+		path := filepath.Join(home, "Library", "LaunchAgents", Label+".plist")
+		content, err := launchdPlist(command, logDir)
+		if err != nil {
+			return Plan{}, err
+		}
+		plan.Files = append(plan.Files, GeneratedFile{Path: path, Content: content, Mode: 0644})
+	case "linux":
+		servicePath := filepath.Join(home, ".config", "systemd", "user", Label+".service")
+		timerPath := filepath.Join(home, ".config", "systemd", "user", Label+".timer")
+		plan.Files = append(plan.Files,
+			GeneratedFile{Path: servicePath, Content: systemdService(command, logDir), Mode: 0644},
+			GeneratedFile{Path: timerPath, Content: systemdTimer(), Mode: 0644},
+		)
+	default:
+		plan.Files = append(plan.Files, GeneratedFile{Path: "crontab", Content: cronLine(command), Mode: 0644})
+		plan.Notes = append(plan.Notes, "Cron is generated as text only; v1 does not mutate crontab automatically.")
+	}
+
+	status := Status(home)
+	plan.Installed = status.Installed
+	plan.LastReport = status.LastReport
+	plan.LastRun = status.LastRun
+	plan.LastFindings = status.LastFindings
+	return plan, nil
+}
+
+func Status(home string) Plan {
+	reportDir := filepath.Join(home, ".local", "state", "nightward", "reports")
+	status := Plan{
+		Preset:    "nightly",
+		Platform:  runtime.GOOS,
+		ReportDir: reportDir,
+		LogDir:    filepath.Join(home, ".local", "state", "nightward", "logs"),
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		status.Installed = fileExists(filepath.Join(home, "Library", "LaunchAgents", Label+".plist"))
+	case "linux":
+		status.Installed = fileExists(filepath.Join(home, ".config", "systemd", "user", Label+".timer"))
+	}
+	status.LastReport, status.LastRun, status.LastFindings = lastReport(reportDir)
+	return status
+}
+
+func Install(home, executable, preset string) (Plan, error) {
+	plan, err := BuildPlan(home, executable, preset)
+	if err != nil {
+		return Plan{}, err
+	}
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		return plan, errors.New("automatic schedule install is only supported for launchd and systemd user timers in v1")
+	}
+	if err := os.MkdirAll(plan.ReportDir, 0755); err != nil {
+		return plan, err
+	}
+	if err := os.MkdirAll(plan.LogDir, 0755); err != nil {
+		return plan, err
+	}
+	for _, file := range plan.Files {
+		if err := os.MkdirAll(filepath.Dir(file.Path), 0755); err != nil {
+			return plan, err
+		}
+		if err := os.WriteFile(file.Path, []byte(file.Content), os.FileMode(file.Mode)); err != nil {
+			return plan, err
+		}
+	}
+	if runtime.GOOS == "darwin" {
+		uid := strconv.Itoa(os.Getuid())
+		_ = exec.Command("launchctl", "bootout", "gui/"+uid, plan.Files[0].Path).Run()
+		if err := exec.Command("launchctl", "bootstrap", "gui/"+uid, plan.Files[0].Path).Run(); err != nil {
+			return plan, fmt.Errorf("wrote launchd plist but failed to bootstrap: %w", err)
+		}
+	} else if runtime.GOOS == "linux" {
+		_ = exec.Command("systemctl", "--user", "daemon-reload").Run()
+		if err := exec.Command("systemctl", "--user", "enable", "--now", Label+".timer").Run(); err != nil {
+			return plan, fmt.Errorf("wrote systemd timer but failed to enable: %w", err)
+		}
+	}
+	plan.Installed = true
+	return plan, nil
+}
+
+func Remove(home string) (Plan, error) {
+	plan := Status(home)
+	switch runtime.GOOS {
+	case "darwin":
+		path := filepath.Join(home, "Library", "LaunchAgents", Label+".plist")
+		uid := strconv.Itoa(os.Getuid())
+		_ = exec.Command("launchctl", "bootout", "gui/"+uid, path).Run()
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return plan, err
+		}
+	case "linux":
+		_ = exec.Command("systemctl", "--user", "disable", "--now", Label+".timer").Run()
+		for _, path := range []string{
+			filepath.Join(home, ".config", "systemd", "user", Label+".service"),
+			filepath.Join(home, ".config", "systemd", "user", Label+".timer"),
+		} {
+			if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return plan, err
+			}
+		}
+		_ = exec.Command("systemctl", "--user", "daemon-reload").Run()
+	default:
+		return plan, errors.New("automatic schedule remove is only supported for launchd and systemd user timers in v1")
+	}
+	plan.Installed = false
+	return plan, nil
+}
+
+func launchdPlist(command []string, logDir string) (string, error) {
+	type key string
+	var buf bytes.Buffer
+	buf.WriteString(xml.Header)
+	buf.WriteString("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n")
+	buf.WriteString("<plist version=\"1.0\">\n<dict>\n")
+	writeKey := func(k key) { buf.WriteString(fmt.Sprintf("  <key>%s</key>\n", k)) }
+	writeKey("Label")
+	buf.WriteString(fmt.Sprintf("  <string>%s</string>\n", Label))
+	writeKey("ProgramArguments")
+	buf.WriteString("  <array>\n")
+	for _, arg := range command {
+		escaped, err := xmlEscape(arg)
+		if err != nil {
+			return "", err
+		}
+		buf.WriteString(fmt.Sprintf("    <string>%s</string>\n", escaped))
+	}
+	buf.WriteString("  </array>\n")
+	writeKey("StartCalendarInterval")
+	buf.WriteString("  <dict>\n    <key>Hour</key>\n    <integer>2</integer>\n    <key>Minute</key>\n    <integer>17</integer>\n  </dict>\n")
+	writeKey("StandardOutPath")
+	buf.WriteString(fmt.Sprintf("  <string>%s</string>\n", filepath.Join(logDir, "nightward.out.log")))
+	writeKey("StandardErrorPath")
+	buf.WriteString(fmt.Sprintf("  <string>%s</string>\n", filepath.Join(logDir, "nightward.err.log")))
+	writeKey("RunAtLoad")
+	buf.WriteString("  <false/>\n</dict>\n</plist>\n")
+	return buf.String(), nil
+}
+
+func systemdService(command []string, logDir string) string {
+	return fmt.Sprintf(`[Unit]
+Description=Nightward AI agent state scan
+
+[Service]
+Type=oneshot
+ExecStart=%s
+Environment=NIGHTWARD_LOG_DIR=%s
+`, shellJoin(command), logDir)
+}
+
+func systemdTimer() string {
+	return `[Unit]
+Description=Nightly Nightward AI agent state scan
+
+[Timer]
+OnCalendar=*-*-* 02:17:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+`
+}
+
+func cronLine(command []string) string {
+	return fmt.Sprintf("17 2 * * * %s\n", shellJoin(command))
+}
+
+func shellJoin(args []string) string {
+	quoted := make([]string, 0, len(args))
+	for _, arg := range args {
+		if strings.ContainsAny(arg, " \t\n'\"") {
+			quoted = append(quoted, "'"+strings.ReplaceAll(arg, "'", "'\\''")+"'")
+		} else {
+			quoted = append(quoted, arg)
+		}
+	}
+	return strings.Join(quoted, " ")
+}
+
+func xmlEscape(value string) (string, error) {
+	var buf bytes.Buffer
+	if err := xml.EscapeText(&buf, []byte(value)); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func lastReport(reportDir string) (string, *time.Time, int) {
+	entries, err := os.ReadDir(reportDir)
+	if err != nil {
+		return "", nil, 0
+	}
+	var newest os.FileInfo
+	var newestPath string
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		if newest == nil || info.ModTime().After(newest.ModTime()) {
+			newest = info
+			newestPath = filepath.Join(reportDir, entry.Name())
+		}
+	}
+	if newest == nil {
+		return "", nil, 0
+	}
+	mod := newest.ModTime().UTC()
+	return newestPath, &mod, countFindings(newestPath)
+}
+
+func countFindings(path string) int {
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	return strings.Count(string(contents), `"severity"`)
+}
