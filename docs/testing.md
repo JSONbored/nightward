@@ -41,7 +41,7 @@ make verify
 
 `make test-junit` writes:
 
-- `reports/go-tests.xml` from Go tests with `gotestsum`
+- `reports/go-tests.xml` from Go tests with `gotestsum`, normalized to include testcase file paths
 - `reports/junit/raycast.xml` from the Raycast extension Node tests
 
 `make trunk-flaky-validate` runs:

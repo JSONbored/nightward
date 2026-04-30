@@ -4,7 +4,7 @@ GOTESTSUM_VERSION ?= v1.13.0
 GOSEC_VERSION ?= v2.26.1
 STATICCHECK_VERSION ?= v0.7.0
 RAYCAST_DIR ?= integrations/raycast
-GO_PACKAGES ?= $(shell go list ./cmd/... ./internal/...)
+GO_PACKAGES ?= $(shell go list ./cmd/... ./internal/... ./tools/...)
 
 .PHONY: test test-race vet staticcheck gosec go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-verify verify build install-local clean-reports
 
@@ -25,7 +25,8 @@ gosec:
 
 go-test-junit:
 	mkdir -p $(REPORTS_DIR)
-	go run gotest.tools/gotestsum@$(GOTESTSUM_VERSION) --format testname --junitfile $(REPORTS_DIR)/go-tests.xml -- $(GO_PACKAGES)
+	go run gotest.tools/gotestsum@$(GOTESTSUM_VERSION) --format testname --junitfile $(REPORTS_DIR)/go-tests.raw.xml -- $(GO_PACKAGES)
+	go run ./tools/normalize-go-junit $(REPORTS_DIR)/go-tests.raw.xml $(REPORTS_DIR)/go-tests.xml
 
 test-junit: clean-reports go-test-junit raycast-install
 	cd $(RAYCAST_DIR) && npm run test:junit
