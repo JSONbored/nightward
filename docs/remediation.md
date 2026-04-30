@@ -23,6 +23,14 @@ Package pinning does not guess versions. Choose a reviewed version from the upst
 
 Move inline secret values out of agent config. Keep only env key names, setup prerequisites, or environment interpolation references in portable files.
 
+### mcp_secret_header
+
+Move sensitive remote MCP header values out of agent config. Keep only header names, setup prerequisites, or environment interpolation references in portable files.
+
+### mcp_local_endpoint
+
+Move loopback, private-network, or machine-local MCP URLs into local-only overlays unless the endpoint is intentionally portable and documented.
+
 ### mcp_unpinned_package
 
 Pin package-executor commands such as `npx`, `uvx`, or `pipx` to reviewed package versions before syncing MCP config.

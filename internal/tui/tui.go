@@ -269,8 +269,14 @@ func (m model) dashboard(width int) string {
 		section("Classifications"),
 	}
 	for _, class := range []inventory.Classification{inventory.Portable, inventory.MachineLocal, inventory.SecretAuth, inventory.RuntimeCache, inventory.AppOwned, inventory.Unknown} {
-		if count := m.report.Summary.ByClassification[class]; count > 0 {
+		if count := m.report.Summary.ItemsByClassification[class]; count > 0 {
 			lines = append(lines, fmt.Sprintf("%-14s %d", class, count))
+		}
+	}
+	lines = append(lines, "", section("Finding Severity"))
+	for _, risk := range []inventory.RiskLevel{inventory.RiskCritical, inventory.RiskHigh, inventory.RiskMedium, inventory.RiskLow, inventory.RiskInfo} {
+		if count := m.report.Summary.FindingsBySeverity[risk]; count > 0 {
+			lines = append(lines, fmt.Sprintf("%-14s %d", risk, count))
 		}
 	}
 	lines = append(lines, "", section("Schedule"))

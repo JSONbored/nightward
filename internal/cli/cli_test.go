@@ -13,12 +13,15 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 	home := t.TempDir()
 	writeTestFile(t, filepath.Join(home, ".mcp.json"), `{"mcpServers":{"demo":{"command":"node","args":["server.js"]}}}`)
 	outputDir := t.TempDir()
+	targetDir := filepath.Join(t.TempDir(), "backup-target")
 	t.Setenv("NIGHTWARD_HOME", home)
 
 	before := listTestFiles(t, home)
+	targetBefore := listOptionalTestFiles(t, targetDir)
 	commands := [][]string{
 		{"scan", "--json"},
 		{"doctor", "--json"},
+		{"plan", "backup", "--target", targetDir, "--json"},
 		{"findings", "list", "--json"},
 		{"fix", "plan", "--all", "--json"},
 		{"fix", "preview", "--all", "--format", "json"},
@@ -35,9 +38,17 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 			t.Fatalf("%s failed with %d: %s", strings.Join(args, " "), code, stderr.String())
 		}
 	}
+	var stdout, stderr bytes.Buffer
+	if code := RunWithName("nw", []string{"findings", "explain", "--json", "mcp_server_review"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("findings explain failed with %d: %s", code, stderr.String())
+	}
 	after := listTestFiles(t, home)
 	if strings.Join(before, "\n") != strings.Join(after, "\n") {
 		t.Fatalf("read-only commands mutated home\nbefore=%v\nafter=%v", before, after)
+	}
+	targetAfter := listOptionalTestFiles(t, targetDir)
+	if strings.Join(targetBefore, "\n") != strings.Join(targetAfter, "\n") {
+		t.Fatalf("read-only backup plan mutated target\nbefore=%v\nafter=%v", targetBefore, targetAfter)
 	}
 }
 
@@ -124,4 +135,12 @@ func listTestFiles(t *testing.T, root string) []string {
 		t.Fatal(err)
 	}
 	return out
+}
+
+func listOptionalTestFiles(t *testing.T, root string) []string {
+	t.Helper()
+	if _, err := os.Stat(root); os.IsNotExist(err) {
+		return nil
+	}
+	return listTestFiles(t, root)
 }

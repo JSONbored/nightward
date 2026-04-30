@@ -141,3 +141,77 @@ func TestSARIFUsesConfigMetadataAndIgnores(t *testing.T) {
 		t.Fatalf("SARIF included ignored finding: %s", text)
 	}
 }
+
+func TestGoldenSARIFForURLSecurityFindings(t *testing.T) {
+	report := inventory.Report{Findings: []inventory.Finding{
+		{
+			ID:             "mcp_secret_header-111111111111",
+			Tool:           "Codex",
+			Path:           "/tmp/nightward-golden-home/.codex/config.toml",
+			Server:         "headers",
+			Severity:       inventory.RiskCritical,
+			Rule:           "mcp_secret_header",
+			Message:        "MCP server \"headers\" stores a sensitive header.",
+			Evidence:       "header_key=Authorization",
+			Recommendation: "Keep sensitive header values outside dotfiles.",
+			Impact:         "Credential-bearing headers in agent config can leak.",
+			Why:            "Remote MCP servers often use headers for authentication.",
+			FixAvailable:   true,
+			FixKind:        inventory.FixExternalizeSecret,
+			Confidence:     "high",
+			Risk:           inventory.RiskHigh,
+			RequiresReview: true,
+			FixSummary:     "Move the Authorization header value out of this config.",
+			FixSteps:       []string{"Remove the inline value for the Authorization header."},
+		},
+		{
+			ID:             "mcp_local_endpoint-222222222222",
+			Tool:           "Cursor",
+			Path:           "/tmp/nightward-golden-home/.cursor/mcp.json",
+			Server:         "local",
+			Severity:       inventory.RiskMedium,
+			Rule:           "mcp_local_endpoint",
+			Message:        "MCP server \"local\" points at a local or private endpoint.",
+			Evidence:       "transport=remote-url type=unknown url=http://127.0.0.1:8787",
+			Recommendation: "Keep local endpoint assumptions machine-local unless intentionally templated.",
+			Impact:         "Local or private MCP endpoints may not exist on another machine.",
+			Why:            "Portable dotfiles should distinguish remote service configuration from machine-local development endpoints.",
+			FixAvailable:   true,
+			FixKind:        inventory.FixManualReview,
+			Confidence:     "medium",
+			Risk:           inventory.RiskLow,
+			RequiresReview: true,
+			FixSummary:     "Move local endpoint assumptions into a machine-local overlay.",
+			FixSteps:       []string{"Confirm whether this MCP endpoint is intentionally machine-local."},
+		},
+	}}
+
+	sarif := BuildSARIF(report)
+	assertGoldenPolicyJSON(t, "testdata/golden/url-security.sarif.golden.json", sarif)
+	data, err := json.Marshal(sarif)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, leaked := range []string{"super-header-secret", "Bearer "} {
+		if strings.Contains(text, leaked) {
+			t.Fatalf("SARIF leaked secret value %q: %s", leaked, text)
+		}
+	}
+}
+
+func assertGoldenPolicyJSON(t *testing.T, path string, value any) {
+	t.Helper()
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual := string(data) + "\n"
+	expected, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read golden %s: %v\nactual:\n%s", path, err, actual)
+	}
+	if string(expected) != actual {
+		t.Fatalf("golden mismatch for %s\nexpected:\n%s\nactual:\n%s", path, expected, actual)
+	}
+}

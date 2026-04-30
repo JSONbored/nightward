@@ -162,6 +162,8 @@ export function dashboardMarkdown(
     `Items: \`${report.summary.total_items}\``,
     `Findings: \`${report.summary.total_findings}\``,
     `Max severity: \`${max}\``,
+    `Critical findings: \`${report.summary.findings_by_severity.critical ?? 0}\``,
+    `High findings: \`${report.summary.findings_by_severity.high ?? 0}\``,
     "",
     "## Schedule",
     `Installed: \`${doctor.schedule?.installed ? "yes" : "no"}\``,

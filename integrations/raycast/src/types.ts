@@ -19,9 +19,12 @@ export type FixKind =
 export type Summary = {
   total_items: number;
   total_findings: number;
-  by_classification: Partial<Record<Classification, number>>;
-  by_risk: Partial<Record<RiskLevel, number>>;
-  tools: Record<string, number>;
+  items_by_classification: Partial<Record<Classification, number>>;
+  items_by_risk: Partial<Record<RiskLevel, number>>;
+  items_by_tool: Record<string, number>;
+  findings_by_severity: Partial<Record<RiskLevel, number>>;
+  findings_by_rule: Record<string, number>;
+  findings_by_tool: Record<string, number>;
 };
 
 export type InventoryItem = {

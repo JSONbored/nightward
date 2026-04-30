@@ -47,10 +47,14 @@ Secret env handling distinguishes:
 - env key references, such as `${API_TOKEN}`, which become guidance-only remediation
 - inline secret values, which become higher-risk externalization plans
 
+Secret header handling follows the same rule: header names may be emitted, but header values are never emitted. Inline values become higher-risk `mcp_secret_header` findings; environment references become guidance-only remediation.
+
 MCP argument evidence redacts secret-looking assignments and flag values, such as `--api-key value`, `TOKEN=value`, and `Authorization: value`.
+
+Remote MCP URL evidence is structural only. Nightward records scheme and host for review, strips path/query details, and does not call the endpoint.
 
 ## What Still Needs Human Review
 
-Nightward can detect obvious local risk, but it cannot know user intent. Findings such as broad filesystem mounts, local token paths, shell wrappers, and unknown MCP server shapes should be reviewed before syncing.
+Nightward can detect obvious local risk, but it cannot know user intent. Findings such as broad filesystem mounts, local token paths, shell wrappers, local MCP endpoints, and unknown MCP server shapes should be reviewed before syncing.
 
 If a report contains private state, treat that as a bug and follow [SECURITY.md](../SECURITY.md).

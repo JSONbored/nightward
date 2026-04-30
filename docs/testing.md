@@ -26,7 +26,8 @@ make verify
 - Adapter tests use temporary HOME directories and fixture config files.
 - CLI no-write tests prove read-only commands do not mutate HOME.
 - Redaction tests must cover scan JSON, policy output, SARIF, Markdown exports, fix previews, and TUI text.
-- Golden-style tests should stay stable for JSON/SARIF shape, not timestamps or host-specific paths.
+- Golden-style tests should stay stable for JSON/SARIF shape, not timestamps or host-specific paths. Scan-summary goldens must keep item buckets separate from finding buckets.
+- MCP fixture tests should cover command servers, URL-shaped servers, sensitive headers, local endpoints, and unsupported shapes.
 - Scheduler tests verify generated launchd, systemd user timer, and cron text without installing schedules.
 - TUI action tests cover clipboard/open command construction and private redacted fix-plan exports.
 - Raycast extension tests cover pure redaction/formatting helpers and safe command execution wrappers.

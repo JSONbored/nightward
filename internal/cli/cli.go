@@ -609,8 +609,17 @@ Short alias: nw
 
 func printScan(w io.Writer, report inventory.Report) {
 	fmt.Fprintf(w, "Nightward scan: %d items, %d findings\n", report.Summary.TotalItems, report.Summary.TotalFindings)
-	for class, count := range report.Summary.ByClassification {
+	fmt.Fprintln(w, "Items by classification:")
+	for class, count := range report.Summary.ItemsByClassification {
 		fmt.Fprintf(w, "  %-14s %d\n", class, count)
+	}
+	if len(report.Summary.FindingsBySeverity) > 0 {
+		fmt.Fprintln(w, "Findings by severity:")
+		for _, severity := range []inventory.RiskLevel{inventory.RiskCritical, inventory.RiskHigh, inventory.RiskMedium, inventory.RiskLow, inventory.RiskInfo} {
+			if count := report.Summary.FindingsBySeverity[severity]; count > 0 {
+				fmt.Fprintf(w, "  %-14s %d\n", severity, count)
+			}
+		}
 	}
 	if len(report.Findings) > 0 {
 		fmt.Fprintln(w, "\nTop findings:")

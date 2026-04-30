@@ -295,7 +295,7 @@ function classificationRows(
   return order
     .map((classification): [Classification, number] => [
       classification,
-      report.summary.by_classification[classification] ?? 0,
+      report.summary.items_by_classification[classification] ?? 0,
     ])
     .filter(([, count]) => count > 0);
 }

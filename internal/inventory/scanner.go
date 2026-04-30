@@ -49,9 +49,12 @@ func (s Scanner) Scan() Report {
 		Hostname:    s.Hostname,
 		Home:        s.Home,
 		Summary: Summary{
-			ByClassification: map[Classification]int{},
-			ByRisk:           map[RiskLevel]int{},
-			Tools:            map[string]int{},
+			ItemsByClassification: map[Classification]int{},
+			ItemsByRisk:           map[RiskLevel]int{},
+			ItemsByTool:           map[string]int{},
+			FindingsBySeverity:    map[RiskLevel]int{},
+			FindingsByRule:        map[string]int{},
+			FindingsByTool:        map[string]int{},
 		},
 	}
 
@@ -96,9 +99,14 @@ func (s Scanner) Scan() Report {
 	report.Summary.TotalItems = len(report.Items)
 	report.Summary.TotalFindings = len(report.Findings)
 	for _, item := range report.Items {
-		report.Summary.ByClassification[item.Classification]++
-		report.Summary.ByRisk[item.Risk]++
-		report.Summary.Tools[item.Tool]++
+		report.Summary.ItemsByClassification[item.Classification]++
+		report.Summary.ItemsByRisk[item.Risk]++
+		report.Summary.ItemsByTool[item.Tool]++
+	}
+	for _, finding := range report.Findings {
+		report.Summary.FindingsBySeverity[finding.Severity]++
+		report.Summary.FindingsByRule[finding.Rule]++
+		report.Summary.FindingsByTool[finding.Tool]++
 	}
 
 	return report

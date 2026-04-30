@@ -29,7 +29,8 @@ Nightward answers the practical questions first:
 - Bubble Tea TUI with dashboard, inventory, findings, fix plan, and backup preview tabs.
 - `nightward` canonical command plus `nw` short alias.
 - Redacted JSON for automation and CI.
-- MCP findings for unpinned package execution, shell wrappers, sensitive env keys, broad filesystem access, token paths, parse failures, and unknown server shapes.
+- MCP findings for unpinned package execution, shell wrappers, sensitive env keys, sensitive headers, local endpoints, broad filesystem access, token paths, parse failures, and unknown server shapes.
+- Scan summaries separate inventory buckets from finding buckets: item classification/risk/tool counts are distinct from finding severity/rule/tool counts.
 - Plan-only remediation metadata: fix kind, confidence, risk, review requirement, impact, and steps.
 - SARIF output for GitHub code scanning.
 - Optional `.nightward.yml` policy config with reason-required ignores.
@@ -150,6 +151,8 @@ Nightward does not apply fixes yet. "Autofix" currently means structured, review
 
 Secret values are never emitted in scan JSON, findings output, fix-plan JSON, Markdown exports, SARIF, or TUI detail text.
 
+`scan --json` is pre-1.0 and may make breaking shape improvements. The current summary schema uses explicit keys such as `items_by_classification`, `items_by_risk`, `findings_by_severity`, and `findings_by_rule` so item risk is not confused with finding severity.
+
 ## TUI
 
 The default `nightward` / `nw` command opens the TUI:
@@ -238,7 +241,9 @@ make verify
 go run ./cmd/nightward --help
 go run ./cmd/nw --help
 go run ./cmd/nw scan --json
+go run ./cmd/nw scan --json | jq '.summary'
 go run ./cmd/nw findings list --json
+go run ./cmd/nw findings list --json | jq '[.[] | select(.rule=="mcp_unknown_command")]'
 go run ./cmd/nw fix plan --all --json
 go run ./cmd/nw fix preview --all --format markdown
 go run ./cmd/nw policy sarif --output /tmp/nightward.sarif
