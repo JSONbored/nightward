@@ -37,6 +37,13 @@ type DoctorReport struct {
 }
 
 func Run(args []string, stdout, stderr io.Writer) int {
+	return RunWithName("nightward", args, stdout, stderr)
+}
+
+func RunWithName(commandName string, args []string, stdout, stderr io.Writer) int {
+	if commandName == "" {
+		commandName = "nightward"
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return fail(stderr, "cannot determine home directory: %v", err)
@@ -52,7 +59,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 
 	switch args[0] {
 	case "-h", "--help", "help":
-		printHelp(stdout)
+		printHelp(stdout, commandName)
 	case "--version", "version":
 		fmt.Fprintln(stdout, version)
 	case "scan":
@@ -66,7 +73,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	case "schedule":
 		return runSchedule(home, args[1:], stdout, stderr)
 	default:
-		return fail(stderr, "unknown command %q\n\nRun `nightward --help` for usage.", args[0])
+		return fail(stderr, "unknown command %q\n\nRun `%s --help` for usage.", args[0], commandName)
 	}
 	return 0
 }
@@ -308,21 +315,24 @@ func maybeWriteReport(report inventory.Report, output, outputDir string) error {
 	return os.WriteFile(output, data, 0600)
 }
 
-func printHelp(w io.Writer) {
-	fmt.Fprint(w, `Nightward watches local AI agent state before it leaks into dotfiles.
+func printHelp(w io.Writer, commandName string) {
+	fmt.Fprintf(w, `Nightward watches local AI agent state before it leaks into dotfiles.
 
 Usage:
-  nightward                                Open the TUI
-  nightward scan [--json] [--output FILE] [--output-dir DIR]
-  nightward doctor [--json]
-  nightward plan backup --target <repo> [--json]
-  nightward adapters list [--json]
-  nightward schedule plan --preset nightly [--json]
-  nightward schedule install --preset nightly --dry-run [--json]
-  nightward schedule remove --dry-run [--json]
+  %[1]s                                Open the TUI
+  %[1]s scan [--json] [--output FILE] [--output-dir DIR]
+  %[1]s doctor [--json]
+  %[1]s plan backup --target <repo> [--json]
+  %[1]s adapters list [--json]
+  %[1]s schedule plan --preset nightly [--json]
+  %[1]s schedule install --preset nightly --dry-run [--json]
+  %[1]s schedule remove --dry-run [--json]
 
 V1 is read-only except explicit schedule install/remove commands.
-`)
+
+Canonical command: nightward
+Short alias: nw
+`, commandName)
 }
 
 func printScan(w io.Writer, report inventory.Report) {

@@ -22,14 +22,13 @@ Nightward gives you a local inventory first:
 ## Install
 
 ```sh
-go build -o ~/.local/bin/nightward ./cmd/nightward
-```
-
-Or:
-
-```sh
 make install-local
 ```
+
+This installs both commands:
+
+- `nightward`: canonical project command
+- `nw`: short alias for frequent terminal/TUI use
 
 ## Usage
 
@@ -37,48 +36,64 @@ Open the TUI:
 
 ```sh
 nightward
+# or
+nw
 ```
 
 Scan and emit redacted JSON:
 
 ```sh
 nightward scan --json
+# or
+nw scan --json
 ```
 
 Check local assumptions:
 
 ```sh
 nightward doctor --json
+# or
+nw doctor --json
 ```
 
 Generate a dry-run backup plan:
 
 ```sh
 nightward plan backup --target ~/dotfiles
+# or
+nw plan backup --target ~/dotfiles
 ```
 
 List supported adapters:
 
 ```sh
 nightward adapters list
+# or
+nw adapters list
 ```
 
 Generate a nightly schedule plan:
 
 ```sh
 nightward schedule plan --preset nightly
+# or
+nw schedule plan --preset nightly
 ```
 
 Preview schedule install without writing:
 
 ```sh
 nightward schedule install --preset nightly --dry-run
+# or
+nw schedule install --preset nightly --dry-run
 ```
 
 Preview schedule removal without writing:
 
 ```sh
 nightward schedule remove --dry-run
+# or
+nw schedule remove --dry-run
 ```
 
 ## Classification Model
@@ -128,6 +143,7 @@ Scheduled scans never copy secrets, mutate dotfiles, restore files, or push to G
 ```sh
 go test ./...
 go run ./cmd/nightward --help
+go run ./cmd/nw --help
 go run ./cmd/nightward scan --json
 go run ./cmd/nightward schedule install --preset nightly --dry-run
 ```
