@@ -198,12 +198,12 @@ Backup plans include portable items, mark machine-local/unknown items for review
 
 ```mermaid
 flowchart TD
-  found["Discovered path"] --> class{"Classification"}
-  class -->|portable| include["include in private backup plan"]
-  class -->|machine-local or unknown| review["review before syncing"]
-  class -->|secret-auth| excludeSecret["exclude by default"]
-  class -->|runtime-cache| excludeCache["exclude by default"]
-  class -->|app-owned| export["prefer app-supported export"]
+  found["Discovered path"] --> bucket{"Classification"}
+  bucket -->|portable| include["include in private backup plan"]
+  bucket -->|machine-local or unknown| review["review before syncing"]
+  bucket -->|secret-auth| excludeSecret["exclude by default"]
+  bucket -->|runtime-cache| excludeCache["exclude by default"]
+  bucket -->|app-owned| export["prefer app-supported export"]
 ```
 
 > [!WARNING]
