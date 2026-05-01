@@ -229,7 +229,7 @@ func Providers() []Provider {
 		{Name: "semgrep", Kind: "local-command", Command: "semgrep", Privacy: "local command; rule packs may require network if user config chooses that", Capabilities: "static analysis and malicious dependency rules"},
 		{Name: "trivy", Kind: "local-command", Command: "trivy", Online: true, Privacy: "network-capable; vulnerability database updates may contact upstream services", Capabilities: "filesystem, dependency, IaC, and secret scanning"},
 		{Name: "osv-scanner", Kind: "local-command", Command: "osv-scanner", Online: true, Privacy: "network-capable; queries vulnerability data for dependency manifests", Capabilities: "open source vulnerability matching"},
-		{Name: "socket", Kind: "local-command", Command: "socket", Online: true, Privacy: "network-capable; may send package metadata to Socket services", Capabilities: "supply-chain risk and malicious package signals"},
+		{Name: "socket", Kind: "local-command", Command: "socket", Online: true, Privacy: "network-capable; uploads dependency manifest metadata and creates a remote Socket scan artifact", Capabilities: "remote supply-chain scan creation and malicious package signals"},
 	}
 }
 

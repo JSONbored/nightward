@@ -16,9 +16,10 @@ import (
 )
 
 const (
-	providerTimeout        = 20 * time.Second
 	providerOutputMaxBytes = 2 * 1024 * 1024
 )
+
+var providerTimeout = 20 * time.Second
 
 type providerFinding struct {
 	Rule     string
@@ -150,6 +151,7 @@ func runProvider(name, root string) ([]providerFinding, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), providerTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204 -- provider name is selected from Nightward's built-in provider allowlist.
+	cmd.Dir = root
 	var stdout, stderr limitedBuffer
 	stdout.limit = providerOutputMaxBytes
 	stderr.limit = 64 * 1024
@@ -403,7 +405,7 @@ func parseOSVScanner(root, output string) ([]providerFinding, error) {
 	}
 	var findings []providerFinding
 	for _, result := range mapSlice(doc, "results", "Results") {
-		path := relativeProviderPath(root, firstString(result, "source", "path", "file", "lockfile"))
+		path := relativeProviderPath(root, providerSourcePath(result))
 		for _, pkg := range mapSlice(result, "packages", "Packages") {
 			pkgInfo, _ := pkg["package"].(map[string]any)
 			name := firstString(pkg, "name", "package", "PkgName")
@@ -460,6 +462,11 @@ func parseSocket(root, output string) ([]providerFinding, error) {
 			}
 			path := relativeProviderPath(root, firstString(issue, "file", "path", "manifest"))
 			pkg := firstString(issue, "package", "pkg", "name")
+			if pkg == "" {
+				if pkgInfo, ok := issue["package"].(map[string]any); ok {
+					pkg = firstString(pkgInfo, "name", "Name", "package")
+				}
+			}
 			evidence := fmt.Sprintf("rule=%s package=%s file=%s", redactProviderText(rule), redactProviderText(pkg), redactProviderText(path))
 			findings = append(findings, providerFinding{Rule: rule, Path: path, Message: redactProviderText(message), Evidence: evidence, Severity: providerSeverity(firstString(issue, "severity", "risk"), inventory.RiskMedium), Category: CategorySupplyChain})
 		}
@@ -495,9 +502,28 @@ func providerSeverity(value string, fallback inventory.RiskLevel) inventory.Risk
 	}
 }
 
+func providerSourcePath(record map[string]any) string {
+	if path := firstString(record, "source", "path", "file", "lockfile"); path != "" {
+		return path
+	}
+	for _, key := range []string{"source", "Source"} {
+		source, ok := record[key].(map[string]any)
+		if !ok {
+			continue
+		}
+		if path := firstString(source, "path", "Path", "file", "File", "lockfile", "Lockfile"); path != "" {
+			return path
+		}
+	}
+	return ""
+}
+
 func providerRecommendation(provider string, category SignalCategory) string {
 	if category == CategorySecrets {
 		return "Rotate exposed credentials if confirmed, remove secret material from portable config, and keep only local secret references."
+	}
+	if provider == "socket" {
+		return "Review the Socket scan artifact and package metadata locally before trusting or syncing this configuration."
 	}
 	return fmt.Sprintf("Review the %s finding locally before trusting or syncing this configuration.", provider)
 }

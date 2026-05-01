@@ -200,7 +200,7 @@ func TestProviderParsersCoverSupportedFormats(t *testing.T) {
 		t.Fatalf("unexpected trivy parse: %#v", trivy)
 	}
 
-	osv, err := parseProviderOutput("osv-scanner", root, `{"results":[{"source":"/tmp/workspace/package-lock.json","packages":[{"package":{"name":"demo"},"vulnerabilities":[{"id":"GHSA-123","summary":"bad package"}]}]}]}`)
+	osv, err := parseProviderOutput("osv-scanner", root, `{"results":[{"source":{"path":"/tmp/workspace/package-lock.json","type":"lockfile"},"packages":[{"package":{"name":"demo"},"vulnerabilities":[{"id":"GHSA-123","summary":"bad package"}]}]}]}`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,6 +231,42 @@ func TestProviderParsersCoverSupportedFormats(t *testing.T) {
 	}
 }
 
+func TestOnlineProviderParsersRedactSecretLikeFields(t *testing.T) {
+	root := "/tmp/workspace"
+	cases := map[string]string{
+		"trivy":       `{"Results":[{"Target":"/tmp/workspace/package-lock.json","Vulnerabilities":[{"VulnerabilityID":"CVE-2026-0001","PkgName":"demo","Severity":"CRITICAL","Title":"API_TOKEN=super-secret-value vulnerable dependency"}],"Misconfigurations":[{"ID":"AVD-1","Severity":"MEDIUM","Title":"password=super-secret-value in config"}],"Secrets":[{"RuleID":"aws-access-key","Severity":"HIGH","Target":"/tmp/workspace/.env","Title":"private_key=super-secret-value"}]}]}`,
+		"osv-scanner": `{"results":[{"source":{"path":"/tmp/workspace/package-lock.json","type":"lockfile"},"packages":[{"package":{"name":"demo"},"vulnerabilities":[{"id":"GHSA-123","summary":"api_key=super-secret-value vulnerable package"}]}]},{"path":"/tmp/workspace/go.mod","vulnerabilities":[{"id":"GO-2026-0001","details":"password=super-secret-value detail"}]}]}`,
+		"socket":      `{"issues":[{"type":"malware","severity":"high","message":"API_TOKEN=super-secret-value","package":{"name":"demo"},"file":"package.json"}],"scanId":"scan_123"}`,
+	}
+	for provider, output := range cases {
+		findings, err := parseProviderOutput(provider, root, output)
+		if err != nil {
+			t.Fatalf("%s parse failed: %v", provider, err)
+		}
+		if len(findings) == 0 {
+			t.Fatalf("%s parse returned no findings", provider)
+		}
+		data, err := json.Marshal(findings)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), "super-secret-value") {
+			t.Fatalf("%s parser leaked provider secret material: %s", provider, data)
+		}
+		if !strings.Contains(string(data), "[redacted]") {
+			t.Fatalf("%s parser did not preserve redaction marker: %s", provider, data)
+		}
+	}
+}
+
+func TestOnlineProviderParsersRejectInvalidJSON(t *testing.T) {
+	for _, provider := range []string{"trivy", "osv-scanner", "socket"} {
+		if _, err := parseProviderOutput(provider, "/tmp/workspace", `{"not-json"`); err == nil {
+			t.Fatalf("%s parser accepted invalid JSON", provider)
+		}
+	}
+}
+
 func TestProviderHelpersAndOutputLimits(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "semgrep.yml"), []byte("rules: []\n"), 0o600); err != nil {
@@ -246,6 +282,9 @@ func TestProviderHelpersAndOutputLimits(t *testing.T) {
 			t.Fatalf("missing online-capable provider args for %s: %#v ok=%t err=%v", name, args, ok, err)
 		}
 	}
+	assertStringSlice(t, "trivy args", []string{"filesystem", "--format", "json", "--scanners", "vuln,secret,misconfig", "--skip-version-check", root}, mustProviderArgs(t, "trivy", root))
+	assertStringSlice(t, "osv-scanner args", []string{"scan", "source", "-r", "--format", "json", root}, mustProviderArgs(t, "osv-scanner", root))
+	assertStringSlice(t, "socket args", []string{"scan", "create", root, "--json"}, mustProviderArgs(t, "socket", root))
 	if _, ok, err := providerArgs("semgrep", t.TempDir()); !ok || err == nil {
 		t.Fatalf("semgrep should require a local config, ok=%t err=%v", ok, err)
 	}
@@ -282,6 +321,33 @@ func TestProviderHelpersAndOutputLimits(t *testing.T) {
 	}
 	if got := providerRecommendation("semgrep", CategoryExecution); !strings.Contains(got, "semgrep") {
 		t.Fatalf("unexpected provider recommendation: %q", got)
+	}
+}
+
+func TestRunOnlineProviderTimeoutIsReportedAndRedacted(t *testing.T) {
+	dir := t.TempDir()
+	workspace := t.TempDir()
+	writeExecutable(t, filepath.Join(dir, "trivy"), `#!/bin/sh
+echo 'API_TOKEN=super-secret-value still running' >&2
+/bin/sleep 1
+`)
+	t.Setenv("PATH", dir)
+	oldTimeout := providerTimeout
+	providerTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { providerTimeout = oldTimeout })
+
+	report := inventory.NewWorkspaceScanner(workspace).Scan()
+	out := Run(report, Options{Mode: "workspace", Workspace: workspace, With: []string{"trivy"}, Online: true})
+	data, err := json.Marshal(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "provider_execution_failed") || !strings.Contains(text, "timed out") {
+		t.Fatalf("timeout was not reported as a provider failure: %s", text)
+	}
+	if strings.Contains(text, "super-secret-value") {
+		t.Fatalf("timeout failure leaked provider stderr: %s", text)
 	}
 }
 
@@ -331,6 +397,27 @@ func writeExecutable(t *testing.T, path, contents string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(contents), 0700); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func mustProviderArgs(t *testing.T, name, root string) []string {
+	t.Helper()
+	args, ok, err := providerArgs(name, root)
+	if err != nil || !ok {
+		t.Fatalf("providerArgs(%s) ok=%t err=%v", name, ok, err)
+	}
+	return args
+}
+
+func assertStringSlice(t *testing.T, name string, want, got []string) {
+	t.Helper()
+	if len(want) != len(got) {
+		t.Fatalf("%s length mismatch\nwant=%#v\ngot=%#v", name, want, got)
+	}
+	for i := range want {
+		if want[i] != got[i] {
+			t.Fatalf("%s mismatch at %d\nwant=%#v\ngot=%#v", name, i, want, got)
+		}
 	}
 }
 

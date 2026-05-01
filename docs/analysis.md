@@ -20,14 +20,16 @@ Nightward avoids "safe" claims. A clean analysis means Nightward found no known 
 
 ## Providers
 
-The built-in `nightward` provider is always offline and enabled by default. Optional providers are discovered but not installed or run automatically:
+The built-in `nightward` provider is always offline and enabled by default. Optional providers are discovered but not installed or run automatically.
 
-- `gitleaks`
-- `trufflehog`
-- `semgrep`
-- `trivy`
-- `osv-scanner`
-- `socket`
+| Provider | Execution class | Required gate | Scope |
+| --- | --- | --- | --- |
+| `gitleaks` | local command | `--with gitleaks` | Secret pattern scanning over the selected workspace. |
+| `trufflehog` | local command | `--with trufflehog` | Filesystem secret scanning with verification disabled by default. |
+| `semgrep` | local command | `--with semgrep` | Static analysis using only a repo-local Semgrep config. |
+| `trivy` | online-capable command | `--with trivy --online` | Filesystem vulnerability, secret, and misconfiguration scan; Trivy may update vulnerability databases. |
+| `osv-scanner` | online-capable command | `--with osv-scanner --online` | Recursive source/lockfile vulnerability scan against OSV data. |
+| `socket` | online-capable command | `--with socket --online` | Creates a remote Socket scan artifact from dependency manifest metadata. |
 
 Check provider posture:
 
@@ -51,7 +53,7 @@ nw analyze --all --workspace . --with gitleaks --json
 nw analyze --all --workspace . --with gitleaks,trufflehog,semgrep --json
 ```
 
-Provider runs use timeouts and bounded output capture. Nightward records redacted finding metadata, not raw secret values. Online-capable providers such as `trivy`, `osv-scanner`, and `socket` stay blocked unless the user also opts into online-capable behavior.
+Provider runs use timeouts and bounded output capture. Nightward records redacted finding metadata, not raw secret values. Online-capable providers such as `trivy`, `osv-scanner`, and `socket` stay blocked unless the user also opts into online-capable behavior. Socket support is deliberately limited to scan creation and returned JSON parsing in v1; Nightward does not fetch or normalize remote Socket reports after creating the scan.
 
 `semgrep` execution is local-config only. Nightward looks for `semgrep.yml`, `semgrep.yaml`, `.semgrep.yml`, `.semgrep.yaml`, or `.semgrep/config.yml` in the scanned workspace instead of using automatic rule discovery.
 

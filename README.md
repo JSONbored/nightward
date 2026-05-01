@@ -251,9 +251,11 @@ Secret values are never emitted in scan JSON, findings output, fix-plan JSON, Ma
 
 `nw analyze` turns scan findings and classifications into explainable signals. It does not claim a package, server, binary, or URL is safe. It reports what Nightward can prove from local structure, why it matters, and how confident the signal is.
 
-Default analysis is offline and built in. Optional providers such as `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, and `socket` are discovered by `providers doctor`; Nightward does not install them or call online services unless a user explicitly selects providers and opts into network-capable behavior. When explicitly selected with `--with`, supported local providers run with timeouts, output caps, and redacted metadata only. Semgrep execution requires a repo-local config file so Nightward does not use automatic rule discovery by default.
+Default analysis is offline and built in. Optional providers are discovered by `providers doctor`; Nightward does not install them or call online services unless a user explicitly selects providers and opts into network-capable behavior. Explicit local providers are `gitleaks`, `trufflehog`, and `semgrep`. Online-capable providers are `trivy`, `osv-scanner`, and `socket`, and they require both `--with` and `--online`. Socket support creates a remote Socket scan artifact from dependency manifest metadata; Nightward does not fetch or normalize remote Socket reports in v1.
 
-Policy config can enable analysis and selected local provider execution with `include_analysis`, `analysis_threshold`, `analysis_providers`, and `allow_online_providers`.
+Provider runs use timeouts, bounded output capture, and redacted metadata only. Semgrep execution requires a repo-local config file so Nightward does not use automatic rule discovery by default.
+
+Policy config can enable analysis and selected provider execution with `include_analysis`, `analysis_threshold`, `analysis_providers`, and `allow_online_providers`; online-capable providers still require explicit policy opt-in.
 
 ```mermaid
 sequenceDiagram
