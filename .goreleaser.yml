@@ -12,6 +12,8 @@ builds:
     binary: nightward
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X github.com/jsonbored/nightward/internal/cli.version={{ .Version }}
     goos:
       - darwin
       - linux
@@ -24,6 +26,8 @@ builds:
     binary: nw
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X github.com/jsonbored/nightward/internal/cli.version={{ .Version }}
     goos:
       - darwin
       - linux
