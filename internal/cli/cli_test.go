@@ -41,6 +41,7 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 		{"rules", "explain", "--json", "mcp_secret_header"},
 		{"policy", "check", "--json"},
 		{"policy", "check", "--include-analysis", "--json"},
+		{"policy", "badge", "--include-analysis", "--output", "-"},
 		{"policy", "init", "--dry-run"},
 		{"policy", "explain"},
 		{"snapshot", "plan", "--target", filepath.Join(home, "snapshot"), "--json"},
@@ -99,6 +100,7 @@ API_TOKEN = "`+secretValue+`"
 		{"rules", "list", "--json"},
 		{"rules", "explain", "--json", "mcp_secret_header"},
 		{"policy", "check", "--json"},
+		{"policy", "badge", "--output", "-", "--sarif-url", "https://example.invalid/nightward.sarif"},
 		{"policy", "sarif", "--output", "-"},
 		{"snapshot", "plan", "--target", filepath.Join(home, "snapshots"), "--json"},
 		{"schedule", "plan", "--json"},
@@ -293,6 +295,7 @@ func TestWorkspaceCommandsAreReadOnlyAndSupportStdoutSARIF(t *testing.T) {
 		{"scan", "--workspace", workspace, "--output", "-"},
 		{"analyze", "--all", "--workspace", workspace, "--json"},
 		{"policy", "check", "--workspace", workspace, "--include-analysis", "--json"},
+		{"policy", "badge", "--workspace", workspace, "--include-analysis", "--output", "-"},
 		{"policy", "sarif", "--workspace", workspace, "--include-analysis", "--output", "-"},
 	}
 	for _, args := range commands {
@@ -312,6 +315,73 @@ func TestWorkspaceCommandsAreReadOnlyAndSupportStdoutSARIF(t *testing.T) {
 	after := listTestFiles(t, workspace)
 	if strings.Join(before, "\n") != strings.Join(after, "\n") {
 		t.Fatalf("workspace commands mutated files\nbefore=%v\nafter=%v", before, after)
+	}
+}
+
+func TestPolicyBadgeWritesArtifactWithoutFailingPolicy(t *testing.T) {
+	home := t.TempDir()
+	writeTestFile(t, filepath.Join(home, ".mcp.json"), `{"mcpServers":{"demo":{"command":"npx","args":["@example/server"]}}}`)
+	t.Setenv("NIGHTWARD_HOME", home)
+	out := filepath.Join(home, "reports", "badge.json")
+
+	stdout, stderr, code := runCLI([]string{"policy", "badge", "--output", out, "--sarif-url", "https://example.invalid/nightward.sarif"})
+	if code != 0 {
+		t.Fatalf("policy badge failed: stdout=%s stderr=%s", stdout, stderr)
+	}
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var badge struct {
+		SchemaVersion int    `json:"schemaVersion"`
+		Passed        bool   `json:"passed"`
+		Message       string `json:"message"`
+		SARIFURL      string `json:"sarif_url"`
+	}
+	if err := json.Unmarshal(data, &badge); err != nil {
+		t.Fatal(err)
+	}
+	if badge.SchemaVersion != 1 || badge.Passed || !strings.Contains(badge.Message, "violations") || badge.SARIFURL == "" {
+		t.Fatalf("unexpected badge artifact: %#v\n%s", badge, data)
+	}
+	info, err := os.Stat(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0600 {
+		t.Fatalf("expected badge mode 0600, got %o", got)
+	}
+}
+
+func TestPolicyBadgeDoesNotRunConfiguredProvidersUnlessAnalysisIncluded(t *testing.T) {
+	workspace := t.TempDir()
+	writeTestFile(t, filepath.Join(workspace, "config.txt"), "API_TOKEN=super-secret-value\n")
+	configPath := filepath.Join(workspace, ".nightward.yml")
+	writeTestFile(t, configPath, "analysis_providers:\n  - gitleaks\n")
+	binDir := t.TempDir()
+	writeTestFile(t, filepath.Join(binDir, "gitleaks"), `#!/bin/sh
+printf '[{"RuleID":"generic-api-key","Description":"API_TOKEN=super-secret-value","File":"config.txt","StartLine":1}]'
+`)
+	if err := os.Chmod(filepath.Join(binDir, "gitleaks"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir)
+
+	stdout, stderr, code := runCLI([]string{"policy", "badge", "--workspace", workspace, "--config", configPath, "--output", "-"})
+	if code != 0 {
+		t.Fatalf("policy badge failed: %s", stderr)
+	}
+	if strings.Contains(stdout, "generic-api-key") || strings.Contains(stdout, "super-secret-value") {
+		t.Fatalf("badge ran providers without include-analysis:\n%s", stdout)
+	}
+
+	stdout, stderr, code = runCLI([]string{"policy", "badge", "--workspace", workspace, "--config", configPath, "--include-analysis", "--output", "-"})
+	if code != 0 {
+		t.Fatalf("policy badge with analysis failed: %s", stderr)
+	}
+	assertNoSecret(t, stdout, "super-secret-value")
+	if !strings.Contains(stdout, `"total_signals": 1`) || !strings.Contains(stdout, `"signal_violations": 1`) {
+		t.Fatalf("badge did not include provider signals when requested:\n%s", stdout)
 	}
 }
 
@@ -358,6 +428,55 @@ printf '{"results":[{"check_id":"nightward.fixture","path":"config.txt","extra":
 	after := listTestFiles(t, workspace)
 	if strings.Join(before, "\n") != strings.Join(after, "\n") {
 		t.Fatalf("provider analyze mutated workspace\nbefore=%v\nafter=%v", before, after)
+	}
+}
+
+func TestAnalyzeWithOnlineProvidersRequiresExplicitOnline(t *testing.T) {
+	workspace := t.TempDir()
+	writeTestFile(t, filepath.Join(workspace, "package.json"), `{"dependencies":{"demo":"1.0.0"}}`)
+	binDir := t.TempDir()
+	writeTestFile(t, filepath.Join(binDir, "trivy"), `#!/bin/sh
+printf '{"Results":[{"Target":"package.json","Vulnerabilities":[{"VulnerabilityID":"CVE-2026-0001","PkgName":"demo","Severity":"HIGH","Title":"demo vulnerable"}]}]}'
+`)
+	if err := os.Chmod(filepath.Join(binDir, "trivy"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(binDir, "osv-scanner"), `#!/bin/sh
+printf '{"results":[{"source":"package.json","packages":[{"package":{"name":"demo"},"vulnerabilities":[{"id":"GHSA-123","summary":"bad package"}]}]}]}'
+`)
+	if err := os.Chmod(filepath.Join(binDir, "osv-scanner"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(binDir, "socket"), `#!/bin/sh
+printf '{"issues":[{"type":"malware","severity":"high","message":"API_TOKEN=super-secret-value","package":"demo","file":"package.json"}]}'
+`)
+	if err := os.Chmod(filepath.Join(binDir, "socket"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir)
+	before := listTestFiles(t, workspace)
+
+	blocked, stderr, code := runCLI([]string{"analyze", "--all", "--workspace", workspace, "--with", "trivy,osv-scanner,socket", "--json"})
+	if code != 0 {
+		t.Fatalf("blocked online-provider posture failed: %s", stderr)
+	}
+	if strings.Contains(blocked, "CVE-2026-0001") || strings.Contains(blocked, "GHSA-123") || strings.Contains(blocked, "malware") {
+		t.Fatalf("online providers ran without --online:\n%s", blocked)
+	}
+
+	stdout, stderr, code := runCLI([]string{"analyze", "--all", "--workspace", workspace, "--with", "trivy,osv-scanner,socket", "--online", "--json"})
+	if code != 0 {
+		t.Fatalf("online provider analyze failed: %s", stderr)
+	}
+	assertNoSecret(t, stdout, "super-secret-value")
+	for _, want := range []string{"CVE-2026-0001", "GHSA-123", "malware"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("online provider finding %q missing from analysis output: %s", want, stdout)
+		}
+	}
+	after := listTestFiles(t, workspace)
+	if strings.Join(before, "\n") != strings.Join(after, "\n") {
+		t.Fatalf("online provider analyze mutated workspace\nbefore=%v\nafter=%v", before, after)
 	}
 }
 

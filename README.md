@@ -157,6 +157,7 @@ Online-capable providers remain blocked until explicitly allowed:
 
 ```sh
 nw providers doctor --with socket --online --json
+nw analyze --all --workspace . --with trivy,osv-scanner,socket --online --json
 ```
 
 Create or explain policy config:
@@ -194,6 +195,7 @@ nw policy check --strict --json
 nw policy sarif --output nightward.sarif
 nw policy check --workspace . --include-analysis --strict --json
 nw policy sarif --workspace . --include-analysis --output -
+nw policy badge --workspace . --include-analysis --sarif-url https://example.invalid/nightward.sarif --output nightward-badge.json
 ```
 
 Preview scheduled nightly scans:
@@ -417,6 +419,7 @@ make release-snapshot
 - [Governance](GOVERNANCE.md)
 - [Maintainers](MAINTAINERS.md)
 - [Contributing guide](CONTRIBUTING.md)
+- [Contributing fixtures](docs/contributing-fixtures.md)
 - [Code of conduct](CODE_OF_CONDUCT.md)
 - [Support](SUPPORT.md)
 - [Roadmap](ROADMAP.md)

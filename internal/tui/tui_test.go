@@ -230,9 +230,16 @@ func TestDashboardShowsReportHistoryAndNextActions(t *testing.T) {
 				{
 					Path:       "/tmp/nightward-home/.local/state/nightward/reports/new.json",
 					ReportName: "new.json",
-					Findings:   1,
+					Findings:   2,
 					SizeBytes:  2048,
 					ModTime:    time.Date(2026, 4, 30, 8, 0, 0, 0, time.UTC),
+				},
+				{
+					Path:       "/tmp/nightward-home/.local/state/nightward/reports/old.json",
+					ReportName: "old.json",
+					Findings:   1,
+					SizeBytes:  1024,
+					ModTime:    time.Date(2026, 4, 29, 8, 0, 0, 0, time.UTC),
 				},
 			},
 		},
@@ -240,7 +247,7 @@ func TestDashboardShowsReportHistoryAndNextActions(t *testing.T) {
 		height: 40,
 	}
 	dashboard := stripANSI(m.dashboard(116))
-	for _, want := range []string{"Recent Reports", "new.json", "2.0KB", "What Next", "Review Findings and Fix Plan"} {
+	for _, want := range []string{"Recent Reports", "new.json", "2.0KB", "Latest delta", "+1 findings", "What Next", "Review Findings and Fix Plan"} {
 		if !strings.Contains(dashboard, want) {
 			t.Fatalf("dashboard missing %q:\n%s", want, dashboard)
 		}

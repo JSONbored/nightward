@@ -34,5 +34,5 @@ The npm package must remain a launcher:
 4. Run local verification.
 5. Create a signed SemVer tag.
 6. Verify GitHub release artifacts.
-7. Verify npm provenance and launcher behavior.
+7. Verify npm metadata and launcher behavior with `scripts/verify-npm-release.sh`.
 8. Update OpenSSF badge evidence.

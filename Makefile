@@ -71,6 +71,7 @@ trunk-flaky-validate:
 ci-scripts-test:
 	bash scripts/test-dco.sh
 	bash scripts/test-action-paths.sh
+	bash scripts/test-release-scripts.sh
 
 raycast-install:
 	cd $(RAYCAST_DIR) && npm ci --ignore-scripts --no-audit

@@ -3,6 +3,10 @@ set -euo pipefail
 
 tag="${1:?release tag required}"
 repo="${GITHUB_REPOSITORY:-JSONbored/nightward}"
+if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "invalid release tag: ${tag}" >&2
+  exit 1
+fi
 version="${tag#v}"
 asset="nightward_${version}_linux_amd64.tar.gz"
 tmp_dir="$(mktemp -d)"
@@ -14,9 +18,11 @@ gh release download "${tag}" \
   --pattern checksums.txt.pem \
   --pattern checksums.txt.sig \
   --pattern "${asset}" \
+  --pattern "${asset}.sbom.json" \
   --dir "${tmp_dir}"
 
 cd "${tmp_dir}"
+test -s "${asset}.sbom.json"
 cosign verify-blob \
   --certificate-identity-regexp "https://github.com/${repo}/.github/workflows/release.yml@refs/tags/v.*" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \

@@ -31,6 +31,15 @@ func TestCheckUsesStrictThreshold(t *testing.T) {
 	if strict.Passed || len(strict.Violations) != 2 || strict.Threshold != inventory.RiskMedium {
 		t.Fatalf("unexpected strict policy report: %#v", strict)
 	}
+
+	badge := BuildBadge(standard, "https://example.invalid/nightward.sarif")
+	if badge.SchemaVersion != 1 || badge.Passed || badge.Color != "red" || badge.Message != "1 violations" || badge.SARIFURL == "" {
+		t.Fatalf("unexpected failing badge: %#v", badge)
+	}
+	passing := BuildBadge(Report{GeneratedAt: report.GeneratedAt, Passed: true, Threshold: inventory.RiskHigh}, "")
+	if !passing.Passed || passing.Color != "brightgreen" || passing.Message != "passing" {
+		t.Fatalf("unexpected passing badge: %#v", passing)
+	}
 }
 
 func TestLoadConfigRejectsUnknownKeysAndReasonlessIgnores(t *testing.T) {
@@ -96,6 +105,9 @@ func TestDefaultConfigExplainValidateAndWriteSARIF(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := WriteSARIFWithConfig(inventory.Report{}, filepath.Join(t.TempDir(), "nightward.sarif"), Config{SARIF: SARIFConfig{ToolName: "Custom Nightward"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteBadge(BuildBadge(Report{GeneratedAt: time.Date(2026, 4, 30, 7, 0, 0, 0, time.UTC), Passed: true, Threshold: inventory.RiskHigh}, ""), filepath.Join(t.TempDir(), "badge.json")); err != nil {
 		t.Fatal(err)
 	}
 }
