@@ -41,7 +41,8 @@ make verify
 - MCP fixture tests should cover command servers, URL-shaped servers, sensitive headers, local endpoints, and unsupported shapes.
 - Scheduler tests verify generated launchd, systemd user timer, and cron text without installing schedules.
 - TUI action tests cover clipboard/open command construction and private redacted fix-plan exports.
-- TUI model tests cover tab switching, search, filters, help, cursor clamping, wide detail panes, compact terminal rendering, and redaction.
+- TUI model tests cover tab switching, search, filters, help, cursor clamping, dashboard report history, what-next guidance, wide detail panes, compact terminal rendering, and redaction.
+- Scheduler tests cover report history ordering, finding counts, non-report filtering, and symlink skipping without installing timers.
 - Raycast extension tests cover pure redaction/formatting helpers and safe command execution wrappers.
 - `go vet`, `staticcheck`, `gosec`, `gitleaks`, `govulncheck`, and fuzz smoke tests are part of the local verification bar. `#nosec` comments must include a narrow reason tied to an intentional local CLI behavior.
 - `make coverage-check` enforces at least 80% combined statement coverage for `./internal/...`.
@@ -81,6 +82,8 @@ npm run build
 ```
 
 `npm run dev` is the manual smoke path when the Raycast CLI is available. Do not run `npm run publish` unless release/publish scope is explicit.
+
+Manual smoke and screenshots must use fixture `Home Override` data only. Keep the evidence table in `docs/screenshots.md` current before broader promotion or Raycast store metadata work.
 
 ## NPM Launcher
 

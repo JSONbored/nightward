@@ -318,6 +318,7 @@ func TestWorkspaceCommandsAreReadOnlyAndSupportStdoutSARIF(t *testing.T) {
 func TestAnalyzeWithExplicitProviderIsReadOnly(t *testing.T) {
 	workspace := t.TempDir()
 	writeTestFile(t, filepath.Join(workspace, "config.txt"), "API_TOKEN=super-secret-value\n")
+	writeTestFile(t, filepath.Join(workspace, "semgrep.yml"), "rules: []\n")
 	binDir := t.TempDir()
 	writeTestFile(t, filepath.Join(binDir, "gitleaks"), `#!/bin/sh
 printf '[{"RuleID":"generic-api-key","Description":"API_TOKEN=super-secret-value","File":"config.txt","StartLine":1}]'
@@ -325,10 +326,22 @@ printf '[{"RuleID":"generic-api-key","Description":"API_TOKEN=super-secret-value
 	if err := os.Chmod(filepath.Join(binDir, "gitleaks"), 0700); err != nil {
 		t.Fatal(err)
 	}
+	writeTestFile(t, filepath.Join(binDir, "trufflehog"), `#!/bin/sh
+printf '{"DetectorName":"GitHub","Verified":true,"SourceMetadata":{"Data":{"Filesystem":{"file":"config.txt"}}}}\n'
+`)
+	if err := os.Chmod(filepath.Join(binDir, "trufflehog"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(binDir, "semgrep"), `#!/bin/sh
+printf '{"results":[{"check_id":"nightward.fixture","path":"config.txt","extra":{"message":"API_TOKEN=super-secret-value","severity":"WARNING"}}]}'
+`)
+	if err := os.Chmod(filepath.Join(binDir, "semgrep"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("PATH", binDir)
 	before := listTestFiles(t, workspace)
 
-	stdout, stderr, code := runCLI([]string{"analyze", "--all", "--workspace", workspace, "--with", "gitleaks", "--json"})
+	stdout, stderr, code := runCLI([]string{"analyze", "--all", "--workspace", workspace, "--with", "gitleaks,trufflehog,semgrep", "--json"})
 	if code != 0 {
 		t.Fatalf("analyze with provider failed: %s", stderr)
 	}
@@ -336,8 +349,10 @@ printf '[{"RuleID":"generic-api-key","Description":"API_TOKEN=super-secret-value
 		t.Fatalf("analyze with provider did not emit JSON: %s", stdout)
 	}
 	assertNoSecret(t, stdout, "super-secret-value")
-	if !strings.Contains(stdout, "generic-api-key") {
-		t.Fatalf("provider finding missing from analysis output: %s", stdout)
+	for _, want := range []string{"generic-api-key", "GitHub", "nightward.fixture"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("provider finding %q missing from analysis output: %s", want, stdout)
+		}
 	}
 
 	after := listTestFiles(t, workspace)
