@@ -207,6 +207,13 @@ func TestProviderParsersCoverSupportedFormats(t *testing.T) {
 	if len(osv) != 1 || osv[0].Rule != "GHSA-123" || osv[0].Path != "package-lock.json" || osv[0].Category != CategorySupplyChain {
 		t.Fatalf("unexpected osv parse: %#v", osv)
 	}
+	osvDirect, err := parseProviderOutput("osv-scanner", root, `{"results":[{"path":"/tmp/workspace/go.mod","vulnerabilities":[{"id":"GO-2026-0001","details":"stdlib issue"}]}]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(osvDirect) != 1 || osvDirect[0].Rule != "GO-2026-0001" || osvDirect[0].Path != "go.mod" {
+		t.Fatalf("unexpected direct osv parse: %#v", osvDirect)
+	}
 
 	socket, err := parseProviderOutput("socket", root, `{"issues":[{"type":"malware","severity":"high","message":"API_TOKEN=super-secret-value","package":"demo","file":"package.json"}]}`)
 	if err != nil {
@@ -214,6 +221,13 @@ func TestProviderParsersCoverSupportedFormats(t *testing.T) {
 	}
 	if len(socket) != 1 || socket[0].Rule != "malware" || strings.Contains(socket[0].Message, "super-secret-value") {
 		t.Fatalf("unexpected socket parse: %#v", socket)
+	}
+	socketScan, err := parseProviderOutput("socket", root, `{"scanId":"scan_123"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(socketScan) != 1 || socketScan[0].Rule != "scan-created" || socketScan[0].Severity != inventory.RiskInfo {
+		t.Fatalf("unexpected socket scan parse: %#v", socketScan)
 	}
 }
 

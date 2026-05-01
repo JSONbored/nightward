@@ -17,6 +17,8 @@ import (
 
 const Label = "dev.nightward.scan"
 
+var execCommand = exec.Command
+
 type Plan struct {
 	Preset       string          `json:"preset"`
 	Platform     string          `json:"platform"`
@@ -144,13 +146,13 @@ func Install(home, executable, preset string) (Plan, error) {
 	}
 	if runtime.GOOS == "darwin" {
 		uid := strconv.Itoa(os.Getuid())
-		_ = exec.Command("launchctl", "bootout", "gui/"+uid, plan.Files[0].Path).Run()                       // #nosec G204 -- fixed system command, generated user LaunchAgent path, no shell.
-		if err := exec.Command("launchctl", "bootstrap", "gui/"+uid, plan.Files[0].Path).Run(); err != nil { // #nosec G204 -- fixed system command, generated user LaunchAgent path, no shell.
+		_ = execCommand("launchctl", "bootout", "gui/"+uid, plan.Files[0].Path).Run()                       // #nosec G204 -- fixed system command, generated user LaunchAgent path, no shell.
+		if err := execCommand("launchctl", "bootstrap", "gui/"+uid, plan.Files[0].Path).Run(); err != nil { // #nosec G204 -- fixed system command, generated user LaunchAgent path, no shell.
 			return plan, fmt.Errorf("wrote launchd plist but failed to bootstrap: %w", err)
 		}
 	} else if runtime.GOOS == "linux" {
-		_ = exec.Command("systemctl", "--user", "daemon-reload").Run()
-		if err := exec.Command("systemctl", "--user", "enable", "--now", Label+".timer").Run(); err != nil {
+		_ = execCommand("systemctl", "--user", "daemon-reload").Run()
+		if err := execCommand("systemctl", "--user", "enable", "--now", Label+".timer").Run(); err != nil {
 			return plan, fmt.Errorf("wrote systemd timer but failed to enable: %w", err)
 		}
 	}
@@ -164,12 +166,12 @@ func Remove(home string) (Plan, error) {
 	case "darwin":
 		path := filepath.Join(home, "Library", "LaunchAgents", Label+".plist")
 		uid := strconv.Itoa(os.Getuid())
-		_ = exec.Command("launchctl", "bootout", "gui/"+uid, path).Run() // #nosec G204 -- fixed system command, generated user LaunchAgent path, no shell.
+		_ = execCommand("launchctl", "bootout", "gui/"+uid, path).Run() // #nosec G204 -- fixed system command, generated user LaunchAgent path, no shell.
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return plan, err
 		}
 	case "linux":
-		_ = exec.Command("systemctl", "--user", "disable", "--now", Label+".timer").Run()
+		_ = execCommand("systemctl", "--user", "disable", "--now", Label+".timer").Run()
 		for _, path := range []string{
 			filepath.Join(home, ".config", "systemd", "user", Label+".service"),
 			filepath.Join(home, ".config", "systemd", "user", Label+".timer"),
@@ -178,7 +180,7 @@ func Remove(home string) (Plan, error) {
 				return plan, err
 			}
 		}
-		_ = exec.Command("systemctl", "--user", "daemon-reload").Run()
+		_ = execCommand("systemctl", "--user", "daemon-reload").Run()
 	default:
 		return plan, errors.New("automatic schedule remove is only supported for launchd and systemd user timers in v1")
 	}
