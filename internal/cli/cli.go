@@ -23,7 +23,7 @@ import (
 	"github.com/jsonbored/nightward/internal/tui"
 )
 
-const version = "0.1.0"
+var version = "0.1.0"
 
 type Check struct {
 	ID      string `json:"id"`
