@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -23,7 +24,7 @@ import (
 	"github.com/jsonbored/nightward/internal/tui"
 )
 
-var version = "0.1.0"
+var version = "devel"
 
 type Check struct {
 	ID      string `json:"id"`
@@ -71,7 +72,7 @@ func RunWithName(commandName string, args []string, stdout, stderr io.Writer) in
 	case "-h", "--help", "help":
 		printHelp(stdout, commandName)
 	case "--version", "version":
-		fmt.Fprintln(stdout, version)
+		fmt.Fprintln(stdout, currentVersion())
 	case "scan":
 		return runScan(home, args[1:], stdout, stderr)
 	case "doctor":
@@ -826,13 +827,26 @@ func doctor(home string) DoctorReport {
 	}
 	return DoctorReport{
 		GeneratedAt: time.Now().UTC(),
-		Version:     version,
+		Version:     currentVersion(),
 		Home:        home,
 		Executable:  exe,
 		Checks:      checks,
 		Schedule:    schedule.Status(home),
 		Adapters:    report.Adapters,
 	}
+}
+
+func currentVersion() string {
+	if v := strings.TrimSpace(version); v != "" && v != "devel" {
+		return v
+	}
+	if info, ok := debug.ReadBuildInfo(); ok {
+		moduleVersion := strings.TrimSpace(info.Main.Version)
+		if moduleVersion != "" && moduleVersion != "(devel)" {
+			return strings.TrimPrefix(moduleVersion, "v")
+		}
+	}
+	return "devel"
 }
 
 func commandCheck(name, detail string) Check {
