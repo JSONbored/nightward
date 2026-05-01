@@ -288,6 +288,56 @@ func TestGoldenSARIFForURLSecurityFindings(t *testing.T) {
 	}
 }
 
+func TestGoldenSARIFForAnalysisSignals(t *testing.T) {
+	report := inventory.Report{Findings: []inventory.Finding{
+		{
+			ID:             "mcp_broad_filesystem-111111111111",
+			Tool:           "Claude Code",
+			Path:           "/tmp/nightward-golden-home/.claude/mcp.json",
+			Server:         "filesystem",
+			Severity:       inventory.RiskMedium,
+			Rule:           "mcp_broad_filesystem",
+			Message:        "MCP server \"filesystem\" can access a broad filesystem path.",
+			Evidence:       "arg=/Users/test",
+			Recommendation: "Narrow filesystem server access to specific project paths.",
+			FixAvailable:   true,
+			FixKind:        inventory.FixNarrowFilesystem,
+			Confidence:     "medium",
+			Risk:           inventory.RiskLow,
+			RequiresReview: true,
+			FixSummary:     "Replace broad filesystem arguments with the smallest project paths needed.",
+			FixSteps:       []string{"Confirm which paths this MCP server needs before syncing the config."},
+		},
+	}}
+	analysisReport := analysis.Report{Signals: []analysis.Signal{
+		{
+			ID:             "signal-provider-1",
+			Provider:       "gitleaks",
+			Rule:           "nightward/provider/gitleaks",
+			Category:       analysis.CategorySecrets,
+			SubjectID:      "workspace",
+			SubjectType:    analysis.SubjectItem,
+			Path:           "/tmp/nightward-golden-home/workspace/.env",
+			Severity:       inventory.RiskHigh,
+			Confidence:     "medium",
+			Message:        "gitleaks reported possible secret material.",
+			Evidence:       "provider=gitleaks finding=1 file=.env",
+			Recommendation: "Review gitleaks findings locally and rotate any exposed credentials.",
+			Why:            "Provider results can reveal workspace secrets outside known agent configs.",
+		},
+	}}
+
+	sarif := BuildSARIFWithAnalysis(report, analysisReport, Config{})
+	assertGoldenPolicyJSON(t, "testdata/golden/analysis-signals.sarif.golden.json", sarif)
+	data, err := json.Marshal(sarif)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "super-secret-value") {
+		t.Fatalf("SARIF leaked secret value: %s", data)
+	}
+}
+
 func assertGoldenPolicyJSON(t *testing.T, path string, value any) {
 	t.Helper()
 	data, err := json.MarshalIndent(value, "", "  ")

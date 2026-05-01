@@ -78,6 +78,12 @@ func TestStatusReadsLatestReportAndFindingCount(t *testing.T) {
 	if err := os.Chtimes(newReport, newTime, newTime); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(reportDir, "notes.txt"), []byte("not a report"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(newReport, filepath.Join(reportDir, "linked.json")); err != nil {
+		t.Logf("skipping symlink fixture: %v", err)
+	}
 
 	status := Status(home)
 	if status.LastReport != newReport || status.LastRun == nil || !status.LastRun.Equal(newTime) {
@@ -85,6 +91,16 @@ func TestStatusReadsLatestReportAndFindingCount(t *testing.T) {
 	}
 	if status.LastFindings != 2 {
 		t.Fatalf("expected two findings, got %d", status.LastFindings)
+	}
+	if len(status.History) != 2 || status.History[0].ReportName != "new.json" || status.History[1].ReportName != "old.json" {
+		t.Fatalf("unexpected report history: %#v", status.History)
+	}
+	if status.History[0].Findings != 2 || status.History[1].Findings != 1 {
+		t.Fatalf("unexpected report history finding counts: %#v", status.History)
+	}
+	limited := ReportHistory(reportDir, 1)
+	if len(limited) != 1 || limited[0].Path != newReport {
+		t.Fatalf("unexpected limited report history: %#v", limited)
 	}
 }
 

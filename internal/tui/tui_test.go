@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jsonbored/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/schedule"
 )
 
 func TestFindingsAndFixPlanViewsRenderRedactedDetails(t *testing.T) {
@@ -206,6 +207,46 @@ func TestTUIViewResponsiveWidths(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestDashboardShowsReportHistoryAndNextActions(t *testing.T) {
+	report := inventory.Report{
+		GeneratedAt: time.Date(2026, 4, 30, 7, 0, 0, 0, time.UTC),
+		Home:        "/tmp/nightward-home",
+		Summary: inventory.Summary{
+			TotalFindings:      1,
+			FindingsBySeverity: map[inventory.RiskLevel]int{inventory.RiskHigh: 1},
+		},
+		Findings: []inventory.Finding{
+			{ID: "one", Severity: inventory.RiskHigh, Rule: "mcp_secret_header", Message: "Header secret"},
+		},
+	}
+	m := model{
+		report: report,
+		schedule: schedule.Plan{
+			ReportDir: "/tmp/nightward-home/.local/state/nightward/reports",
+			History: []schedule.ReportRecord{
+				{
+					Path:       "/tmp/nightward-home/.local/state/nightward/reports/new.json",
+					ReportName: "new.json",
+					Findings:   1,
+					SizeBytes:  2048,
+					ModTime:    time.Date(2026, 4, 30, 8, 0, 0, 0, time.UTC),
+				},
+			},
+		},
+		width:  120,
+		height: 40,
+	}
+	dashboard := stripANSI(m.dashboard(116))
+	for _, want := range []string{"Recent Reports", "new.json", "2.0KB", "What Next", "Review Findings and Fix Plan"} {
+		if !strings.Contains(dashboard, want) {
+			t.Fatalf("dashboard missing %q:\n%s", want, dashboard)
+		}
+	}
+	if got, label, ok := m.copySelection(); !ok || label != "latest report" || !strings.HasSuffix(got, "new.json") {
+		t.Fatalf("unexpected dashboard copy selection: got=%q label=%q ok=%t", got, label, ok)
 	}
 }
 
