@@ -25,6 +25,7 @@
     "patch_hint": {
       "kind": "externalize-secret",
       "env_key": "AUTHORIZATION",
+      "header_key": "Authorization",
       "inline_secret": true
     }
   },
@@ -53,7 +54,8 @@
     ],
     "patch_hint": {
       "kind": "externalize-secret",
-      "env_key": "X_API_KEY"
+      "env_key": "X_API_KEY",
+      "header_key": "X-API-Key"
     }
   },
   {
@@ -78,7 +80,11 @@
       "Confirm whether this MCP endpoint is intentionally machine-local.",
       "Keep the URL in an ignored local overlay if it is not portable.",
       "Document the expected local service when the endpoint is required for this machine."
-    ]
+    ],
+    "patch_hint": {
+      "kind": "manual-review",
+      "replacement": "\u003creviewed-portable-or-local-overlay-url\u003e"
+    }
   },
   {
     "id": "mcp_unknown_command-a318c5ca6d87",

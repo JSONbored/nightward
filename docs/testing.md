@@ -20,6 +20,7 @@ make trunk-check
 make ci-scripts-test
 make raycast-verify
 make npm-package-verify
+make site-verify
 make release-snapshot
 make verify
 ```
@@ -92,5 +93,18 @@ npm test
 npm audit --audit-level=moderate
 npm run pack:dry-run
 ```
+
+## Documentation Site
+
+The public docs/marketing site lives under `site/` and uses VitePress with local search.
+
+```sh
+cd site
+npm ci
+npm audit --audit-level=moderate
+npm run build
+```
+
+`make site-verify` runs the same install/build path from the repository root. The site should not add analytics or third-party runtime scripts by default.
 
 The launcher must remain dependency-light, avoid `postinstall`, and verify downloaded GitHub Release archives against `checksums.txt` before extraction.

@@ -90,6 +90,14 @@ func TestDefaultConfigExplainValidateAndWriteSARIF(t *testing.T) {
 	if !strings.Contains(string(data), `"2.1.0"`) {
 		t.Fatalf("unexpected SARIF file:\n%s", data)
 	}
+
+	out = filepath.Join(t.TempDir(), "nightward.sarif")
+	if err := WriteSARIF(inventory.Report{}, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteSARIFWithConfig(inventory.Report{}, filepath.Join(t.TempDir(), "nightward.sarif"), Config{SARIF: SARIFConfig{ToolName: "Custom Nightward"}}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestCheckWithConfigIgnoresWithReasonAndOverridesThreshold(t *testing.T) {

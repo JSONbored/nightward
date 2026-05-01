@@ -19,6 +19,7 @@ Release artifacts include:
 - `nightward` and `nw` binaries for macOS, Linux, and Windows.
 - `checksums.txt`.
 - `checksums.txt.sig` from Cosign.
+- `checksums.txt.pem` from Cosign keyless signing.
 - SBOM files for release archives.
 
 Users who want the strongest supply-chain verification should download from GitHub Releases and verify the signed checksum file before installing.
@@ -43,7 +44,9 @@ npm install -g nightward
 nw scan --json
 ```
 
-Publishing is disabled by default. The release workflow publishes to npm only when `NPM_PUBLISH=true` is configured and npm credentials/trusted publishing are ready.
+Publishing is disabled by default. The release workflow publishes to npm only when `NPM_PUBLISH=true` is configured and npm trusted publishing is ready for package `nightward`, repository `JSONbored/nightward`, and workflow `.github/workflows/release.yml`.
+
+The package should not use a long-lived npm token. It should publish through GitHub OIDC/trusted publishing with provenance.
 
 ## Deferred Channels
 

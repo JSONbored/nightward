@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+tag="${1:?release tag required}"
+repo="${GITHUB_REPOSITORY:-JSONbored/nightward}"
+version="${tag#v}"
+asset="nightward_${version}_linux_amd64.tar.gz"
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "${tmp_dir}"' EXIT
+
+gh release download "${tag}" \
+  --repo "${repo}" \
+  --pattern checksums.txt \
+  --pattern checksums.txt.pem \
+  --pattern checksums.txt.sig \
+  --pattern "${asset}" \
+  --dir "${tmp_dir}"
+
+cd "${tmp_dir}"
+cosign verify-blob \
+  --certificate-identity-regexp "https://github.com/${repo}/.github/workflows/release.yml@refs/tags/v.*" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate checksums.txt.pem \
+  --signature checksums.txt.sig \
+  checksums.txt
+sha256sum -c checksums.txt --ignore-missing
+tar -xzf "${asset}"
+
+./nightward --version | grep -Fx "${version}"
+./nw --version | grep -Fx "${version}"
+
+echo "release archive smoke passed for ${repo}@${tag}"

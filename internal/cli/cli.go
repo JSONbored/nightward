@@ -16,6 +16,8 @@ import (
 	"github.com/jsonbored/nightward/internal/fixplan"
 	"github.com/jsonbored/nightward/internal/inventory"
 	"github.com/jsonbored/nightward/internal/policy"
+	"github.com/jsonbored/nightward/internal/reporthtml"
+	"github.com/jsonbored/nightward/internal/rules"
 	"github.com/jsonbored/nightward/internal/schedule"
 	"github.com/jsonbored/nightward/internal/snapshot"
 	"github.com/jsonbored/nightward/internal/tui"
@@ -88,6 +90,10 @@ func RunWithName(commandName string, args []string, stdout, stderr io.Writer) in
 		return runTrust(home, args[1:], stdout, stderr)
 	case "providers":
 		return runProviders(args[1:], stdout, stderr)
+	case "rules":
+		return runRules(args[1:], stdout, stderr)
+	case "report":
+		return runReport(home, args[1:], stdout, stderr)
 	case "policy":
 		return runPolicy(home, args[1:], stdout, stderr)
 	case "snapshot":
@@ -97,6 +103,94 @@ func RunWithName(commandName string, args []string, stdout, stderr io.Writer) in
 	default:
 		return fail(stderr, "unknown command %q\n\nRun `%s --help` for usage.", args[0], commandName)
 	}
+	return 0
+}
+
+func runRules(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		return fail(stderr, "usage: nightward rules <list|explain> [--json]")
+	}
+	switch args[0] {
+	case "list":
+		fs := flag.NewFlagSet("rules list", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		list := rules.List()
+		if *jsonOut {
+			return writeJSON(stdout, list, stderr)
+		}
+		for _, rule := range list {
+			fmt.Fprintf(stdout, "%-22s %-8s %s\n", rule.ID, rule.DefaultSeverity, rule.Title)
+		}
+	case "explain":
+		ordered := flagsFirst(args[1:], nil)
+		fs := flag.NewFlagSet("rules explain", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(ordered); err != nil {
+			return 2
+		}
+		if fs.NArg() != 1 {
+			return fail(stderr, "usage: nightward rules explain <rule-id> [--json]")
+		}
+		rule, ok := rules.Find(fs.Arg(0))
+		if !ok {
+			return fail(stderr, "rule not found or ambiguous: %s", fs.Arg(0))
+		}
+		if *jsonOut {
+			return writeJSON(stdout, rule, stderr)
+		}
+		fmt.Fprintf(stdout, "%s\n", rule.ID)
+		fmt.Fprintf(stdout, "  severity: %s\n", rule.DefaultSeverity)
+		fmt.Fprintf(stdout, "  category: %s\n", rule.Category)
+		fmt.Fprintf(stdout, "  title:    %s\n", rule.Title)
+		fmt.Fprintf(stdout, "\n%s\n\nRecommendation: %s\n", rule.Description, rule.Recommendation)
+		if rule.DocsURL != "" {
+			fmt.Fprintf(stdout, "Docs: %s\n", rule.DocsURL)
+		}
+	default:
+		return fail(stderr, "usage: nightward rules <list|explain> [--json]")
+	}
+	return 0
+}
+
+func runReport(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 || args[0] != "html" {
+		return fail(stderr, "usage: nightward report html --input scan.json --output report.html")
+	}
+	fs := flag.NewFlagSet("report html", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	input := fs.String("input", "", "scan JSON input path")
+	output := fs.String("output", "", "HTML report output path")
+	if err := fs.Parse(args[1:]); err != nil {
+		return 2
+	}
+	if *input == "" || *output == "" {
+		return fail(stderr, "missing required --input and --output")
+	}
+	var report inventory.Report
+	data, err := os.ReadFile(filepath.Clean(expandHome(home, *input))) // #nosec G304 -- explicit user-selected scan JSON input path.
+	if err != nil {
+		return fail(stderr, "failed to read scan JSON: %v", err)
+	}
+	if err := json.Unmarshal(data, &report); err != nil {
+		return fail(stderr, "failed to parse scan JSON: %v", err)
+	}
+	html, err := reporthtml.Render(report)
+	if err != nil {
+		return fail(stderr, "failed to render HTML report: %v", err)
+	}
+	outputPath := filepath.Clean(expandHome(home, *output))
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0700); err != nil {
+		return fail(stderr, "failed to create report directory: %v", err)
+	}
+	if err := os.WriteFile(outputPath, []byte(html), 0600); err != nil { // #nosec G306 -- explicit user-selected report output should be private by default.
+		return fail(stderr, "failed to write HTML report: %v", err)
+	}
+	fmt.Fprintf(stdout, "Wrote HTML report to %s\n", outputPath)
 	return 0
 }
 
@@ -779,6 +873,9 @@ Usage:
   %[1]s trust explain <finding-id> [--workspace DIR] [--json]
   %[1]s providers list [--json]
   %[1]s providers doctor [--with providers] [--online] [--json]
+  %[1]s rules list [--json]
+  %[1]s rules explain <rule-id> [--json]
+  %[1]s report html --input scan.json --output report.html
   %[1]s policy init --dry-run
   %[1]s policy explain
   %[1]s policy check [--config .nightward.yml] [--workspace DIR] [--include-analysis] [--strict] [--json]

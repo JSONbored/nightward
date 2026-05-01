@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -28,12 +29,21 @@ type Plan struct {
 	LastReport   string          `json:"last_report,omitempty"`
 	LastRun      *time.Time      `json:"last_run,omitempty"`
 	LastFindings int             `json:"last_findings,omitempty"`
+	History      []ReportRecord  `json:"history,omitempty"`
 }
 
 type GeneratedFile struct {
 	Path    string `json:"path"`
 	Content string `json:"content"`
 	Mode    uint32 `json:"mode"`
+}
+
+type ReportRecord struct {
+	Path       string    `json:"path"`
+	ModTime    time.Time `json:"mod_time"`
+	Findings   int       `json:"findings"`
+	SizeBytes  int64     `json:"size_bytes"`
+	ReportName string    `json:"report_name"`
 }
 
 func BuildPlan(home, executable, preset string) (Plan, error) {
@@ -87,6 +97,7 @@ func BuildPlanForOS(goos, home, executable, preset string) (Plan, error) {
 	plan.LastReport = status.LastReport
 	plan.LastRun = status.LastRun
 	plan.LastFindings = status.LastFindings
+	plan.History = status.History
 	return plan, nil
 }
 
@@ -105,6 +116,7 @@ func Status(home string) Plan {
 		status.Installed = fileExists(filepath.Join(home, ".config", "systemd", "user", Label+".timer"))
 	}
 	status.LastReport, status.LastRun, status.LastFindings = lastReport(reportDir)
+	status.History = ReportHistory(reportDir, 5)
 	return status
 }
 
@@ -258,12 +270,20 @@ func fileExists(path string) bool {
 }
 
 func lastReport(reportDir string) (string, *time.Time, int) {
-	entries, err := os.ReadDir(reportDir)
-	if err != nil {
+	history := ReportHistory(reportDir, 1)
+	if len(history) == 0 {
 		return "", nil, 0
 	}
-	var newest os.FileInfo
-	var newestPath string
+	mod := history[0].ModTime
+	return history[0].Path, &mod, history[0].Findings
+}
+
+func ReportHistory(reportDir string, limit int) []ReportRecord {
+	entries, err := os.ReadDir(reportDir)
+	if err != nil {
+		return nil
+	}
+	var history []ReportRecord
 	for _, entry := range entries {
 		if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
@@ -272,16 +292,22 @@ func lastReport(reportDir string) (string, *time.Time, int) {
 		if err != nil {
 			continue
 		}
-		if newest == nil || info.ModTime().After(newest.ModTime()) {
-			newest = info
-			newestPath = filepath.Join(reportDir, entry.Name())
-		}
+		path := filepath.Join(reportDir, entry.Name())
+		history = append(history, ReportRecord{
+			Path:       path,
+			ModTime:    info.ModTime().UTC(),
+			Findings:   countFindings(path),
+			SizeBytes:  info.Size(),
+			ReportName: entry.Name(),
+		})
 	}
-	if newest == nil {
-		return "", nil, 0
+	sort.Slice(history, func(i, j int) bool {
+		return history[i].ModTime.After(history[j].ModTime)
+	})
+	if limit > 0 && len(history) > limit {
+		return history[:limit]
 	}
-	mod := newest.ModTime().UTC()
-	return newestPath, &mod, countFindings(newestPath)
+	return history
 }
 
 func countFindings(path string) int {

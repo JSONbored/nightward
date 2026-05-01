@@ -183,6 +183,9 @@ func Run(report inventory.Report, options Options) Report {
 			}
 		}
 	}
+	if options.FindingID == "" && options.Package == "" {
+		appendProviderSignals(&out, report, options)
+	}
 
 	sort.Slice(out.Subjects, func(i, j int) bool {
 		if out.Subjects[i].Type == out.Subjects[j].Type {

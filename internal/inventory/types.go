@@ -77,9 +77,11 @@ type PatchHint struct {
 	Kind          FixKind  `json:"kind,omitempty"`
 	Package       string   `json:"package,omitempty"`
 	EnvKey        string   `json:"env_key,omitempty"`
+	HeaderKey     string   `json:"header_key,omitempty"`
 	InlineSecret  bool     `json:"inline_secret,omitempty"`
 	DirectCommand string   `json:"direct_command,omitempty"`
 	DirectArgs    []string `json:"direct_args,omitempty"`
+	Replacement   string   `json:"replacement,omitempty"`
 }
 
 type AdapterStatus struct {

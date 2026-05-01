@@ -18,5 +18,6 @@ Authorization = "Bearer secret"
 		}
 		_, _ = readJSONServers([]byte(data))
 		_, _ = readTOMLServers([]byte(data))
+		_, _ = readYAMLServers([]byte(data))
 	})
 }
