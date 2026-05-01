@@ -11,6 +11,7 @@ import { usePromise } from "@raycast/utils";
 import { useState } from "react";
 import {
   findingKeywords,
+  findingFixLabel,
   findingMarkdown,
   findingSubtitle,
   findingTitle,
@@ -100,7 +101,6 @@ function FindingItem({
         tintColor: severityColor(finding.severity as RiskLevel),
       }}
       accessories={[
-        { text: finding.tool },
         {
           tag: {
             value: finding.severity,
@@ -110,11 +110,11 @@ function FindingItem({
         finding.fix_available
           ? {
               tag: {
-                value: finding.fix_kind ?? "fix",
+                value: findingFixLabel(finding),
                 color: finding.requires_review ? Color.Yellow : Color.Green,
               },
             }
-          : { text: "manual" },
+          : { text: findingFixLabel(finding) },
       ]}
       detail={<FindingDetail finding={finding} />}
       actions={<FindingActions finding={finding} onRefresh={onRefresh} />}

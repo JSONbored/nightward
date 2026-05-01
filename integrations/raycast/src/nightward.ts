@@ -1,7 +1,11 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
+import {
+  selectedAnalysisProviders,
+  selectedOnlineProviders,
+} from "./provider-options";
 import type {
   AnalysisReport,
   DoctorReport,
@@ -33,11 +37,13 @@ type ExecFileLike = (
 export type NightwardPreferences = {
   nightwardPath?: string;
   homeOverride?: string;
+  allowOnlineProviders?: boolean;
 };
 
 export type RuntimeOptions = {
   executable: string;
   homeOverride?: string;
+  allowOnlineProviders: boolean;
   timeoutMs: number;
   execFileImpl?: ExecFileLike;
 };
@@ -60,6 +66,7 @@ export function normalizePreferences(
   return {
     executable: preferences.nightwardPath?.trim() || "nw",
     homeOverride: preferences.homeOverride?.trim() || undefined,
+    allowOnlineProviders: preferences.allowOnlineProviders === true,
     timeoutMs: 20000,
   };
 }
@@ -81,7 +88,7 @@ export async function explainFinding(
   options: RuntimeOptions,
 ): Promise<Finding> {
   return runNightwardJSON<Finding>(
-    ["findings", "explain", id, "--json"],
+    ["findings", "explain", "--json", id],
     options,
   );
 }
@@ -92,20 +99,42 @@ export async function fixPlan(options: RuntimeOptions): Promise<FixPlan> {
 
 export async function analysisReport(
   options: RuntimeOptions,
+  selectedProviders: string[] = [],
 ): Promise<AnalysisReport> {
-  return runNightwardJSON<AnalysisReport>(
-    ["analyze", "--all", "--json"],
-    options,
+  const args = ["analyze", "--all"];
+  const providers = selectedAnalysisProviders(
+    selectedProviders,
+    options.allowOnlineProviders,
   );
+  if (providers.length > 0) {
+    args.push("--with", providers.join(","));
+  }
+  if (
+    options.allowOnlineProviders &&
+    selectedOnlineProviders(selectedProviders).length > 0
+  ) {
+    args.push("--online");
+  }
+  args.push("--json");
+  return runNightwardJSON<AnalysisReport>(args, options);
 }
 
 export async function providersDoctor(
   options: RuntimeOptions,
+  selectedProviders: string[] = [],
 ): Promise<ProviderStatus[]> {
-  return runNightwardJSON<ProviderStatus[]>(
-    ["providers", "doctor", "--json"],
-    options,
-  );
+  const args = ["providers", "doctor"];
+  if (selectedProviders.length > 0) {
+    args.push("--with", selectedProviders.join(","));
+  }
+  if (
+    options.allowOnlineProviders &&
+    selectedOnlineProviders(selectedProviders).length > 0
+  ) {
+    args.push("--online");
+  }
+  args.push("--json");
+  return runNightwardJSON<ProviderStatus[]>(args, options);
 }
 
 export async function explainSignal(
@@ -113,15 +142,16 @@ export async function explainSignal(
   options: RuntimeOptions,
 ): Promise<AnalysisReport> {
   return runNightwardJSON<AnalysisReport>(
-    ["analyze", "finding", findingId, "--json"],
+    ["analyze", "finding", "--json", findingId],
     options,
   );
 }
 
 export async function exportAnalysisMarkdown(
   options: RuntimeOptions,
+  selectedProviders: string[] = [],
 ): Promise<string> {
-  const report = await analysisReport(options);
+  const report = await analysisReport(options, selectedProviders);
   return [
     "# Nightward Analysis",
     "",
@@ -206,7 +236,10 @@ function execNightward(
   args: string[],
   options: RuntimeOptions,
 ): Promise<string> {
-  const env = { ...process.env };
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    PATH: raycastCommandPath(executable),
+  };
   if (options.homeOverride) {
     env.NIGHTWARD_HOME = options.homeOverride;
   }
@@ -238,6 +271,22 @@ function execNightward(
 
 function commandLabel(executable: string, args: string[]): string {
   return [executable, ...args].join(" ");
+}
+
+function raycastCommandPath(executable: string): string {
+  const current = process.env.PATH?.split(delimiter) ?? [];
+  const extra = [
+    executable.includes("/") ? dirname(executable) : "",
+    join(homedir(), ".local", "bin"),
+    join(homedir(), "go", "bin"),
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    "/usr/bin",
+    "/bin",
+    "/usr/sbin",
+    "/sbin",
+  ];
+  return [...new Set([...current, ...extra].filter(Boolean))].join(delimiter);
 }
 
 function isENOENT(error: unknown): boolean {

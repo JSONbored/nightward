@@ -12,7 +12,10 @@ import {
   adapterSummary,
   classificationColor,
   dashboardMarkdown,
+  findingFixLabel,
   findingMarkdown,
+  findingSubtitle,
+  findingTitle,
   maxSeverity,
   severityColor,
   sortedFindings,
@@ -204,13 +207,21 @@ export default function Command() {
           .map((finding) => (
             <List.Item
               key={finding.id}
-              title={finding.rule}
-              subtitle={finding.message}
+              title={findingTitle(finding)}
+              subtitle={findingSubtitle(finding)}
               icon={{
                 source: Icon.Warning,
                 tintColor: severityColor(finding.severity),
               }}
-              accessories={[{ text: finding.severity }, { text: finding.tool }]}
+              accessories={[
+                {
+                  tag: {
+                    value: finding.severity,
+                    color: severityColor(finding.severity),
+                  },
+                },
+                { text: findingFixLabel(finding) },
+              ]}
               detail={<List.Item.Detail markdown={findingMarkdown(finding)} />}
               actions={
                 <ActionPanel>

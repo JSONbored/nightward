@@ -83,7 +83,7 @@ test("markdown helpers preserve escaped evidence without leaking formatting", ()
   };
 
   const markdown = findingMarkdown(finding);
-  assert.match(markdown, /^# mcp\\_\\\[review\\\]\\\\path/m);
+  assert.match(markdown, /^# MCP \\\[review\\\]\\\\path/m);
   assert.match(markdown, /``command=`node` path=C:\\Users\\example``/);
 });
 
@@ -215,7 +215,7 @@ test("menu bar status summarizes risk and schedule state", () => {
   };
 
   const status = menuBarStatus(report, doctor, analysis);
-  assert.equal(status.title, "NW 1C");
+  assert.equal(status.title, "1");
   assert.equal(status.risk, "critical");
   assert.match(status.tooltip, /3 findings/);
   assert.match(status.tooltip, /1 provider warnings/);
