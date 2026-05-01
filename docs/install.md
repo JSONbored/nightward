@@ -12,7 +12,7 @@ This builds `nightward` and `nw` from the local checkout into `~/.local/bin` by 
 
 ## GitHub Releases
 
-After the first reviewed release tag, GitHub Releases are the canonical binary distribution channel.
+GitHub Releases are the canonical binary distribution channel.
 
 Release artifacts include:
 
@@ -35,7 +35,7 @@ The package is a thin launcher:
 - verifies the archive SHA-256 from `checksums.txt`
 - caches extracted `nightward` and `nw` binaries locally
 
-Example after the first release is published:
+Example:
 
 ```sh
 npx @jsonbored/nightward --help
@@ -49,7 +49,7 @@ The package should not use a long-lived npm token. It should publish through Git
 
 ## Deferred Channels
 
-These are useful, but should wait until the first signed GitHub Release proves stable:
+These are useful, but should wait until signed GitHub Release artifacts prove stable across patch releases:
 
 - Homebrew tap
 - Nix package

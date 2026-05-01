@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jsonbored/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/schedule"
 )
 
 func TestRenderEscapesHTML(t *testing.T) {
@@ -37,6 +38,25 @@ func TestRenderEscapesHTML(t *testing.T) {
 	}
 	if !strings.Contains(html, "mcp_secret_header") {
 		t.Fatalf("expected finding rule in report: %s", html)
+	}
+}
+
+func TestRenderIndexEscapesReportHistory(t *testing.T) {
+	html, err := RenderIndex([]schedule.ReportRecord{
+		{Path: "/tmp/<report>.json", ReportName: "<report>.json", Findings: 2, SizeBytes: 123, ModTime: time.Date(2026, 5, 1, 1, 0, 0, 0, time.UTC)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(html, "/tmp/<report>.json") || !strings.Contains(html, "Nightward Report History") {
+		t.Fatalf("expected escaped report history index:\n%s", html)
+	}
+	empty, err := RenderIndex(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(empty, "No JSON reports found.") {
+		t.Fatalf("expected empty report history copy:\n%s", empty)
 	}
 }
 

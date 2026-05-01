@@ -20,7 +20,7 @@ Project badge: <https://www.bestpractices.dev/projects/12713>
 - Dynamic analysis: automated tests, race tests, Raycast tests/build, and Go fuzz smoke tests.
 - Secret scanning: Gitleaks in CI and `make gitleaks`.
 - Release notes: <https://github.com/JSONbored/nightward/blob/main/CHANGELOG.md>
-- Maintained status evidence after first release: reviewed PRs, CI-green `main`, Renovate dependency updates, issue response history, and signed release tags.
+- Maintained status evidence: reviewed PRs, CI-green `main`, Renovate dependency updates, issue response history, and signed release tags.
 
 ## N/A Crypto Fields
 
@@ -43,7 +43,7 @@ The release pipeline uses external tools for signing release checksums and SBOM 
 
 ## Gold-Oriented Backlog
 
-- SLSA provenance/attestations after the first signed release.
+- SLSA provenance/attestations for future release workflows.
 - Reproducible-build comparison using `CGO_ENABLED=0`, `-trimpath`, pinned Go toolchain, and rebuild verification.
 - Wider fuzz/property tests for MCP parsing, redaction, symlink traversal, huge files, malformed configs, and permission-denied paths.
 - More maintainer depth and documented two-person review coverage once the project has additional maintainers.
@@ -58,6 +58,5 @@ These cannot be completed by repository files alone:
 - Keep maintainer 2FA enabled.
 - Let Scorecard `Maintained` age out after the repository is older than 90 days.
 - Improve Scorecard `Code-Review` through future reviewed PR history.
-- Create the first signed release only after the release candidate is reviewed.
 - Configure npm trusted publishing before setting `NPM_PUBLISH=true`.
 - Enable GitHub Pages for the repository after the site workflow is merged.

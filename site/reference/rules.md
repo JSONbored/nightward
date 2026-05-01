@@ -1,37 +1,17 @@
-# Rules Reference
+# Rule Reference
 
-Nightward rules are intentionally conservative. A finding asks for review; it does not claim that a tool is malicious.
+This page is generated from `nw rules list --json`.
 
-## MCP rules
-
-- `mcp_server_review`
-- `mcp_unpinned_package`
-- `mcp_secret_env`
-- `mcp_secret_header`
-- `mcp_shell_command`
-- `mcp_broad_filesystem`
-- `mcp_local_endpoint`
-- `mcp_local_token_path`
-- `mcp_symlink_config`
-- `mcp_unknown_command`
-- `mcp_parse_failed`
-
-## Analysis categories
-
-- `supply-chain`
-- `secrets-exposure`
-- `filesystem-scope`
-- `network-exposure`
-- `execution-risk`
-- `machine-locality`
-- `app-state`
-- `unknown`
-
-Use these commands for rule metadata and local finding detail:
-
-```sh
-nw rules list
-nw rules explain mcp_secret_header
-nw findings explain <id>
-nw trust explain <id>
-```
+| Rule | Severity | Category | Fix | Summary |
+| --- | --- | --- | --- | --- |
+| `mcp_broad_filesystem` | medium | mcp | manual | Broad filesystem access |
+| `mcp_local_endpoint` | medium | mcp | manual | Local endpoint |
+| `mcp_local_token_path` | medium | mcp | manual | Local token path |
+| `mcp_parse_failed` | medium | mcp | manual | MCP parse failure |
+| `mcp_secret_env` | medium | mcp | manual | Sensitive environment key |
+| `mcp_secret_header` | high | mcp | manual | Sensitive header key |
+| `mcp_server_review` | info | mcp | manual | Review MCP server |
+| `mcp_shell_command` | high | mcp | manual | Shell wrapper |
+| `mcp_symlink_config` | medium | mcp | manual | Symlinked MCP config |
+| `mcp_unknown_command` | medium | mcp | manual | Unknown MCP server shape |
+| `mcp_unpinned_package` | high | mcp | manual | Unpinned package executor |

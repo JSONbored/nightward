@@ -17,6 +17,7 @@ import (
 	"github.com/jsonbored/nightward/internal/fixplan"
 	"github.com/jsonbored/nightward/internal/inventory"
 	"github.com/jsonbored/nightward/internal/policy"
+	"github.com/jsonbored/nightward/internal/reportdiff"
 	"github.com/jsonbored/nightward/internal/reporthtml"
 	"github.com/jsonbored/nightward/internal/rules"
 	"github.com/jsonbored/nightward/internal/schedule"
@@ -34,13 +35,23 @@ type Check struct {
 }
 
 type DoctorReport struct {
-	GeneratedAt time.Time                 `json:"generated_at"`
-	Version     string                    `json:"version"`
-	Home        string                    `json:"home"`
-	Executable  string                    `json:"executable"`
-	Checks      []Check                   `json:"checks"`
-	Schedule    schedule.Plan             `json:"schedule"`
-	Adapters    []inventory.AdapterStatus `json:"adapters"`
+	SchemaVersion int                       `json:"schema_version"`
+	GeneratedAt   time.Time                 `json:"generated_at"`
+	Version       string                    `json:"version"`
+	Home          string                    `json:"home"`
+	Executable    string                    `json:"executable"`
+	Checks        []Check                   `json:"checks"`
+	Schedule      schedule.Plan             `json:"schedule"`
+	Adapters      []inventory.AdapterStatus `json:"adapters"`
+}
+
+type AdapterFixtureTemplate struct {
+	SchemaVersion int      `json:"schema_version"`
+	Adapter       string   `json:"adapter"`
+	FixtureRoot   string   `json:"fixture_root"`
+	Paths         []string `json:"paths"`
+	TestIdeas     []string `json:"test_ideas"`
+	Notes         []string `json:"notes"`
 }
 
 func Run(args []string, stdout, stderr io.Writer) int {
@@ -159,39 +170,120 @@ func runRules(args []string, stdout, stderr io.Writer) int {
 }
 
 func runReport(home string, args []string, stdout, stderr io.Writer) int {
-	if len(args) == 0 || args[0] != "html" {
-		return fail(stderr, "usage: nightward report html --input scan.json --output report.html")
+	if len(args) == 0 {
+		return fail(stderr, "usage: nightward report <html|diff|history|index> [flags]")
 	}
-	fs := flag.NewFlagSet("report html", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	input := fs.String("input", "", "scan JSON input path")
-	output := fs.String("output", "", "HTML report output path")
-	if err := fs.Parse(args[1:]); err != nil {
-		return 2
+	switch args[0] {
+	case "html":
+		fs := flag.NewFlagSet("report html", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		input := fs.String("input", "", "scan JSON input path")
+		output := fs.String("output", "", "HTML report output path")
+		previous := fs.String("previous", "", "optional previous scan JSON for report-to-report diff")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if *input == "" || *output == "" {
+			return fail(stderr, "missing required --input and --output")
+		}
+		report, err := readInventoryReport(home, *input)
+		if err != nil {
+			return fail(stderr, "failed to load scan JSON: %v", err)
+		}
+		var options reporthtml.Options
+		if *previous != "" {
+			before, err := readInventoryReport(home, *previous)
+			if err != nil {
+				return fail(stderr, "failed to load previous scan JSON: %v", err)
+			}
+			diff := reportdiff.Compare(*previous, *input, before, report)
+			options.Diff = &diff
+		}
+		html, err := reporthtml.RenderWithOptions(report, options)
+		if err != nil {
+			return fail(stderr, "failed to render HTML report: %v", err)
+		}
+		outputPath := filepath.Clean(expandHome(home, *output))
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0700); err != nil {
+			return fail(stderr, "failed to create report directory: %v", err)
+		}
+		if err := os.WriteFile(outputPath, []byte(html), 0600); err != nil { // #nosec G306,G703 -- explicit user-selected report output should be private by default.
+			return fail(stderr, "failed to write HTML report: %v", err)
+		}
+		fmt.Fprintf(stdout, "Wrote HTML report to %s\n", outputPath)
+	case "diff":
+		fs := flag.NewFlagSet("report diff", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		fromPath := fs.String("from", "", "previous scan JSON")
+		toPath := fs.String("to", "", "new scan JSON")
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if *fromPath == "" || *toPath == "" {
+			return fail(stderr, "missing required --from and --to")
+		}
+		before, err := readInventoryReport(home, *fromPath)
+		if err != nil {
+			return fail(stderr, "failed to load --from scan JSON: %v", err)
+		}
+		after, err := readInventoryReport(home, *toPath)
+		if err != nil {
+			return fail(stderr, "failed to load --to scan JSON: %v", err)
+		}
+		diff := reportdiff.Compare(*fromPath, *toPath, before, after)
+		if *jsonOut {
+			return writeJSON(stdout, diff, stderr)
+		}
+		printReportDiff(stdout, diff)
+	case "history":
+		fs := flag.NewFlagSet("report history", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		dir := fs.String("dir", defaultReportDir(home), "Nightward report directory")
+		limit := fs.Int("limit", 10, "maximum reports to list; 0 means all")
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		history := schedule.ReportHistory(filepath.Clean(expandHome(home, *dir)), *limit)
+		if history == nil {
+			history = []schedule.ReportRecord{}
+		}
+		if *jsonOut {
+			return writeJSON(stdout, history, stderr)
+		}
+		printReportHistory(stdout, history)
+	case "index":
+		fs := flag.NewFlagSet("report index", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		dir := fs.String("dir", defaultReportDir(home), "Nightward report directory")
+		output := fs.String("output", "", "HTML history index output path")
+		limit := fs.Int("limit", 50, "maximum reports to include; 0 means all")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if *output == "" {
+			return fail(stderr, "missing required --output")
+		}
+		history := schedule.ReportHistory(filepath.Clean(expandHome(home, *dir)), *limit)
+		if history == nil {
+			history = []schedule.ReportRecord{}
+		}
+		html, err := reporthtml.RenderIndex(history)
+		if err != nil {
+			return fail(stderr, "failed to render report index: %v", err)
+		}
+		outputPath := filepath.Clean(expandHome(home, *output))
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0700); err != nil {
+			return fail(stderr, "failed to create report directory: %v", err)
+		}
+		if err := os.WriteFile(outputPath, []byte(html), 0600); err != nil { // #nosec G306,G703 -- explicit user-selected report index should be private by default.
+			return fail(stderr, "failed to write report index: %v", err)
+		}
+		fmt.Fprintf(stdout, "Wrote report history index to %s\n", outputPath)
+	default:
+		return fail(stderr, "usage: nightward report <html|diff|history|index> [flags]")
 	}
-	if *input == "" || *output == "" {
-		return fail(stderr, "missing required --input and --output")
-	}
-	var report inventory.Report
-	data, err := os.ReadFile(filepath.Clean(expandHome(home, *input))) // #nosec G304 -- explicit user-selected scan JSON input path.
-	if err != nil {
-		return fail(stderr, "failed to read scan JSON: %v", err)
-	}
-	if err := json.Unmarshal(data, &report); err != nil {
-		return fail(stderr, "failed to parse scan JSON: %v", err)
-	}
-	html, err := reporthtml.Render(report)
-	if err != nil {
-		return fail(stderr, "failed to render HTML report: %v", err)
-	}
-	outputPath := filepath.Clean(expandHome(home, *output))
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0700); err != nil {
-		return fail(stderr, "failed to create report directory: %v", err)
-	}
-	if err := os.WriteFile(outputPath, []byte(html), 0600); err != nil { // #nosec G306 -- explicit user-selected report output should be private by default.
-		return fail(stderr, "failed to write HTML report: %v", err)
-	}
-	fmt.Fprintf(stdout, "Wrote HTML report to %s\n", outputPath)
 	return 0
 }
 
@@ -313,25 +405,72 @@ func runPlan(home string, args []string, stdout, stderr io.Writer) int {
 }
 
 func runAdapters(home string, args []string, stdout, stderr io.Writer) int {
-	if len(args) == 0 || args[0] != "list" {
-		return fail(stderr, "usage: nightward adapters list [--json]")
+	if len(args) == 0 {
+		return fail(stderr, "usage: nightward adapters <list|explain|template> [flags]")
 	}
-	fs := flag.NewFlagSet("adapters list", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	jsonOut := fs.Bool("json", false, "print JSON output")
-	if err := fs.Parse(args[1:]); err != nil {
-		return 2
-	}
-	adapters := inventory.NewScanner(home).Scan().Adapters
-	if *jsonOut {
-		return writeJSON(stdout, adapters, stderr)
-	}
-	for _, adapter := range adapters {
-		status := "missing"
-		if adapter.Available {
-			status = "found"
+	switch args[0] {
+	case "list":
+		fs := flag.NewFlagSet("adapters list", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		workspace := fs.String("workspace", "", "scan a repository/workspace instead of HOME")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
 		}
-		fmt.Fprintf(stdout, "%-12s %s - %s\n", adapter.Name, status, adapter.Description)
+		adapters := scanReport(home, *workspace).Adapters
+		if *jsonOut {
+			return writeJSON(stdout, adapters, stderr)
+		}
+		for _, adapter := range adapters {
+			status := "missing"
+			if adapter.Available {
+				status = "found"
+			}
+			fmt.Fprintf(stdout, "%-12s %s - %s\n", adapter.Name, status, adapter.Description)
+		}
+	case "explain":
+		ordered := flagsFirst(args[1:], map[string]bool{"--workspace": true})
+		fs := flag.NewFlagSet("adapters explain", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		workspace := fs.String("workspace", "", "scan a repository/workspace instead of HOME")
+		if err := fs.Parse(ordered); err != nil {
+			return 2
+		}
+		if fs.NArg() != 1 {
+			return fail(stderr, "usage: nightward adapters explain <adapter-name> [--workspace DIR] [--json]")
+		}
+		adapter, ok := findAdapter(scanReport(home, *workspace).Adapters, fs.Arg(0))
+		if !ok {
+			return fail(stderr, "adapter not found or ambiguous: %s", fs.Arg(0))
+		}
+		if *jsonOut {
+			return writeJSON(stdout, adapter, stderr)
+		}
+		printAdapterExplain(stdout, adapter)
+	case "template":
+		ordered := flagsFirst(args[1:], map[string]bool{"--workspace": true})
+		fs := flag.NewFlagSet("adapters template", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		workspace := fs.String("workspace", "", "scan a repository/workspace instead of HOME")
+		if err := fs.Parse(ordered); err != nil {
+			return 2
+		}
+		if fs.NArg() != 1 {
+			return fail(stderr, "usage: nightward adapters template <adapter-name> [--workspace DIR] [--json]")
+		}
+		adapter, ok := findAdapter(scanReport(home, *workspace).Adapters, fs.Arg(0))
+		if !ok {
+			return fail(stderr, "adapter not found or ambiguous: %s", fs.Arg(0))
+		}
+		template := buildAdapterFixtureTemplate(home, *workspace, adapter)
+		if *jsonOut {
+			return writeJSON(stdout, template, stderr)
+		}
+		printAdapterFixtureTemplate(stdout, template)
+	default:
+		return fail(stderr, "usage: nightward adapters <list|explain|template> [flags]")
 	}
 	return 0
 }
@@ -826,13 +965,14 @@ func doctor(home string) DoctorReport {
 		pathCheck("state_dir", filepath.Join(home, ".local", "state", "nightward"), false),
 	}
 	return DoctorReport{
-		GeneratedAt: time.Now().UTC(),
-		Version:     currentVersion(),
-		Home:        home,
-		Executable:  exe,
-		Checks:      checks,
-		Schedule:    schedule.Status(home),
-		Adapters:    report.Adapters,
+		SchemaVersion: 1,
+		GeneratedAt:   time.Now().UTC(),
+		Version:       currentVersion(),
+		Home:          home,
+		Executable:    exe,
+		Checks:        checks,
+		Schedule:      schedule.Status(home),
+		Adapters:      report.Adapters,
 	}
 }
 
@@ -871,6 +1011,25 @@ func pathCheck(id, path string, required bool) Check {
 		return Check{ID: id, Status: "warn", Message: "path is not a directory", Detail: cleanPath}
 	}
 	return Check{ID: id, Status: "ok", Message: "path available", Detail: cleanPath}
+}
+
+func readInventoryReport(home, path string) (inventory.Report, error) {
+	var report inventory.Report
+	data, err := os.ReadFile(filepath.Clean(expandHome(home, path))) // #nosec G304 -- explicit local scan JSON input path selected by the user.
+	if err != nil {
+		return report, err
+	}
+	if err := json.Unmarshal(data, &report); err != nil {
+		return report, err
+	}
+	if report.SchemaVersion == 0 {
+		report.SchemaVersion = inventory.ReportSchemaVersion
+	}
+	return report, nil
+}
+
+func defaultReportDir(home string) string {
+	return filepath.Join(home, ".local", "state", "nightward", "reports")
 }
 
 func maybeWriteReport(report inventory.Report, output, outputDir string) error {
@@ -912,7 +1071,9 @@ Usage:
   %[1]s scan [--json] [--workspace DIR] [--output FILE|-] [--output-dir DIR]
   %[1]s doctor [--json]
   %[1]s plan backup --target <repo> [--json]
-  %[1]s adapters list [--json]
+  %[1]s adapters list [--workspace DIR] [--json]
+  %[1]s adapters explain <adapter-name> [--workspace DIR] [--json]
+  %[1]s adapters template <adapter-name> [--workspace DIR] [--json]
   %[1]s findings list [--json]
   %[1]s findings explain <finding-id> [--json]
   %[1]s fix plan [--finding <id>|--rule <rule>|--all] [--json]
@@ -926,7 +1087,10 @@ Usage:
   %[1]s providers doctor [--with providers] [--online] [--json]
   %[1]s rules list [--json]
   %[1]s rules explain <rule-id> [--json]
-  %[1]s report html --input scan.json --output report.html
+  %[1]s report html --input scan.json --output report.html [--previous previous.json]
+  %[1]s report diff --from previous.json --to current.json [--json]
+  %[1]s report history [--dir reports] [--limit 10] [--json]
+  %[1]s report index [--dir reports] --output index.html [--limit 50]
   %[1]s policy init --dry-run
   %[1]s policy explain
   %[1]s policy check [--config .nightward.yml] [--workspace DIR] [--include-analysis] [--strict] [--json]
@@ -970,6 +1134,45 @@ func printScan(w io.Writer, report inventory.Report) {
 	}
 }
 
+func printAdapterExplain(w io.Writer, adapter inventory.AdapterStatus) {
+	status := "missing"
+	if adapter.Available {
+		status = "found"
+	}
+	fmt.Fprintf(w, "%s\n", adapter.Name)
+	fmt.Fprintf(w, "  status:      %s\n", status)
+	fmt.Fprintf(w, "  description: %s\n", adapter.Description)
+	if len(adapter.Found) > 0 {
+		fmt.Fprintln(w, "\nFound:")
+		for _, path := range adapter.Found {
+			fmt.Fprintf(w, "  %s\n", path)
+		}
+	}
+	if len(adapter.Checked) > 0 {
+		fmt.Fprintln(w, "\nChecked:")
+		for _, path := range adapter.Checked {
+			fmt.Fprintf(w, "  %s\n", path)
+		}
+	}
+}
+
+func printAdapterFixtureTemplate(w io.Writer, template AdapterFixtureTemplate) {
+	fmt.Fprintf(w, "# Nightward adapter fixture: %s\n\n", template.Adapter)
+	fmt.Fprintf(w, "Fixture root: %s\n\n", template.FixtureRoot)
+	fmt.Fprintln(w, "Suggested paths:")
+	for _, path := range template.Paths {
+		fmt.Fprintf(w, "  %s\n", path)
+	}
+	fmt.Fprintln(w, "\nTest ideas:")
+	for _, idea := range template.TestIdeas {
+		fmt.Fprintf(w, "  - %s\n", idea)
+	}
+	fmt.Fprintln(w, "\nNotes:")
+	for _, note := range template.Notes {
+		fmt.Fprintf(w, "  - %s\n", note)
+	}
+}
+
 func printDoctor(w io.Writer, report DoctorReport) {
 	fmt.Fprintf(w, "Nightward doctor %s\n", report.Version)
 	for _, check := range report.Checks {
@@ -980,6 +1183,46 @@ func printDoctor(w io.Writer, report DoctorReport) {
 		fmt.Fprintf(w, " last_report=%s", report.Schedule.LastReport)
 	}
 	fmt.Fprintln(w)
+}
+
+func printReportDiff(w io.Writer, diff reportdiff.Diff) {
+	fmt.Fprintf(w, "Report diff: added=%d removed=%d changed=%d unchanged=%d\n", diff.Summary.Added, diff.Summary.Removed, diff.Summary.Changed, diff.Summary.Unchanged)
+	for _, record := range diff.Added {
+		fmt.Fprintf(w, "  added   [%s] %s %s\n", record.Finding.Severity, record.Finding.Rule, record.Finding.ID)
+	}
+	for _, record := range diff.Removed {
+		fmt.Fprintf(w, "  removed [%s] %s %s\n", record.Finding.Severity, record.Finding.Rule, record.Finding.ID)
+	}
+	for _, change := range diff.Changed {
+		fmt.Fprintf(w, "  changed [%s] %s %s (%s)\n", change.After.Severity, change.After.Rule, change.Key, strings.Join(change.Fields, ", "))
+	}
+}
+
+func printReportHistory(w io.Writer, history []schedule.ReportRecord) {
+	if len(history) == 0 {
+		fmt.Fprintln(w, "No Nightward reports found.")
+		return
+	}
+	fmt.Fprintln(w, "Nightward report history:")
+	previous := -1
+	for i, record := range history {
+		delta := ""
+		if previous >= 0 {
+			change := record.Findings - previous
+			if change > 0 {
+				delta = fmt.Sprintf(" (%+d vs newer)", change)
+			} else if change < 0 {
+				delta = fmt.Sprintf(" (%d vs newer)", change)
+			} else {
+				delta = " (no change vs newer)"
+			}
+		}
+		if i == 0 {
+			delta = " (latest)"
+		}
+		fmt.Fprintf(w, "  %s  findings=%d%s  %s\n", record.ModTime.Format(time.RFC3339), record.Findings, delta, record.Path)
+		previous = record.Findings
+	}
 }
 
 func printBackupPlan(w io.Writer, plan backupplan.Plan) {
@@ -1153,6 +1396,69 @@ func fixSelector(report inventory.Report, findingID, rule string, all bool) (fix
 		findingID = finding.ID
 	}
 	return fixplan.Selector{FindingID: findingID, Rule: rule, All: all}, nil
+}
+
+func findAdapter(adapters []inventory.AdapterStatus, idOrPrefix string) (inventory.AdapterStatus, bool) {
+	idOrPrefix = strings.ToLower(strings.TrimSpace(idOrPrefix))
+	for _, adapter := range adapters {
+		if strings.ToLower(adapter.Name) == idOrPrefix {
+			return adapter, true
+		}
+	}
+	var matched []inventory.AdapterStatus
+	for _, adapter := range adapters {
+		if strings.HasPrefix(strings.ToLower(adapter.Name), idOrPrefix) {
+			matched = append(matched, adapter)
+		}
+	}
+	if len(matched) == 1 {
+		return matched[0], true
+	}
+	return inventory.AdapterStatus{}, false
+}
+
+func buildAdapterFixtureTemplate(home, workspace string, adapter inventory.AdapterStatus) AdapterFixtureTemplate {
+	slug := strings.NewReplacer("/", "-", " ", "-", "_", "-").Replace(strings.ToLower(adapter.Name))
+	root := filepath.Join("testdata", "homes", slug)
+	if workspace != "" {
+		root = filepath.Join("testdata", "workspaces", slug)
+	}
+	template := AdapterFixtureTemplate{
+		SchemaVersion: 1,
+		Adapter:       adapter.Name,
+		FixtureRoot:   root,
+		TestIdeas: []string{
+			"Add the smallest realistic config file for one adapter behavior.",
+			"Include one malformed or edge-case fixture if parser behavior changes.",
+			"Assert redaction for secret-looking values; never commit real credentials.",
+			"Run go test ./internal/inventory ./internal/analysis ./internal/cli before opening a PR.",
+		},
+		Notes: []string{
+			"Nightward fixture templates are suggestions only; this command does not write files.",
+			"Keep fixtures minimal and prefer explicit expected behavior in test names.",
+		},
+	}
+	base := home
+	if workspace != "" {
+		base = expandHome(home, workspace)
+	}
+	for _, checked := range adapter.Checked {
+		template.Paths = append(template.Paths, fixturePath(root, base, checked))
+	}
+	return template
+}
+
+func fixturePath(root, base, checked string) string {
+	rel, err := filepath.Rel(base, checked)
+	if err == nil && !strings.HasPrefix(rel, "..") && rel != "." {
+		return filepath.Join(root, rel)
+	}
+	cleaned := strings.TrimPrefix(filepath.Clean(checked), filepath.VolumeName(checked))
+	cleaned = strings.TrimPrefix(cleaned, string(filepath.Separator))
+	if cleaned == "" {
+		return root
+	}
+	return filepath.Join(root, cleaned)
 }
 
 func scanReport(home, workspace string) inventory.Report {

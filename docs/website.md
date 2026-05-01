@@ -24,6 +24,9 @@ Screenshot capture requires Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/
 ## Pages
 
 - `/`
+- `/start/before-syncing-dotfiles`
+- `/start/audit-mcp-workstation`
+- `/start/run-in-ci`
 - `/guide/what-is-nightward`
 - `/guide/getting-started`
 - `/guide/install`
@@ -33,14 +36,23 @@ Screenshot capture requires Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/
 - `/guide/mcp-security`
 - `/guide/remediation`
 - `/guide/policy-and-sarif`
+- `/use/provider-execution`
+- `/use/report-history`
+- `/use/troubleshooting`
 - `/integrations/github-action`
 - `/integrations/trunk`
 - `/integrations/raycast`
+- `/reference/cli`
 - `/reference/config`
+- `/reference/providers`
 - `/reference/json-output`
 - `/reference/rules`
+- `/reference/support-matrix`
+- `/reference/output-surfaces`
+- `/reference/distribution`
 - `/security/threat-model`
 - `/security/release-verification`
+- `/contribute/adapters-and-rules`
 - `/roadmap`
 
 ## Stitch Design Brief

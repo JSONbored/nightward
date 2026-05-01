@@ -29,10 +29,11 @@ type Entry struct {
 }
 
 type Plan struct {
-	GeneratedAt time.Time `json:"generated_at"`
-	TargetRoot  string    `json:"target_root"`
-	Entries     []Entry   `json:"entries"`
-	Summary     Summary   `json:"summary"`
+	SchemaVersion int       `json:"schema_version"`
+	GeneratedAt   time.Time `json:"generated_at"`
+	TargetRoot    string    `json:"target_root"`
+	Entries       []Entry   `json:"entries"`
+	Summary       Summary   `json:"summary"`
 }
 
 type Summary struct {
@@ -43,8 +44,9 @@ type Summary struct {
 
 func Build(report inventory.Report, targetRoot string) Plan {
 	plan := Plan{
-		GeneratedAt: report.GeneratedAt,
-		TargetRoot:  targetRoot,
+		SchemaVersion: 1,
+		GeneratedAt:   report.GeneratedAt,
+		TargetRoot:    targetRoot,
 	}
 	for _, item := range report.Items {
 		action, reason := actionFor(item)

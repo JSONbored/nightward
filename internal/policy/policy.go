@@ -17,6 +17,7 @@ import (
 )
 
 type Report struct {
+	SchemaVersion    int                 `json:"schema_version"`
 	GeneratedAt      time.Time           `json:"generated_at"`
 	Strict           bool                `json:"strict"`
 	Passed           bool                `json:"passed"`
@@ -102,6 +103,7 @@ type SARIFConfig struct {
 }
 
 const sarifAnalysisRulePrefix = "nightward/" + "analyze/"
+const defaultSARIFSemanticVersion = "0.1.4"
 
 type Options struct {
 	Strict          bool
@@ -152,10 +154,11 @@ func CheckWithOptions(report inventory.Report, options Options) Report {
 		threshold = options.Config.SeverityThreshold
 	}
 	out := Report{
-		GeneratedAt: report.GeneratedAt,
-		Strict:      options.Strict,
-		Threshold:   threshold,
-		ConfigPath:  options.Config.path,
+		SchemaVersion: 1,
+		GeneratedAt:   report.GeneratedAt,
+		Strict:        options.Strict,
+		Threshold:     threshold,
+		ConfigPath:    options.Config.path,
 		Summary: Summary{
 			TotalFindings: len(report.Findings),
 		},
@@ -277,7 +280,7 @@ func BuildSARIFWithAnalysis(report inventory.Report, analysisReport analysis.Rep
 	}
 	semanticVersion := config.SARIF.SemanticVersion
 	if semanticVersion == "" {
-		semanticVersion = "0.1.0"
+		semanticVersion = defaultSARIFSemanticVersion
 	}
 	run := map[string]any{
 		"tool": map[string]any{
@@ -308,7 +311,7 @@ func DefaultConfig() Config {
 			ToolName:        "Nightward",
 			Category:        "nightward",
 			InformationURI:  "https://github.com/JSONbored/nightward",
-			SemanticVersion: "0.1.0",
+			SemanticVersion: defaultSARIFSemanticVersion,
 		},
 	}
 }

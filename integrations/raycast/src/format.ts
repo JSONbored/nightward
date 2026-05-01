@@ -215,6 +215,11 @@ export function dashboardMarkdown(
       last_report?: string;
       last_findings?: number;
       report_dir?: string;
+      history?: Array<{
+        findings: number;
+        report_name: string;
+        mod_time: string;
+      }>;
     };
   },
 ): string {
@@ -241,6 +246,8 @@ export function dashboardMarkdown(
     lines.push(`Last report: \`${doctor.schedule.last_report}\``);
   if (doctor.schedule?.last_findings !== undefined)
     lines.push(`Last findings: \`${doctor.schedule.last_findings}\``);
+  const delta = reportHistoryDelta(doctor.schedule?.history);
+  if (delta) lines.push(`Change since previous scheduled scan: \`${delta}\``);
   return lines.join("\n");
 }
 
@@ -266,6 +273,7 @@ export type MenuBarStatus = {
   scheduled: boolean;
   lastFindings?: number;
   lastReport?: string;
+  historyDelta?: string;
 };
 
 export function menuBarStatus(
@@ -280,6 +288,7 @@ export function menuBarStatus(
   const findings = report.summary.total_findings;
   const signals = analysis.summary.total_signals;
   const providerWarnings = analysis.summary.provider_warnings;
+  const historyDelta = reportHistoryDelta(doctor.schedule.history);
   const issueCount = findings + providerWarnings;
   const title =
     issueCount === 0
@@ -294,8 +303,11 @@ export function menuBarStatus(
     `${signals} analysis signals`,
     `${providerWarnings} provider warnings`,
     `max risk: ${risk}`,
+    historyDelta ? `scheduled delta: ${historyDelta}` : "",
     doctor.schedule.installed ? "scheduled" : "not scheduled",
-  ].join(" - ");
+  ]
+    .filter(Boolean)
+    .join(" - ");
 
   return {
     title,
@@ -310,6 +322,7 @@ export function menuBarStatus(
     scheduled: doctor.schedule.installed,
     lastFindings: doctor.schedule.last_findings,
     lastReport: doctor.schedule.last_report,
+    historyDelta,
   };
 }
 
@@ -327,10 +340,22 @@ export function menuBarStatusMarkdown(status: MenuBarStatus): string {
     status.lastFindings !== undefined
       ? `Last scheduled findings: \`${status.lastFindings}\``
       : "",
+    status.historyDelta
+      ? `Change since previous scheduled scan: \`${status.historyDelta}\``
+      : "",
     status.lastReport ? `Last report: \`${status.lastReport}\`` : "",
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+export function reportHistoryDelta(
+  history?: Array<{ findings: number }>,
+): string | undefined {
+  if (!history || history.length < 2) return undefined;
+  const delta = history[0].findings - history[1].findings;
+  if (delta === 0) return "no change";
+  return delta > 0 ? `+${delta} findings` : `${delta} findings`;
 }
 
 export function basename(path: string): string {

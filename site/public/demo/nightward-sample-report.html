@@ -7,20 +7,30 @@
   <style>
     :root { color-scheme: dark; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #071014; color: #e6fffb; }
     body { margin: 0; padding: 32px; }
-    main { max-width: 1120px; margin: 0 auto; }
-    h1, h2 { letter-spacing: 0; }
-    .meta, .card { border: 1px solid #1f3b3d; border-radius: 8px; background: #0b171b; padding: 16px; margin: 16px 0; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    main { max-width: 1180px; margin: 0 auto; }
+    h1, h2, h3 { letter-spacing: 0; }
+    .meta, .panel { border: 1px solid #1f3b3d; border-radius: 8px; background: #0b171b; padding: 16px; margin: 16px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
     .metric { border: 1px solid #1f3b3d; border-radius: 8px; padding: 12px; background: #091317; }
     .metric strong { display: block; color: #5eead4; font-size: 28px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .pill { border: 1px solid #315559; border-radius: 999px; color: #c7f9f4; padding: 5px 10px; text-decoration: none; }
+    .pill:hover { border-color: #5eead4; }
     table { width: 100%; border-collapse: collapse; margin: 12px 0; }
     th, td { border-bottom: 1px solid #1f3b3d; padding: 10px; text-align: left; vertical-align: top; }
     th { color: #99f6e4; font-weight: 700; }
     code { color: #c7f9f4; overflow-wrap: anywhere; }
-    .finding { border-left: 4px solid #5eead4; padding-left: 12px; margin: 14px 0; }
+    details { border: 1px solid #1f3b3d; border-radius: 8px; margin: 12px 0; padding: 10px 12px; background: #091317; }
+    details[open] { background: #0b171b; }
+    summary { cursor: pointer; font-weight: 700; }
+    .finding { border-left: 4px solid #5eead4; padding-left: 12px; }
     .severity-high, .severity-critical { border-left-color: #fb7185; }
     .severity-medium { border-left-color: #facc15; }
+    .severity-low { border-left-color: #7dd3fc; }
     .note { color: #b7c9ca; }
+    .diff-added { color: #86efac; }
+    .diff-removed { color: #fca5a5; }
+    .diff-changed { color: #fde68a; }
   </style>
 </head>
 <body>
@@ -28,6 +38,7 @@
   <h1>Nightward Report</h1>
   <p class="note">Generated 2026-05-01T00:00:00Z. This static report is rendered from redacted Nightward JSON.</p>
   <section class="meta">
+    <div><strong>Schema:</strong> <code>1</code></div>
     <div><strong>Host:</strong> nightward-fixture</div>
     <div><strong>Home:</strong> <code>/tmp/nightward-fixture-home</code></div>
 
@@ -35,48 +46,128 @@
   <section class="grid">
     <div class="metric"><strong>1</strong> items</div>
     <div class="metric"><strong>4</strong> findings</div>
+    <div class="metric"><strong>0</strong> critical findings</div>
     <div class="metric"><strong>1</strong> high findings</div>
     <div class="metric"><strong>2</strong> medium findings</div>
   </section>
-  <section class="card">
+  <nav class="toolbar" aria-label="Report sections">
+    <a class="pill" href="#findings">Findings</a>
+    <a class="pill" href="#remediation">Remediation groups</a>
+    <a class="pill" href="#inventory">Inventory sample</a>
+
+  </nav>
+
+  <section class="panel" id="findings">
     <h2>Findings</h2>
 
+      <div class="toolbar">
+      <a class="pill" href="#severity-high">high (1)</a><a class="pill" href="#severity-medium">medium (2)</a><a class="pill" href="#severity-info">info (1)</a>
+      </div>
 
-      <article class="finding severity-high">
-        <h3>mcp_unpinned_package: MCP server &#34;demo&#34; runs a package executor without an obvious pinned package version.</h3>
-        <p><strong>Severity:</strong> high · <strong>Tool:</strong> Codex</p>
-        <p><code>/tmp/nightward-fixture-home/.codex/config.toml</code></p>
-        <p><strong>Evidence:</strong> <code>command=npx args=-y @modelcontextprotocol/server-filesystem $HOME</code></p>
-        <p><strong>Recommendation:</strong> Pin package versions or replace with a trusted local binary before syncing.</p>
-      </article>
+      <section id="severity-high">
+        <h3>high</h3>
 
-      <article class="finding severity-medium">
-        <h3>mcp_secret_env: MCP server &#34;demo&#34; references a sensitive environment key.</h3>
-        <p><strong>Severity:</strong> medium · <strong>Tool:</strong> Codex</p>
-        <p><code>/tmp/nightward-fixture-home/.codex/config.toml</code></p>
-        <p><strong>Evidence:</strong> <code>env_key=API_TOKEN</code></p>
-        <p><strong>Recommendation:</strong> Keep secret values outside dotfiles and document required env names only.</p>
-      </article>
+        <details class="finding severity-high">
+          <summary>mcp_unpinned_package: MCP server &#34;demo&#34; runs a package executor without an obvious pinned package version.</summary>
+          <p><strong>Severity:</strong> high · <strong>Tool:</strong> Codex</p>
+          <p><code>/tmp/nightward-fixture-home/.codex/config.toml</code></p>
+          <p><strong>Server:</strong> <code>demo</code></p>
+          <p><strong>Evidence:</strong> <code>command=npx args=-y @modelcontextprotocol/server-filesystem $HOME</code></p>
+          <p><strong>Impact:</strong> A future package publish or dependency change can alter code that the AI client executes locally.</p>
+          <p><strong>Recommendation:</strong> Pin package versions or replace with a trusted local binary before syncing.</p>
 
-      <article class="finding severity-medium">
-        <h3>mcp_broad_filesystem: MCP server &#34;demo&#34; appears to reference broad filesystem access.</h3>
-        <p><strong>Severity:</strong> medium · <strong>Tool:</strong> Codex</p>
-        <p><code>/tmp/nightward-fixture-home/.codex/config.toml</code></p>
-        <p><strong>Evidence:</strong> <code>-y @modelcontextprotocol/server-filesystem $HOME</code></p>
-        <p><strong>Recommendation:</strong> Narrow filesystem access to explicit project/config paths where possible.</p>
-      </article>
+          <p><strong>Plan-only remediation:</strong> pin-package · confidence high · risk medium</p>
+          <p>Pin @modelcontextprotocol/server-filesystem to an explicit version before syncing this MCP config.</p>
+          <ol><li>Choose a reviewed version for @modelcontextprotocol/server-filesystem.</li><li>Change the package arg from &#34;@modelcontextprotocol/server-filesystem&#34; to &#34;@modelcontextprotocol/server-filesystem@&lt;version&gt;&#34;.</li><li>Commit only the pinned package reference, not any local credential or cache files.</li></ol>
 
-      <article class="finding severity-info">
-        <h3>mcp_server_review: Review MCP server &#34;demo&#34; before syncing this config.</h3>
-        <p><strong>Severity:</strong> info · <strong>Tool:</strong> Codex</p>
-        <p><code>/tmp/nightward-fixture-home/.codex/config.toml</code></p>
-        <p><strong>Evidence:</strong> <code>command=npx</code></p>
-        <p><strong>Recommendation:</strong> Confirm the server source, permissions, and local path assumptions.</p>
-      </article>
+        </details>
+
+      </section>
+
+      <section id="severity-medium">
+        <h3>medium</h3>
+
+        <details class="finding severity-medium">
+          <summary>mcp_secret_env: MCP server &#34;demo&#34; references a sensitive environment key.</summary>
+          <p><strong>Severity:</strong> medium · <strong>Tool:</strong> Codex</p>
+          <p><code>/tmp/nightward-fixture-home/.codex/config.toml</code></p>
+          <p><strong>Server:</strong> <code>demo</code></p>
+          <p><strong>Evidence:</strong> <code>env_key=API_TOKEN</code></p>
+          <p><strong>Impact:</strong> Credential material in agent config can leak through dotfiles, backups, screenshots, or support bundles.</p>
+          <p><strong>Recommendation:</strong> Keep secret values outside dotfiles and document required env names only.</p>
+
+          <p><strong>Plan-only remediation:</strong> externalize-secret · confidence medium · risk low</p>
+          <p>Document API_TOKEN as a local prerequisite without committing its value.</p>
+          <ol><li>Confirm API_TOKEN is only referenced by name or environment interpolation.</li><li>Document how to provide the secret locally without adding the value to dotfiles.</li><li>Keep the real value in a password manager, OS keychain, or machine-local env file excluded from Git.</li></ol>
+
+        </details>
+
+        <details class="finding severity-medium">
+          <summary>mcp_broad_filesystem: MCP server &#34;demo&#34; appears to reference broad filesystem access.</summary>
+          <p><strong>Severity:</strong> medium · <strong>Tool:</strong> Codex</p>
+          <p><code>/tmp/nightward-fixture-home/.codex/config.toml</code></p>
+          <p><strong>Server:</strong> <code>demo</code></p>
+          <p><strong>Evidence:</strong> <code>-y @modelcontextprotocol/server-filesystem $HOME</code></p>
+          <p><strong>Impact:</strong> A broad mount can expose unrelated personal files or credentials to an MCP server.</p>
+          <p><strong>Recommendation:</strong> Narrow filesystem access to explicit project/config paths where possible.</p>
+
+          <p><strong>Plan-only remediation:</strong> narrow-filesystem · confidence medium · risk medium</p>
+          <p>Replace broad filesystem arguments with the smallest project or config paths that server actually needs.</p>
+          <ol><li>List the exact directories this MCP server needs for your workflow.</li><li>Replace broad paths such as $HOME, ~, /, or full user roots with those explicit directories.</li><li>Do not guess missing paths; rerun the tool workflow after narrowing scope.</li></ol>
+
+        </details>
+
+      </section>
+
+      <section id="severity-info">
+        <h3>info</h3>
+
+        <details class="finding severity-info">
+          <summary>mcp_server_review: Review MCP server &#34;demo&#34; before syncing this config.</summary>
+          <p><strong>Severity:</strong> info · <strong>Tool:</strong> Codex</p>
+          <p><code>/tmp/nightward-fixture-home/.codex/config.toml</code></p>
+          <p><strong>Server:</strong> <code>demo</code></p>
+          <p><strong>Evidence:</strong> <code>command=npx</code></p>
+          <p><strong>Impact:</strong> This server may execute local code or expose local files when an AI client invokes it.</p>
+          <p><strong>Recommendation:</strong> Confirm the server source, permissions, and local path assumptions.</p>
+
+          <p><strong>Plan-only remediation:</strong> ignore-with-reason · confidence medium · risk low</p>
+          <p>Keep the server only if its source, permissions, and local assumptions are understood.</p>
+          <ol><li>Identify the server package, binary, or script owner.</li><li>Confirm the command and arguments are expected for this machine.</li><li>Document why this server is safe to keep or exclude it from portable dotfiles.</li></ol>
+
+        </details>
+
+      </section>
 
 
   </section>
-  <section class="card">
+  <section class="panel" id="remediation">
+    <h2>Remediation Groups</h2>
+
+
+      <details>
+        <summary>externalize-secret (1)</summary>
+        <ul><li><code>mcp_secret_env-909634ba142a</code> mcp_secret_env: MCP server &#34;demo&#34; references a sensitive environment key.</li></ul>
+      </details>
+
+      <details>
+        <summary>ignore-with-reason (1)</summary>
+        <ul><li><code>mcp_server_review-fe1f27ea32db</code> mcp_server_review: Review MCP server &#34;demo&#34; before syncing this config.</li></ul>
+      </details>
+
+      <details>
+        <summary>narrow-filesystem (1)</summary>
+        <ul><li><code>mcp_broad_filesystem-fe1f27ea32db</code> mcp_broad_filesystem: MCP server &#34;demo&#34; appears to reference broad filesystem access.</li></ul>
+      </details>
+
+      <details>
+        <summary>pin-package (1)</summary>
+        <ul><li><code>mcp_unpinned_package-fe1f27ea32db</code> mcp_unpinned_package: MCP server &#34;demo&#34; runs a package executor without an obvious pinned package version.</li></ul>
+      </details>
+
+
+  </section>
+  <section class="panel" id="inventory">
     <h2>Inventory Sample</h2>
     <table>
       <thead><tr><th>Tool</th><th>Classification</th><th>Risk</th><th>Path</th></tr></thead>

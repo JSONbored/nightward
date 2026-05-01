@@ -3,7 +3,7 @@
 Nightward includes an importable Trunk plugin definition after release tags exist.
 
 ```sh
-trunk plugins add --id nightward https://github.com/JSONbored/nightward v0.1.0
+trunk plugins add --id nightward https://github.com/JSONbored/nightward v0.1.4
 trunk check enable nightward-policy
 ```
 

@@ -24,9 +24,10 @@ type Selector struct {
 }
 
 type Plan struct {
-	GeneratedAt time.Time `json:"generated_at"`
-	Summary     Summary   `json:"summary"`
-	Fixes       []Fix     `json:"fixes"`
+	SchemaVersion int       `json:"schema_version"`
+	GeneratedAt   time.Time `json:"generated_at"`
+	Summary       Summary   `json:"summary"`
+	Fixes         []Fix     `json:"fixes"`
 }
 
 type Summary struct {
@@ -56,7 +57,7 @@ type Fix struct {
 }
 
 func Build(report inventory.Report, selector Selector) Plan {
-	plan := Plan{GeneratedAt: report.GeneratedAt}
+	plan := Plan{SchemaVersion: 1, GeneratedAt: report.GeneratedAt}
 	for _, finding := range report.Findings {
 		if !matches(finding, selector) {
 			continue

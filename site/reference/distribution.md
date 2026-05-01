@@ -1,0 +1,18 @@
+# Distribution
+
+Nightward v0.1.4 is distributed through signed GitHub Releases and the npm launcher.
+
+## Current Channels
+
+| Channel | Status | Notes |
+| --- | --- | --- |
+| GitHub Releases | Shipped | Canonical signed artifacts, checksums, and release notes. |
+| npm launcher | Shipped | No `postinstall`; verifies GitHub Release checksums before caching binaries. |
+| `go install` | Shipped | Useful for Go users who already trust the module path. |
+| GitHub Action | Shipped | Uses release tags for CI policy/SARIF workflows. |
+| Trunk plugin import | Shipped | Imports the in-repo plugin from release tags. |
+| Raycast extension | Development-ready | Local Raycast extension commands and menu-bar status. |
+
+## Later Channels
+
+Homebrew is the next packaging target. Nix, Scoop, WinGet, mise, and aqua should follow once release artifacts prove stable across a few tags. Docker is deferred because scanning a user's HOME from a container is awkward and easy to misconfigure.

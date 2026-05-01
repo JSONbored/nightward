@@ -20,18 +20,19 @@ const Label = "dev.nightward.scan"
 var execCommand = exec.Command
 
 type Plan struct {
-	Preset       string          `json:"preset"`
-	Platform     string          `json:"platform"`
-	ReportDir    string          `json:"report_dir"`
-	LogDir       string          `json:"log_dir"`
-	Command      []string        `json:"command"`
-	Files        []GeneratedFile `json:"files"`
-	Notes        []string        `json:"notes,omitempty"`
-	Installed    bool            `json:"installed"`
-	LastReport   string          `json:"last_report,omitempty"`
-	LastRun      *time.Time      `json:"last_run,omitempty"`
-	LastFindings int             `json:"last_findings,omitempty"`
-	History      []ReportRecord  `json:"history,omitempty"`
+	SchemaVersion int             `json:"schema_version"`
+	Preset        string          `json:"preset"`
+	Platform      string          `json:"platform"`
+	ReportDir     string          `json:"report_dir"`
+	LogDir        string          `json:"log_dir"`
+	Command       []string        `json:"command"`
+	Files         []GeneratedFile `json:"files"`
+	Notes         []string        `json:"notes,omitempty"`
+	Installed     bool            `json:"installed"`
+	LastReport    string          `json:"last_report,omitempty"`
+	LastRun       *time.Time      `json:"last_run,omitempty"`
+	LastFindings  int             `json:"last_findings,omitempty"`
+	History       []ReportRecord  `json:"history,omitempty"`
 }
 
 type GeneratedFile struct {
@@ -67,11 +68,12 @@ func BuildPlanForOS(goos, home, executable, preset string) (Plan, error) {
 	logDir := filepath.Join(home, ".local", "state", "nightward", "logs")
 	command := []string{executable, "scan", "--json", "--output-dir", reportDir}
 	plan := Plan{
-		Preset:    preset,
-		Platform:  goos,
-		ReportDir: reportDir,
-		LogDir:    logDir,
-		Command:   command,
+		SchemaVersion: 1,
+		Preset:        preset,
+		Platform:      goos,
+		ReportDir:     reportDir,
+		LogDir:        logDir,
+		Command:       command,
 	}
 
 	switch goos {
@@ -106,10 +108,11 @@ func BuildPlanForOS(goos, home, executable, preset string) (Plan, error) {
 func Status(home string) Plan {
 	reportDir := filepath.Join(home, ".local", "state", "nightward", "reports")
 	status := Plan{
-		Preset:    "nightly",
-		Platform:  runtime.GOOS,
-		ReportDir: reportDir,
-		LogDir:    filepath.Join(home, ".local", "state", "nightward", "logs"),
+		SchemaVersion: 1,
+		Preset:        "nightly",
+		Platform:      runtime.GOOS,
+		ReportDir:     reportDir,
+		LogDir:        filepath.Join(home, ".local", "state", "nightward", "logs"),
 	}
 	switch runtime.GOOS {
 	case "darwin":

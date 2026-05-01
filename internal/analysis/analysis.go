@@ -44,13 +44,14 @@ type Options struct {
 }
 
 type Report struct {
-	GeneratedAt time.Time        `json:"generated_at"`
-	Mode        string           `json:"mode"`
-	Workspace   string           `json:"workspace,omitempty"`
-	Summary     Summary          `json:"summary"`
-	Providers   []ProviderStatus `json:"providers"`
-	Subjects    []Subject        `json:"subjects"`
-	Signals     []Signal         `json:"signals"`
+	SchemaVersion int              `json:"schema_version"`
+	GeneratedAt   time.Time        `json:"generated_at"`
+	Mode          string           `json:"mode"`
+	Workspace     string           `json:"workspace,omitempty"`
+	Summary       Summary          `json:"summary"`
+	Providers     []ProviderStatus `json:"providers"`
+	Subjects      []Subject        `json:"subjects"`
+	Signals       []Signal         `json:"signals"`
 }
 
 type Summary struct {
@@ -114,9 +115,10 @@ func Run(report inventory.Report, options Options) Report {
 		options.Mode = "home"
 	}
 	out := Report{
-		GeneratedAt: report.GeneratedAt,
-		Mode:        options.Mode,
-		Workspace:   options.Workspace,
+		SchemaVersion: 1,
+		GeneratedAt:   report.GeneratedAt,
+		Mode:          options.Mode,
+		Workspace:     options.Workspace,
 		Summary: Summary{
 			SignalsBySeverity: map[inventory.RiskLevel]int{},
 			SignalsByCategory: map[SignalCategory]int{},

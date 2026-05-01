@@ -7,6 +7,7 @@ import {
   menuBarStatusMarkdown,
   maxSeverity,
   redactText,
+  reportHistoryDelta,
   signalMarkdown,
   sortedFindings,
   sortedSignals,
@@ -177,6 +178,22 @@ test("menu bar status summarizes risk and schedule state", () => {
       installed: true,
       last_report: "/tmp/reports/latest.json",
       last_findings: 2,
+      history: [
+        {
+          path: "/tmp/reports/latest.json",
+          mod_time: "2026-05-01T00:00:00Z",
+          findings: 3,
+          size_bytes: 512,
+          report_name: "latest.json",
+        },
+        {
+          path: "/tmp/reports/previous.json",
+          mod_time: "2026-04-30T00:00:00Z",
+          findings: 1,
+          size_bytes: 500,
+          report_name: "previous.json",
+        },
+      ],
     },
   };
   const analysis: AnalysisReport = {
@@ -202,7 +219,22 @@ test("menu bar status summarizes risk and schedule state", () => {
   assert.equal(status.risk, "critical");
   assert.match(status.tooltip, /3 findings/);
   assert.match(status.tooltip, /1 provider warnings/);
+  assert.equal(status.historyDelta, "+2 findings");
   assert.match(menuBarStatusMarkdown(status), /Last scheduled findings: `2`/);
+  assert.match(
+    menuBarStatusMarkdown(status),
+    /Change since previous scheduled scan: `\+2 findings`/,
+  );
+});
+
+test("report history delta handles missing and equal histories", () => {
+  assert.equal(reportHistoryDelta(undefined), undefined);
+  assert.equal(reportHistoryDelta([{ findings: 2 }]), undefined);
+  assert.equal(
+    reportHistoryDelta([{ findings: 2 }, { findings: 2 }]),
+    "no change",
+  );
+  assert.equal(reportHistoryDelta([{ findings: 1 }, { findings: 4 }]), "-3 findings");
 });
 
 function baseFinding(

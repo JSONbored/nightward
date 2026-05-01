@@ -118,6 +118,10 @@ export default function Command() {
                   ? `${data.doctor.schedule.last_findings} last findings`
                   : "no report yet",
             },
+            ...(data.doctor.schedule.history &&
+            data.doctor.schedule.history.length > 1
+              ? [{ text: `${data.doctor.schedule.history.length} reports` }]
+              : []),
           ]}
           detail={<ScheduleDetail doctor={data.doctor} />}
           actions={
@@ -279,6 +283,14 @@ function ScheduleDetail({ doctor }: { doctor: DoctorReport }) {
     lines.push(`Last report: \`${doctor.schedule.last_report}\``);
   if (doctor.schedule.last_findings !== undefined)
     lines.push(`Last findings: \`${doctor.schedule.last_findings}\``);
+  if (doctor.schedule.history && doctor.schedule.history.length > 0) {
+    lines.push("", "## Report History");
+    for (const record of doctor.schedule.history.slice(0, 5)) {
+      lines.push(
+        `- \`${record.findings}\` findings - ${record.report_name} - \`${record.mod_time}\``,
+      );
+    }
+  }
   return <List.Item.Detail markdown={lines.join("\n")} />;
 }
 

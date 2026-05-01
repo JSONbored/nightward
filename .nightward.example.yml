@@ -15,4 +15,4 @@ sarif:
   tool_name: Nightward
   category: nightward
   information_uri: https://github.com/JSONbored/nightward
-  semantic_version: 0.1.0
+  semantic_version: 0.1.4

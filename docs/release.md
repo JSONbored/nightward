@@ -31,8 +31,8 @@ Use these repository settings before the first public release:
 Use strict SemVer tags:
 
 ```sh
-git tag -s v0.1.0 -m "chore(release): 0.1.0"
-git push origin v0.1.0
+git tag -s vX.Y.Z -m "chore(release): X.Y.Z"
+git push origin vX.Y.Z
 ```
 
 Unsigned tags should not be used for public releases.
@@ -86,7 +86,7 @@ If a bad npm package is published, deprecate that version with a clear reason an
 The release workflow smokes the published GitHub archive before npm publish:
 
 ```sh
-bash scripts/smoke-release-archive.sh v0.1.0
+bash scripts/smoke-release-archive.sh vX.Y.Z
 ```
 
 The npm job then installs the packed npm tarball and runs both command names before publishing.
@@ -94,5 +94,5 @@ The npm job then installs the packed npm tarball and runs both command names bef
 After npm publish, verify package metadata and launcher install smoke:
 
 ```sh
-bash scripts/verify-npm-release.sh 0.1.0
+bash scripts/verify-npm-release.sh X.Y.Z
 ```

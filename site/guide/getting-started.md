@@ -1,6 +1,12 @@
 # Getting Started
 
-Install from source while Nightward is pre-release:
+Try the release launcher or install from source:
+
+```sh
+npx @jsonbored/nightward --help
+```
+
+For local development:
 
 ```sh
 git clone https://github.com/JSONbored/nightward.git

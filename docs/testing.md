@@ -44,6 +44,7 @@ make trunk-check
 make ci-scripts-test
 make raycast-verify
 make npm-package-verify
+make docs-qa
 make site-verify
 make release-snapshot
 make verify
@@ -74,6 +75,7 @@ make verify
 - `make ci-scripts-test` verifies repository-maintained CI helper scripts such as DCO checking, action path validation, and release-script input validation.
 - Raycast dependency audits run with `npm audit --audit-level=moderate`.
 - The npm launcher tests run with `make npm-package-verify`, including unit tests, `npm audit`, and `npm pack --dry-run`.
+- `make docs-qa` verifies generated CLI/provider/rule/config references and fails on stale release-version placeholders in public docs.
 
 ## Trunk Flaky Tests
 
@@ -133,6 +135,6 @@ npm audit --audit-level=moderate
 npm run build
 ```
 
-`make site-verify` runs the same install/build path from the repository root. The site should not add analytics or third-party runtime scripts by default.
+`make site-verify` also runs `make docs-qa` from the repository root. The site should not add analytics or third-party runtime scripts by default.
 
 The launcher must remain dependency-light, avoid `postinstall`, and verify downloaded GitHub Release archives against `checksums.txt` before extraction.

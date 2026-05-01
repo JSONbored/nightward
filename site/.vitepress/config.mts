@@ -31,25 +31,38 @@ export default defineConfig({
       text: "Edit this page on GitHub",
     },
     nav: [
-      { text: "Guide", link: "/guide/what-is-nightward" },
-      { text: "Install", link: "/guide/install" },
+      { text: "Start", link: "/start/before-syncing-dotfiles" },
+      { text: "Use Nightward", link: "/guide/getting-started" },
       { text: "Integrations", link: "/integrations/github-action" },
-      { text: "Security", link: "/security/threat-model" },
+      { text: "Trust & Security", link: "/security/threat-model" },
+      { text: "Reference", link: "/reference/cli" },
+      { text: "Contribute", link: "/contribute/adapters-and-rules" },
       { text: "GitHub", link: "https://github.com/JSONbored/nightward" },
     ],
     sidebar: [
       {
-        text: "Guide",
+        text: "Start",
         items: [
           { text: "What is Nightward?", link: "/guide/what-is-nightward" },
+          { text: "Before syncing dotfiles", link: "/start/before-syncing-dotfiles" },
+          { text: "Audit an MCP workstation", link: "/start/audit-mcp-workstation" },
+          { text: "Run in CI", link: "/start/run-in-ci" },
           { text: "Getting started", link: "/guide/getting-started" },
           { text: "Install", link: "/guide/install" },
+        ],
+      },
+      {
+        text: "Use Nightward",
+        items: [
           { text: "Privacy model", link: "/guide/privacy-model" },
           { text: "TUI", link: "/guide/tui" },
           { text: "CLI", link: "/guide/cli" },
           { text: "MCP security", link: "/guide/mcp-security" },
           { text: "Remediation", link: "/guide/remediation" },
           { text: "Policy and SARIF", link: "/guide/policy-and-sarif" },
+          { text: "Provider execution", link: "/use/provider-execution" },
+          { text: "Report history", link: "/use/report-history" },
+          { text: "Troubleshooting", link: "/use/troubleshooting" },
         ],
       },
       {
@@ -63,16 +76,27 @@ export default defineConfig({
       {
         text: "Reference",
         items: [
+          { text: "CLI", link: "/reference/cli" },
           { text: "Config", link: "/reference/config" },
+          { text: "Providers", link: "/reference/providers" },
           { text: "JSON output", link: "/reference/json-output" },
           { text: "Rules", link: "/reference/rules" },
+          { text: "Support matrix", link: "/reference/support-matrix" },
+          { text: "Output surfaces", link: "/reference/output-surfaces" },
+          { text: "Distribution", link: "/reference/distribution" },
         ],
       },
       {
-        text: "Security",
+        text: "Trust & Security",
         items: [
           { text: "Threat model", link: "/security/threat-model" },
           { text: "Release verification", link: "/security/release-verification" },
+        ],
+      },
+      {
+        text: "Contribute",
+        items: [
+          { text: "Adapters and rules", link: "/contribute/adapters-and-rules" },
         ],
       },
       { text: "Roadmap", items: [{ text: "Roadmap", link: "/roadmap" }] },

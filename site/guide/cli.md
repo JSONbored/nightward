@@ -16,6 +16,8 @@ nw fix plan --all --json
 nw fix preview --all --format markdown
 nw rules list --json
 nw rules explain mcp_secret_header --json
+nw adapters list --json
+nw adapters explain Codex --json
 nw policy check --strict --json
 nw policy sarif --output nightward.sarif
 ```
@@ -45,9 +47,11 @@ Schedule install/remove are explicit write paths. Schedule planning is read-only
 ```sh
 nw scan --json --output /tmp/nightward-scan.json
 nw report html --input /tmp/nightward-scan.json --output /tmp/nightward-report.html
+nw report diff --from /tmp/previous.json --to /tmp/nightward-scan.json
+nw report history
 ```
 
-The HTML report is a local static file rendered from redacted scan JSON.
+The HTML report is a local static file rendered from redacted scan JSON. Pass `--previous` to include added, removed, and changed findings.
 
 The public demo report is generated from a committed fixture home, then scrubbed before publication:
 

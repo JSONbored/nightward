@@ -44,14 +44,14 @@ The in-repo plugin exposes:
 Users should import a pinned Nightward tag, not a moving branch:
 
 ```sh
-trunk plugins add --id nightward https://github.com/JSONbored/nightward v0.1.0
+trunk plugins add --id nightward https://github.com/JSONbored/nightward v0.1.4
 trunk check enable nightward-policy
 ```
 
 ## Release Hardening Backlog
 
 - Add SLSA provenance/attestations once release artifact flow is stable.
-- Defer Homebrew tap automation until the first tagged release.
+- Add Homebrew tap automation after the current release artifacts prove stable across patch releases.
 
 ## Local Test Suites
 

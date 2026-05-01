@@ -30,6 +30,8 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 		{"scan", "--json"},
 		{"doctor", "--json"},
 		{"plan", "backup", "--target", targetDir, "--json"},
+		{"adapters", "explain", "Codex", "--json"},
+		{"adapters", "template", "Codex", "--json"},
 		{"findings", "list", "--json"},
 		{"fix", "plan", "--all", "--json"},
 		{"fix", "preview", "--all", "--format", "json"},
@@ -47,6 +49,7 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 		{"snapshot", "plan", "--target", filepath.Join(home, "snapshot"), "--json"},
 		{"policy", "sarif", "--output", filepath.Join(outputDir, "nightward.sarif")},
 		{"policy", "sarif", "--include-analysis", "--output", "-"},
+		{"report", "history", "--json"},
 		{"schedule", "plan", "--preset", "nightly", "--json"},
 		{"schedule", "install", "--preset", "nightly", "--dry-run", "--json"},
 		{"schedule", "remove", "--dry-run", "--json"},
@@ -88,6 +91,8 @@ API_TOKEN = "`+secretValue+`"
 		{"scan", "--json"},
 		{"doctor", "--json"},
 		{"adapters", "list", "--json"},
+		{"adapters", "explain", "--json", "Codex"},
+		{"adapters", "template", "--json", "Codex"},
 		{"findings", "list", "--json"},
 		{"findings", "explain", "--json", findingID},
 		{"fix", "plan", "--all", "--json"},
@@ -102,6 +107,7 @@ API_TOKEN = "`+secretValue+`"
 		{"policy", "check", "--json"},
 		{"policy", "badge", "--output", "-", "--sarif-url", "https://example.invalid/nightward.sarif"},
 		{"policy", "sarif", "--output", "-"},
+		{"report", "history", "--json"},
 		{"snapshot", "plan", "--target", filepath.Join(home, "snapshots"), "--json"},
 		{"schedule", "plan", "--json"},
 		{"schedule", "install", "--dry-run", "--json"},
@@ -135,6 +141,8 @@ API_TOKEN = "`+secretValue+`"
 		{"trust", "explain", findingID},
 		{"rules", "list"},
 		{"rules", "explain", "mcp_secret_header"},
+		{"adapters", "explain", "Codex"},
+		{"adapters", "template", "Codex"},
 		{"policy", "init", "--dry-run"},
 		{"policy", "explain"},
 		{"schedule", "install", "--dry-run"},
@@ -203,6 +211,82 @@ func TestReportHTMLCommandWritesPrivateReport(t *testing.T) {
 	}
 	if got := info.Mode().Perm(); got != 0600 {
 		t.Fatalf("expected 0600 report, got %o", got)
+	}
+}
+
+func TestReportDiffHistoryAndIndexCommands(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("NIGHTWARD_HOME", home)
+	reportsDir := filepath.Join(home, ".local", "state", "nightward", "reports")
+	beforePath := filepath.Join(reportsDir, "before.json")
+	afterPath := filepath.Join(reportsDir, "after.json")
+	indexPath := filepath.Join(home, "reports", "index.html")
+	htmlPath := filepath.Join(home, "reports", "current.html")
+	writeTestFile(t, beforePath, `{
+  "generated_at": "2026-05-01T00:00:00Z",
+  "hostname": "host",
+  "home": "/tmp/home",
+  "summary": {"total_findings": 1, "findings_by_severity": {"high": 1}},
+  "items": [],
+  "findings": [{"id":"finding-1","tool":"codex","path":"/tmp/config","severity":"high","rule":"mcp_secret_header","message":"old","recommended_action":"externalize"}],
+  "adapters": []
+}`)
+	writeTestFile(t, afterPath, `{
+  "generated_at": "2026-05-01T00:05:00Z",
+  "hostname": "host",
+  "home": "/tmp/home",
+  "summary": {"total_findings": 2, "findings_by_severity": {"critical": 1, "high": 1}},
+  "items": [],
+  "findings": [
+    {"id":"finding-1","tool":"codex","path":"/tmp/config","severity":"high","rule":"mcp_secret_header","message":"new","recommended_action":"externalize"},
+    {"id":"finding-2","tool":"cursor","path":"/tmp/mcp.json","severity":"critical","rule":"mcp_secret_env","message":"added","recommended_action":"externalize"}
+  ],
+  "adapters": []
+}`)
+
+	stdout, stderr, code := runCLI([]string{"report", "diff", "--from", beforePath, "--to", afterPath, "--json"})
+	if code != 0 {
+		t.Fatalf("report diff failed: %s", stderr)
+	}
+	if !json.Valid([]byte(stdout)) || !strings.Contains(stdout, `"added": 1`) || !strings.Contains(stdout, `"changed": 1`) {
+		t.Fatalf("unexpected report diff JSON:\n%s", stdout)
+	}
+
+	stdout, stderr, code = runCLI([]string{"report", "diff", "--from", beforePath, "--to", afterPath})
+	if code != 0 || !strings.Contains(stdout, "Report diff: added=1 removed=0 changed=1") {
+		t.Fatalf("unexpected report diff text stdout=%s stderr=%s", stdout, stderr)
+	}
+
+	stdout, stderr, code = runCLI([]string{"report", "history", "--json"})
+	if code != 0 {
+		t.Fatalf("report history failed: %s", stderr)
+	}
+	if !json.Valid([]byte(stdout)) || !strings.Contains(stdout, "after.json") {
+		t.Fatalf("unexpected history JSON:\n%s", stdout)
+	}
+
+	stdout, stderr, code = runCLI([]string{"report", "html", "--input", afterPath, "--previous", beforePath, "--output", htmlPath})
+	if code != 0 {
+		t.Fatalf("report html with previous failed: stdout=%s stderr=%s", stdout, stderr)
+	}
+	data, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if html := string(data); !strings.Contains(html, "Changes Since Previous Scan") || !strings.Contains(html, "finding-2") {
+		t.Fatalf("expected report diff section:\n%s", html)
+	}
+
+	stdout, stderr, code = runCLI([]string{"report", "index", "--output", indexPath})
+	if code != 0 {
+		t.Fatalf("report index failed: stdout=%s stderr=%s", stdout, stderr)
+	}
+	data, err = os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if html := string(data); !strings.Contains(html, "Nightward Report History") || !strings.Contains(html, "after.json") {
+		t.Fatalf("unexpected report index:\n%s", html)
 	}
 }
 
@@ -614,6 +698,7 @@ func TestHumanPrintersCoverPolicySnapshotAndSchedule(t *testing.T) {
 	}
 
 	now := time.Date(2026, 4, 30, 2, 17, 0, 0, time.UTC)
+	next := now.Add(-24 * time.Hour)
 	out.Reset()
 	printSchedulePlan(&out, schedule.Plan{
 		Preset:     "nightly",
@@ -627,6 +712,38 @@ func TestHumanPrintersCoverPolicySnapshotAndSchedule(t *testing.T) {
 	})
 	if text := out.String(); !strings.Contains(text, "Schedule preset") || !strings.Contains(text, "agent.plist") || !strings.Contains(text, "dry run") {
 		t.Fatalf("unexpected schedule output:\n%s", text)
+	}
+
+	out.Reset()
+	printReportHistory(&out, []schedule.ReportRecord{
+		{Path: "/tmp/latest.json", ModTime: now, Findings: 4, ReportName: "latest.json"},
+		{Path: "/tmp/previous.json", ModTime: next, Findings: 2, ReportName: "previous.json"},
+	})
+	if text := out.String(); !strings.Contains(text, "latest") || !strings.Contains(text, "-2 vs newer") {
+		t.Fatalf("unexpected report history output:\n%s", text)
+	}
+	out.Reset()
+	printReportHistory(&out, nil)
+	if !strings.Contains(out.String(), "No Nightward reports found") {
+		t.Fatalf("expected empty report history output: %s", out.String())
+	}
+
+	adapter := inventory.AdapterStatus{
+		Name:        "Codex",
+		Description: "Codex configs",
+		Checked:     []string{filepath.Join("/tmp/home", ".codex", "config.toml"), "/outside/config.toml"},
+	}
+	template := buildAdapterFixtureTemplate("/tmp/home", "", adapter)
+	if template.SchemaVersion != 1 || !strings.Contains(strings.Join(template.Paths, "\n"), filepath.Join("testdata", "homes", "codex", ".codex", "config.toml")) {
+		t.Fatalf("unexpected adapter fixture template: %#v", template)
+	}
+	out.Reset()
+	printAdapterFixtureTemplate(&out, template)
+	if !strings.Contains(out.String(), "Nightward adapter fixture") {
+		t.Fatalf("unexpected adapter template text:\n%s", out.String())
+	}
+	if _, ok := findAdapter([]inventory.AdapterStatus{{Name: "Codex"}, {Name: "Cursor"}}, "c"); ok {
+		t.Fatal("expected ambiguous adapter prefix")
 	}
 }
 
