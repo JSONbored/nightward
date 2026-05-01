@@ -46,6 +46,8 @@ Verify a release locally with:
 ```sh
 cosign verify-blob \
   --bundle checksums.txt.sigstore.json \
+  --certificate-identity-regexp 'https://github.com/JSONbored/nightward/.github/workflows/release.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.txt
 ```
 
