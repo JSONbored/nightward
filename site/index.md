@@ -3,18 +3,18 @@ layout: home
 
 hero:
   name: Nightward
-  text: See what your AI tools would leak before syncing dotfiles.
-  tagline: Find MCP risks, local-only state, secret exposure, and reviewable fix plans without telemetry or live config mutation.
+  text: Find AI-tool risks before you sync.
+  tagline: Scan agent configs, MCP servers, and dotfiles for secrets, broad local access, and machine-only state. Local by default. Review-first by design.
   image:
     src: /logo.svg
     alt: Nightward logo
   actions:
     - theme: brand
-      text: Start with dotfiles
-      link: /start/before-syncing-dotfiles
+      text: Install Nightward
+      link: /guide/install
     - theme: alt
-      text: Verify a release
-      link: /security/release-verification
+      text: View sample report
+      link: /demo/nightward-sample-report.html
     - theme: alt
       text: GitHub
       link: https://github.com/JSONbored/nightward
@@ -28,14 +28,21 @@ features:
     details: Emits redacted JSON, searchable static HTML reports, report diffs, policy badges, SARIF, Trunk output, and Raycast status.
 ---
 
-<!-- markdownlint-disable MD041 -->
+<!-- markdownlint-disable MD041 MD033 -->
 
-```sh
-npx @jsonbored/nightward --help
-nw doctor --json
-nw scan --workspace . --json --output nightward-scan.json
-nw report html --input nightward-scan.json --output nightward-report.html
-```
+<section class="nw-install-strip" aria-label="Install Nightward">
+  <div class="nw-install-copy">
+    <p class="nw-eyebrow">Start now</p>
+    <h2>Run a local AI-tool audit in one command.</h2>
+    <p>No account, no telemetry, no default network calls, and no config mutation.</p>
+  </div>
+  <div class="nw-install-command" aria-label="Recommended install command">
+    <span>Recommended</span>
+    <code>npx @jsonbored/nightward</code>
+  </div>
+</section>
+
+Prefer a persistent CLI? Use [npm, GitHub Releases, or `go install`](/guide/install), then run `nw scan`.
 
 ## Pick A Path
 

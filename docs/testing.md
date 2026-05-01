@@ -138,3 +138,13 @@ npm run build
 `make site-verify` also runs `make docs-qa` from the repository root. The site should not add analytics or third-party runtime scripts by default.
 
 The launcher must remain dependency-light, avoid `postinstall`, and verify downloaded GitHub Release archives against `checksums.txt` before extraction.
+
+## Intentional Manual Or Post-Release Checks
+
+Most repository checks are centralized behind `make verify` and the suite aliases above. The remaining loose commands are intentionally not part of the default gate because they require a browser, a published release, or manual UI evidence:
+
+- `make demo-assets` regenerates fixture-only sample JSON, HTML, report screenshot, and social preview assets. It requires Chrome, Chromium, Brave, or `NIGHTWARD_CHROME`.
+- `make test-release-install VERSION=<version>` verifies a published GitHub/npm release after artifacts exist.
+- `npm run dev` under `integrations/raycast` is the local Raycast UI smoke path and should be paired with fixture-only evidence in `docs/screenshots.md`.
+
+New validation scripts should be wired into `make verify`, a suite alias, or this section with a clear reason they are manual.

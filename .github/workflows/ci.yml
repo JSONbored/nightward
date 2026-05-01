@@ -250,6 +250,9 @@ jobs:
         run: npm audit --audit-level=moderate
         working-directory: site
 
+      - name: Check generated docs freshness
+        run: make docs-qa
+
       - name: Build documentation site
         run: npm run build
         working-directory: site

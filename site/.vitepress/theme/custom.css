@@ -13,6 +13,70 @@
   height: 220px;
 }
 
+.nw-install-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  align-items: center;
+  gap: 24px;
+  margin: 8px 0 36px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 24px;
+  background:
+    linear-gradient(90deg, rgba(15, 118, 110, 0.18), transparent 45%),
+    var(--vp-c-bg-soft);
+}
+
+.nw-install-copy h2 {
+  margin: 4px 0 8px;
+  border: 0;
+  padding: 0;
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.nw-install-copy p {
+  margin: 0;
+  color: var(--vp-c-text-2);
+}
+
+.nw-eyebrow {
+  margin: 0;
+  color: var(--vp-c-brand-1);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.nw-install-command {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(94, 234, 212, 0.32);
+  border-radius: 8px;
+  padding: 16px;
+  background: #071014;
+}
+
+.nw-install-command span {
+  color: #9af4eb;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.nw-install-command code {
+  display: block;
+  overflow-x: auto;
+  border-radius: 6px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #f7fffd;
+  font-size: 15px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
 .nw-terminal {
   border: 1px solid var(--vp-c-divider);
   border-radius: 8px;
@@ -97,6 +161,11 @@
 }
 
 @media (max-width: 760px) {
+  .nw-install-strip {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
   .nw-release-pill:not(.nw-release-pill--footer) {
     display: none;
   }

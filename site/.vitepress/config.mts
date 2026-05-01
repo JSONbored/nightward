@@ -1,22 +1,38 @@
 import { defineConfig } from "vitepress";
 
 const base = process.env.NIGHTWARD_SITE_BASE ?? "/nightward/";
+const siteUrl = "https://jsonbored.github.io/nightward/";
+const siteTitle = "Nightward";
+const siteDescription =
+  "Find AI-tool risks before you sync: scan agent configs, MCP servers, and dotfiles for secrets, broad local access, and machine-only state.";
+const socialImage = `${siteUrl}og-image.png`;
 
 export default defineConfig({
-  title: "Nightward",
-  description: "See what your AI tools would leak before syncing dotfiles.",
+  title: siteTitle,
+  description: siteDescription,
   base,
   cleanUrls: true,
   lastUpdated: true,
   metaChunk: true,
   sitemap: {
-    hostname: "https://jsonbored.github.io/nightward/",
+    hostname: siteUrl,
   },
   head: [
+    ["link", { rel: "icon", type: "image/svg+xml", href: `${base}favicon.svg` }],
+    ["link", { rel: "canonical", href: siteUrl }],
     ["meta", { name: "theme-color", content: "#0f172a" }],
+    ["meta", { name: "description", content: siteDescription }],
     ["meta", { property: "og:type", content: "website" }],
-    ["meta", { property: "og:title", content: "Nightward" }],
-    ["meta", { property: "og:description", content: "See MCP risk, local-only state, secret exposure, and reviewable fix plans before syncing dotfiles." }],
+    ["meta", { property: "og:site_name", content: siteTitle }],
+    ["meta", { property: "og:title", content: siteTitle }],
+    ["meta", { property: "og:description", content: siteDescription }],
+    ["meta", { property: "og:url", content: siteUrl }],
+    ["meta", { property: "og:image", content: socialImage }],
+    ["meta", { property: "og:image:alt", content: "Nightward release page preview with install command and local-first security posture." }],
+    ["meta", { name: "twitter:card", content: "summary_large_image" }],
+    ["meta", { name: "twitter:title", content: siteTitle }],
+    ["meta", { name: "twitter:description", content: siteDescription }],
+    ["meta", { name: "twitter:image", content: socialImage }],
   ],
   themeConfig: {
     logo: "/logo.svg",

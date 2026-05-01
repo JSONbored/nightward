@@ -11,12 +11,14 @@ make demo-assets
 ```
 
 The generator rewrites hostname, HOME, local paths, timestamps, and secret-looking fixture values before writing the sample scan JSON, static HTML report, and PNG screenshot.
+It also renders the static Open Graph preview image used by the website metadata.
 Screenshot capture requires Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`.
 
 ## Site Goals
 
 - Explain the problem in the first viewport.
 - Make the install path obvious.
+- Keep favicon, social preview metadata, and release-current copy in the repo.
 - Show the local-first privacy stance clearly.
 - Document CLI, TUI, policy, integrations, security, and release verification.
 - Avoid analytics, telemetry, or hosted-docs dependencies by default.

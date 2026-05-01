@@ -14,6 +14,8 @@ const outputDir = join(repoRoot, "site", "public", "demo");
 const scanOutput = join(outputDir, "nightward-sample-scan.json");
 const htmlOutput = join(outputDir, "nightward-sample-report.html");
 const screenshotOutput = join(outputDir, "nightward-sample-report.png");
+const ogImageOutput = join(repoRoot, "site", "public", "og-image.png");
+const faviconPath = join(repoRoot, "site", "public", "favicon.svg");
 const tempDir = mkdtempSync(join(tmpdir(), "nightward-demo-"));
 const rawScan = join(tempDir, "raw-scan.json");
 let sourceHost = "";
@@ -26,15 +28,15 @@ function run(command, args, options = {}) {
   });
 }
 
-function screenshotExists() {
-  return existsSync(screenshotOutput) && statSync(screenshotOutput).size > 0;
+function screenshotExists(path) {
+  return existsSync(path) && statSync(path).size > 0;
 }
 
-function screenshotSize() {
-  return existsSync(screenshotOutput) ? statSync(screenshotOutput).size : 0;
+function screenshotSize(path) {
+  return existsSync(path) ? statSync(path).size : 0;
 }
 
-function captureScreenshot(chrome, args) {
+function captureScreenshot(chrome, args, outputPath) {
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(chrome, args, {
       cwd: repoRoot,
@@ -77,7 +79,7 @@ function captureScreenshot(chrome, args) {
     };
 
     poll = setInterval(() => {
-      const size = screenshotSize();
+      const size = screenshotSize(outputPath);
       if (size > 0 && size === lastScreenshotSize) {
         stableScreenshotChecks += 1;
       } else {
@@ -93,7 +95,7 @@ function captureScreenshot(chrome, args) {
     }, 250);
 
     timeout = setTimeout(() => {
-      timedOutWithScreenshot = screenshotExists();
+      timedOutWithScreenshot = screenshotExists(outputPath);
       killGroup("SIGTERM");
       setTimeout(() => killGroup("SIGKILL"), 1_500).unref();
     }, 20_000);
@@ -106,7 +108,7 @@ function captureScreenshot(chrome, args) {
     });
     child.on("close", (code, signal) => {
       finish(() => {
-        if (code === 0 || ((completedAfterScreenshot || timedOutWithScreenshot) && screenshotExists())) {
+        if (code === 0 || ((completedAfterScreenshot || timedOutWithScreenshot) && screenshotExists(outputPath))) {
           if (timedOutWithScreenshot) {
             console.warn("Chrome timed out after writing the demo screenshot; keeping the completed PNG.");
           }
@@ -180,6 +182,105 @@ function assertScrubbed(label, bytes) {
   }
 }
 
+function writeOgPreviewHTML() {
+  const logo = readFileSync(faviconPath, "utf8");
+  const preview = join(tempDir, "og-preview.html");
+  writeFileSync(
+    preview,
+    `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nightward preview</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        width: 1200px;
+        height: 630px;
+        background: #071014;
+        color: #f7fffd;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 1fr 340px;
+        gap: 64px;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+        padding: 56px 82px;
+        background:
+          linear-gradient(90deg, rgba(15, 118, 110, 0.26), transparent 58%),
+          #071014;
+      }
+      .eyebrow {
+        color: #5eead4;
+        font-size: 24px;
+        font-weight: 760;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 18px 0 20px;
+        max-width: 760px;
+        font-size: 66px;
+        line-height: 0.98;
+        letter-spacing: 0;
+      }
+      p {
+        margin: 0;
+        max-width: 780px;
+        color: #c7f9f4;
+        font-size: 28px;
+        line-height: 1.26;
+      }
+      .command {
+        display: inline-block;
+        margin-top: 32px;
+        border: 1px solid rgba(94, 234, 212, 0.4);
+        border-radius: 8px;
+        padding: 18px 22px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #ffffff;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 28px;
+      }
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 300px;
+        height: 300px;
+        margin-left: auto;
+        border: 1px solid rgba(94, 234, 212, 0.22);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+      .mark svg {
+        width: 168px;
+        height: 168px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <div class="eyebrow">Nightward</div>
+        <h1>Find AI-tool risks before you sync.</h1>
+        <p>Scan agent configs, MCP servers, and dotfiles for secrets, broad local access, and machine-only state.</p>
+        <div class="command">npx @jsonbored/nightward</div>
+      </section>
+      <aside class="mark" aria-hidden="true">${logo}</aside>
+    </main>
+  </body>
+</html>
+`,
+    { mode: 0o644 },
+  );
+  return preview;
+}
+
 try {
   mkdirSync(outputDir, { recursive: true });
   run("go", ["run", "./cmd/nw", "scan", "--json", "--output", rawScan], {
@@ -218,12 +319,33 @@ try {
     "--window-size=1440,1100",
     `--screenshot=${screenshotOutput}`,
     pathToFileURL(htmlOutput).href,
-  ]);
+  ], screenshotOutput);
   chmodSync(screenshotOutput, 0o644);
+  assertScrubbed("sample report screenshot", readFileSync(screenshotOutput));
+
+  const ogPreview = writeOgPreviewHTML();
+  const ogChromeProfile = join(tempDir, "chrome-og-profile");
+  rmSync(ogImageOutput, { force: true });
+  await captureScreenshot(chrome, [
+    "--headless=new",
+    "--disable-background-networking",
+    "--disable-gpu",
+    "--hide-scrollbars",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--no-sandbox",
+    `--user-data-dir=${ogChromeProfile}`,
+    "--window-size=1200,630",
+    `--screenshot=${ogImageOutput}`,
+    pathToFileURL(ogPreview).href,
+  ], ogImageOutput);
+  chmodSync(ogImageOutput, 0o644);
+  assertScrubbed("Open Graph image", readFileSync(ogImageOutput));
 
   console.log(`Generated ${relative(repoRoot, scanOutput)}`);
   console.log(`Generated ${relative(repoRoot, htmlOutput)}`);
   console.log(`Generated ${relative(repoRoot, screenshotOutput)}`);
+  console.log(`Generated ${relative(repoRoot, ogImageOutput)}`);
 } finally {
   rmSync(tempDir, { recursive: true, force: true });
 }
