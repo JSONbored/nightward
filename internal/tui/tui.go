@@ -304,6 +304,18 @@ func (m model) dashboard(width int) string {
 	if m.schedule.LastReport != "" {
 		lines = append(lines, fmt.Sprintf("Last report:  %s", m.schedule.LastReport))
 	}
+	if len(m.schedule.History) > 0 {
+		lines = append(lines, "", section("Recent Reports"))
+		limit := len(m.schedule.History)
+		if limit > 3 {
+			limit = 3
+		}
+		for _, record := range m.schedule.History[:limit] {
+			lines = append(lines, fmt.Sprintf("%s  findings=%d  size=%s  %s", record.ModTime.Local().Format("2006-01-02 15:04"), record.Findings, byteSize(record.SizeBytes), record.ReportName))
+		}
+	}
+	lines = append(lines, "", section("What Next"))
+	lines = append(lines, m.nextActions()...)
 	return fitLines(lines, width)
 }
 
@@ -582,6 +594,9 @@ func (m model) currentBackupEntry() (backupplan.Entry, bool) {
 func (m model) copySelection() (string, string, bool) {
 	switch m.tab {
 	case 0:
+		if len(m.schedule.History) > 0 && m.schedule.History[0].Path != "" {
+			return m.schedule.History[0].Path, "latest report", true
+		}
 		if m.schedule.ReportDir != "" {
 			return m.schedule.ReportDir, "report path", true
 		}
@@ -607,6 +622,28 @@ func (m model) copySelection() (string, string, bool) {
 		}
 	}
 	return "", "", false
+}
+
+func (m model) nextActions() []string {
+	if m.report.Summary.TotalFindings == 0 && len(m.report.Findings) == 0 {
+		if m.schedule.ReportDir != "" {
+			return []string{"Run `nw scan --output-dir " + m.schedule.ReportDir + "` before syncing shared dotfiles."}
+		}
+		return []string{"Run `nw scan --json` before syncing shared dotfiles."}
+	}
+	if m.report.Summary.FindingsBySeverity[inventory.RiskCritical] > 0 || m.report.Summary.FindingsBySeverity[inventory.RiskHigh] > 0 || maxRisk(m.report.Findings) == inventory.RiskCritical || maxRisk(m.report.Findings) == inventory.RiskHigh {
+		return []string{
+			"Review Findings and Fix Plan before syncing or publishing config.",
+			"Export a redacted fix plan with `e` for review material.",
+		}
+	}
+	if !m.schedule.Installed {
+		return []string{"Preview a nightly schedule with `nw schedule plan --json`."}
+	}
+	if len(m.schedule.History) > 1 {
+		return []string{"Compare recent reports before publishing screenshots or store metadata."}
+	}
+	return []string{"Run explicit local providers with `nw analyze --all --with gitleaks,trufflehog,semgrep --json`."}
 }
 
 func (m model) currentDocsURL() (string, bool) {
@@ -924,6 +961,16 @@ func section(label string) string {
 
 func metricLine(label string, value int, color lipgloss.Color) string {
 	return lipgloss.NewStyle().Foreground(color).Bold(true).Render(fmt.Sprintf("%-10s %d", label, value))
+}
+
+func byteSize(size int64) string {
+	if size < 1024 {
+		return fmt.Sprintf("%dB", size)
+	}
+	if size < 1024*1024 {
+		return fmt.Sprintf("%.1fKB", float64(size)/1024)
+	}
+	return fmt.Sprintf("%.1fMB", float64(size)/(1024*1024))
 }
 
 func severityColor(risk inventory.RiskLevel) lipgloss.Color {
