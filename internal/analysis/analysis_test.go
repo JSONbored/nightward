@@ -91,6 +91,134 @@ func TestProviderDoctorFindsFakeLocalProvider(t *testing.T) {
 	t.Fatal("missing gitleaks provider")
 }
 
+func TestRunExecutesExplicitLocalProviderAndRedacts(t *testing.T) {
+	dir := t.TempDir()
+	workspace := t.TempDir()
+	writeExecutable(t, filepath.Join(dir, "gitleaks"), `#!/bin/sh
+printf '[{"RuleID":"generic-api-key","Description":"API_TOKEN=super-secret-value","File":"config.toml","StartLine":7}]'
+`)
+	t.Setenv("PATH", dir)
+
+	report := inventory.NewWorkspaceScanner(workspace).Scan()
+	out := Run(report, Options{Mode: "workspace", Workspace: workspace, With: []string{"gitleaks"}})
+	if out.Summary.SignalsByProvider["gitleaks"] != 1 {
+		t.Fatalf("expected one gitleaks signal, got %#v", out.Summary)
+	}
+	data, err := json.Marshal(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if strings.Contains(text, "super-secret-value") {
+		t.Fatalf("provider signal leaked secret: %s", text)
+	}
+	if !strings.Contains(text, "generic-api-key") || !strings.Contains(text, "config.toml") {
+		t.Fatalf("provider signal missed finding metadata: %s", text)
+	}
+}
+
+func TestRunReportsProviderExecutionFailureAsSignal(t *testing.T) {
+	dir := t.TempDir()
+	workspace := t.TempDir()
+	writeExecutable(t, filepath.Join(dir, "gitleaks"), `#!/bin/sh
+echo 'API_TOKEN=super-secret-value failed' >&2
+exit 2
+`)
+	t.Setenv("PATH", dir)
+
+	report := inventory.NewWorkspaceScanner(workspace).Scan()
+	out := Run(report, Options{Mode: "workspace", Workspace: workspace, With: []string{"gitleaks"}})
+	if out.Summary.SignalsByProvider["gitleaks"] != 1 {
+		t.Fatalf("expected provider failure signal, got %#v", out.Summary)
+	}
+	data, err := json.Marshal(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "super-secret-value") {
+		t.Fatalf("provider failure leaked stderr: %s", data)
+	}
+}
+
+func TestProviderParsersCoverSupportedFormats(t *testing.T) {
+	root := "/tmp/workspace"
+	gitleaks, err := parseProviderOutput("gitleaks", root, `[{"RuleID":"generic-api-key","Description":"secret match","File":"/tmp/workspace/config.toml","StartLine":9}]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(gitleaks) != 1 || gitleaks[0].Path != "config.toml" || gitleaks[0].Severity != inventory.RiskHigh || !strings.Contains(gitleaks[0].Evidence, "line=9") {
+		t.Fatalf("unexpected gitleaks parse: %#v", gitleaks)
+	}
+
+	trufflehog, err := parseProviderOutput("trufflehog", root, `{"DetectorName":"GitHub","Verified":true,"SourceMetadata":{"Data":{"Filesystem":{"file":"/tmp/workspace/.env"}}}}`+"\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(trufflehog) != 1 || trufflehog[0].Path != ".env" || trufflehog[0].Severity != inventory.RiskCritical {
+		t.Fatalf("unexpected trufflehog parse: %#v", trufflehog)
+	}
+
+	semgrep, err := parseProviderOutput("semgrep", root, `{"results":[{"check_id":"go.lang.security","path":"/tmp/workspace/main.go","extra":{"message":"review this","severity":"ERROR"}}]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(semgrep) != 1 || semgrep[0].Path != "main.go" || semgrep[0].Severity != inventory.RiskHigh || semgrep[0].Category != CategoryExecution {
+		t.Fatalf("unexpected semgrep parse: %#v", semgrep)
+	}
+}
+
+func TestProviderHelpersAndOutputLimits(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "semgrep.yml"), []byte("rules: []\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"gitleaks", "trufflehog", "semgrep"} {
+		if args, ok, err := providerArgs(name, root); err != nil || !ok || len(args) == 0 {
+			t.Fatalf("missing provider args for %s: %#v ok=%t err=%v", name, args, ok, err)
+		}
+	}
+	if _, ok, err := providerArgs("socket", root); err != nil || ok {
+		t.Fatal("socket should not have an offline provider runner")
+	}
+	if _, ok, err := providerArgs("semgrep", t.TempDir()); !ok || err == nil {
+		t.Fatalf("semgrep should require a local config, ok=%t err=%v", ok, err)
+	}
+	externalConfigDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(externalConfigDir, "semgrep.yml"), []byte("rules: []\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	symlinkRoot := t.TempDir()
+	if err := os.Symlink(filepath.Join(externalConfigDir, "semgrep.yml"), filepath.Join(symlinkRoot, "semgrep.yml")); err == nil {
+		if _, ok := localSemgrepConfig(symlinkRoot); ok {
+			t.Fatal("semgrep config symlink outside workspace should be ignored")
+		}
+	}
+	if got := semgrepSeverity("WARNING"); got != inventory.RiskMedium {
+		t.Fatalf("unexpected warning severity: %s", got)
+	}
+	if got := semgrepSeverity("INFO"); got != inventory.RiskLow {
+		t.Fatalf("unexpected info severity: %s", got)
+	}
+	if got := semgrepSeverity("unknown"); got != inventory.RiskMedium {
+		t.Fatalf("unexpected default severity: %s", got)
+	}
+
+	var limited limitedBuffer
+	limited.limit = 5
+	if n, err := limited.Write([]byte("123456789")); err != nil || n != 9 {
+		t.Fatalf("unexpected limited write n=%d err=%v", n, err)
+	}
+	if got := limited.String(); !strings.Contains(got, "12345") || !strings.Contains(got, "truncated") {
+		t.Fatalf("unexpected limited buffer output: %q", got)
+	}
+	if got := firstProviderLine("API_TOKEN=super-secret-value\nsecond"); strings.Contains(got, "super-secret-value") || !strings.Contains(got, "[redacted]") {
+		t.Fatalf("stderr was not redacted: %q", got)
+	}
+	if got := providerRecommendation("semgrep", CategoryExecution); !strings.Contains(got, "semgrep") {
+		t.Fatalf("unexpected provider recommendation: %q", got)
+	}
+}
+
 func TestExplainRelativePathAndHumanProviderSummary(t *testing.T) {
 	report := Run(inventory.Report{
 		Findings: []inventory.Finding{
@@ -130,6 +258,13 @@ func TestExplainRelativePathAndHumanProviderSummary(t *testing.T) {
 	disabled := HumanProviderSummary(ProviderStatus{Provider: Provider{Name: "socket"}, Enabled: false, Available: false, Status: "missing"})
 	if !strings.Contains(enabled, "enabled ready (available)") || !strings.Contains(disabled, "disabled missing") {
 		t.Fatalf("unexpected provider summaries: %q / %q", enabled, disabled)
+	}
+}
+
+func writeExecutable(t *testing.T, path, contents string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(contents), 0700); err != nil {
+		t.Fatal(err)
 	}
 }
 

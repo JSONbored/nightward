@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
+	"gopkg.in/yaml.v3"
 )
 
 type mcpServer struct {
@@ -26,11 +27,38 @@ type mcpServer struct {
 	Raw       map[string]any
 }
 
+const maxMCPConfigBytes = 2 * 1024 * 1024
+
 var secretKeyPattern = regexp.MustCompile(`(?i)(token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)`)
 
 func inspectMCP(item Item, spec pathSpec) []Finding {
 	if !spec.CheckMCP || item.Kind == "directory" {
 		return nil
+	}
+	if item.Kind == "symlink" {
+		return []Finding{{
+			ID:             findingID("mcp_symlink_config", item.Tool, item.Path, "symlink"),
+			Tool:           item.Tool,
+			Path:           item.Path,
+			Severity:       RiskMedium,
+			Rule:           "mcp_symlink_config",
+			Message:        "MCP config path is a symlink and was not followed.",
+			Evidence:       "kind=symlink",
+			Recommendation: "Review the symlink target manually before syncing or publishing this config.",
+			Impact:         "Symlinked agent configs can point outside the expected dotfiles or workspace boundary.",
+			Why:            "Nightward keeps scanner reads bounded to explicit config files so review output does not accidentally traverse local-only state.",
+			FixAvailable:   true,
+			FixKind:        FixManualReview,
+			Confidence:     "high",
+			Risk:           RiskLow,
+			RequiresReview: true,
+			FixSummary:     "Replace the symlink with a reviewed config file or document the target as machine-local.",
+			FixSteps: []string{
+				"Inspect the symlink target locally.",
+				"Confirm the target is intended for portable review.",
+				"Prefer a real config file or an ignored machine-local overlay for target-specific MCP settings.",
+			},
+		}}
 	}
 
 	servers, err := readMCPServers(item.Path)
@@ -73,7 +101,15 @@ func inspectMCP(item Item, spec pathSpec) []Finding {
 }
 
 func readMCPServers(path string) ([]mcpServer, error) {
-	contents, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- MCP config path comes from Nightward's local adapter inventory.
+	clean := filepath.Clean(path)
+	info, err := os.Stat(clean)
+	if err != nil {
+		return nil, err
+	}
+	if info.Size() > maxMCPConfigBytes {
+		return nil, fmt.Errorf("MCP config exceeds size cap: %d bytes > %d bytes", info.Size(), maxMCPConfigBytes)
+	}
+	contents, err := os.ReadFile(clean) // #nosec G304 -- MCP config path comes from Nightward's local adapter inventory.
 	if err != nil {
 		return nil, err
 	}
@@ -81,6 +117,8 @@ func readMCPServers(path string) ([]mcpServer, error) {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".toml":
 		return readTOMLServers(contents)
+	case ".yaml", ".yml":
+		return readYAMLServers(contents)
 	default:
 		return readJSONServers(contents)
 	}
@@ -104,6 +142,21 @@ func readJSONServers(contents []byte) ([]mcpServer, error) {
 func readTOMLServers(contents []byte) ([]mcpServer, error) {
 	var doc map[string]any
 	if err := toml.Unmarshal(contents, &doc); err != nil {
+		return nil, err
+	}
+
+	var servers []mcpServer
+	for _, key := range []string{"mcp_servers", "mcpServers", "servers"} {
+		if group, ok := doc[key].(map[string]any); ok {
+			servers = append(servers, mapServers(group)...)
+		}
+	}
+	return servers, nil
+}
+
+func readYAMLServers(contents []byte) ([]mcpServer, error) {
+	var doc map[string]any
+	if err := yaml.Unmarshal(contents, &doc); err != nil {
 		return nil, err
 	}
 
@@ -410,7 +463,7 @@ func headerFindings(item Item, server mcpServer) []Finding {
 			RequiresReview: true,
 			FixSummary:     summary,
 			FixSteps:       steps,
-			PatchHint:      &PatchHint{Kind: FixExternalizeSecret, EnvKey: envNameForHeader(key), InlineSecret: !referenceOnly},
+			PatchHint:      &PatchHint{Kind: FixExternalizeSecret, EnvKey: envNameForHeader(key), HeaderKey: key, InlineSecret: !referenceOnly},
 		})
 	}
 	return findings
@@ -443,6 +496,7 @@ func urlFindings(item Item, server mcpServer) []Finding {
 			"Keep the URL in an ignored local overlay if it is not portable.",
 			"Document the expected local service when the endpoint is required for this machine.",
 		},
+		PatchHint: &PatchHint{Kind: FixManualReview, Replacement: "<reviewed-portable-or-local-overlay-url>"},
 	}}
 }
 
@@ -472,6 +526,7 @@ func argFindings(item Item, server mcpServer) []Finding {
 				"Replace broad paths such as $HOME, ~, /, or full user roots with those explicit directories.",
 				"Do not guess missing paths; rerun the tool workflow after narrowing scope.",
 			},
+			PatchHint: &PatchHint{Kind: FixNarrowFilesystem, DirectArgs: narrowBroadArgs(server.Args)},
 		})
 	}
 	if referencesTokenPath(server.Args) {
@@ -498,9 +553,24 @@ func argFindings(item Item, server mcpServer) []Finding {
 				"Prefer environment references, keychain integration, or a machine-local ignored overlay.",
 				"Exclude any file containing credential paths from public or shared dotfiles unless redacted.",
 			},
+			PatchHint: &PatchHint{Kind: FixManualReview, DirectArgs: redactArgSlice(server.Args), Replacement: "<local-secret-path-kept-out-of-dotfiles>"},
 		})
 	}
 	return findings
+}
+
+func narrowBroadArgs(args []string) []string {
+	out := append([]string(nil), args...)
+	for i, arg := range out {
+		cleaned := strings.TrimRight(arg, string(filepath.Separator))
+		if cleaned == "" {
+			continue
+		}
+		if cleaned == "/" || cleaned == "~" || cleaned == "$HOME" || strings.HasPrefix(cleaned, "/Users/") || strings.HasPrefix(cleaned, "/home/") {
+			out[i] = "<explicit-project-or-config-path>"
+		}
+	}
+	return redactArgSlice(out)
 }
 
 func packageName(args []string) (string, bool) {

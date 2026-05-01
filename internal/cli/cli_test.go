@@ -37,6 +37,8 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 		{"analyze", "--all", "--json"},
 		{"providers", "list", "--json"},
 		{"providers", "doctor", "--json"},
+		{"rules", "list", "--json"},
+		{"rules", "explain", "--json", "mcp_secret_header"},
 		{"policy", "check", "--json"},
 		{"policy", "check", "--include-analysis", "--json"},
 		{"policy", "init", "--dry-run"},
@@ -94,6 +96,8 @@ API_TOKEN = "`+secretValue+`"
 		{"trust", "explain", "--json", findingID},
 		{"providers", "list", "--json"},
 		{"providers", "doctor", "--json"},
+		{"rules", "list", "--json"},
+		{"rules", "explain", "--json", "mcp_secret_header"},
 		{"policy", "check", "--json"},
 		{"policy", "sarif", "--output", "-"},
 		{"snapshot", "plan", "--target", filepath.Join(home, "snapshots"), "--json"},
@@ -127,6 +131,8 @@ API_TOKEN = "`+secretValue+`"
 		{"fix", "export", "--all", "--format", "markdown"},
 		{"analyze", "--all"},
 		{"trust", "explain", findingID},
+		{"rules", "list"},
+		{"rules", "explain", "mcp_secret_header"},
 		{"policy", "init", "--dry-run"},
 		{"policy", "explain"},
 		{"schedule", "install", "--dry-run"},
@@ -146,6 +152,8 @@ API_TOKEN = "`+secretValue+`"
 		{"plan", "backup", "--json"},
 		{"fix", "preview", "--all", "--format", "xml"},
 		{"policy", "init"},
+		{"rules", "explain", "mcp_secret"},
+		{"report", "html", "--input", "missing.json", "--output", filepath.Join(home, "report.html")},
 		{"snapshot", "diff", "--from", "missing.json"},
 		{"schedule", "install", "--preset", "bogus", "--dry-run"},
 	}
@@ -154,6 +162,45 @@ API_TOKEN = "`+secretValue+`"
 		if code == 0 {
 			t.Fatalf("%s unexpectedly succeeded", strings.Join(args, " "))
 		}
+	}
+}
+
+func TestReportHTMLCommandWritesPrivateReport(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("NIGHTWARD_HOME", home)
+	scanPath := filepath.Join(home, "scan.json")
+	reportPath := filepath.Join(home, "reports", "nightward.html")
+	writeTestFile(t, scanPath, `{
+  "generated_at": "2026-05-01T00:00:00Z",
+  "hostname": "host<script>",
+  "home": "/tmp/home",
+  "summary": {
+    "total_items": 1,
+    "total_findings": 1,
+    "findings_by_severity": {"high": 1}
+  },
+  "items": [{"id":"item-1","tool":"codex","path":"/tmp/<secret>","classification":"portable","risk":"low"}],
+  "findings": [{"id":"finding-1","tool":"codex","path":"/tmp/config","severity":"high","rule":"mcp_secret_header","message":"<bad>","recommended_action":"externalize"}]
+}`)
+
+	stdout, stderr, code := runCLI([]string{"report", "html", "--input", scanPath, "--output", reportPath})
+	if code != 0 {
+		t.Fatalf("report html failed: stdout=%s stderr=%s", stdout, stderr)
+	}
+	data, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(data)
+	if strings.Contains(html, "<bad>") || strings.Contains(html, "host<script>") || strings.Contains(html, "/tmp/<secret>") {
+		t.Fatalf("expected escaped HTML report:\n%s", html)
+	}
+	info, err := os.Stat(reportPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0600 {
+		t.Fatalf("expected 0600 report, got %o", got)
 	}
 }
 
@@ -265,6 +312,37 @@ func TestWorkspaceCommandsAreReadOnlyAndSupportStdoutSARIF(t *testing.T) {
 	after := listTestFiles(t, workspace)
 	if strings.Join(before, "\n") != strings.Join(after, "\n") {
 		t.Fatalf("workspace commands mutated files\nbefore=%v\nafter=%v", before, after)
+	}
+}
+
+func TestAnalyzeWithExplicitProviderIsReadOnly(t *testing.T) {
+	workspace := t.TempDir()
+	writeTestFile(t, filepath.Join(workspace, "config.txt"), "API_TOKEN=super-secret-value\n")
+	binDir := t.TempDir()
+	writeTestFile(t, filepath.Join(binDir, "gitleaks"), `#!/bin/sh
+printf '[{"RuleID":"generic-api-key","Description":"API_TOKEN=super-secret-value","File":"config.txt","StartLine":1}]'
+`)
+	if err := os.Chmod(filepath.Join(binDir, "gitleaks"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir)
+	before := listTestFiles(t, workspace)
+
+	stdout, stderr, code := runCLI([]string{"analyze", "--all", "--workspace", workspace, "--with", "gitleaks", "--json"})
+	if code != 0 {
+		t.Fatalf("analyze with provider failed: %s", stderr)
+	}
+	if !json.Valid([]byte(stdout)) {
+		t.Fatalf("analyze with provider did not emit JSON: %s", stdout)
+	}
+	assertNoSecret(t, stdout, "super-secret-value")
+	if !strings.Contains(stdout, "generic-api-key") {
+		t.Fatalf("provider finding missing from analysis output: %s", stdout)
+	}
+
+	after := listTestFiles(t, workspace)
+	if strings.Join(before, "\n") != strings.Join(after, "\n") {
+		t.Fatalf("provider analyze mutated workspace\nbefore=%v\nafter=%v", before, after)
 	}
 }
 

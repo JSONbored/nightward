@@ -43,13 +43,24 @@ Online-capable providers remain blocked unless explicitly allowed:
 nw providers doctor --with socket --online --json
 ```
 
-Policy/SARIF config can opt into provider posture:
+Supported local providers can be executed explicitly during analysis:
+
+```sh
+nw analyze --all --workspace . --with gitleaks --json
+nw analyze --all --workspace . --with gitleaks,trufflehog,semgrep --json
+```
+
+Provider runs use timeouts and bounded output capture. Nightward records redacted finding metadata, not raw secret values. Online-capable providers such as `trivy`, `osv-scanner`, and `socket` stay blocked unless the user also opts into online-capable behavior.
+
+`semgrep` execution is local-config only. Nightward looks for `semgrep.yml`, `semgrep.yaml`, `.semgrep.yml`, `.semgrep.yaml`, or `.semgrep/config.yml` in the scanned workspace instead of using automatic rule discovery.
+
+Policy/SARIF config can opt into provider execution:
 
 ```yaml
 include_analysis: true
 analysis_threshold: high
 analysis_providers:
-  - socket
+  - gitleaks
 allow_online_providers: false
 ```
 

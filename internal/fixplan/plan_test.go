@@ -122,6 +122,115 @@ func TestBuildPreviewProducesRedactedPatchForInlineSecret(t *testing.T) {
 	}
 }
 
+func TestBuildPreviewProducesRedactedPatchForInlineHeaderSecret(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".mcp.yaml")
+	if err := os.WriteFile(path, []byte(`mcpServers:
+  remote:
+    url: https://mcp.example.test
+    headers:
+      Authorization: Bearer super-secret-value
+`), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	report := inventory.Report{Findings: []inventory.Finding{
+		{
+			ID:             "mcp_secret_header-111111111111",
+			Tool:           "Generic MCP",
+			Path:           path,
+			Server:         "remote",
+			Rule:           "mcp_secret_header",
+			Severity:       inventory.RiskCritical,
+			FixKind:        inventory.FixExternalizeSecret,
+			RequiresReview: true,
+			PatchHint:      &inventory.PatchHint{Kind: inventory.FixExternalizeSecret, EnvKey: "AUTHORIZATION", HeaderKey: "Authorization", InlineSecret: true},
+		},
+	}}
+
+	preview := BuildPreview(report, Selector{All: true})
+	if preview.Summary.Patchable != 1 {
+		t.Fatalf("expected patchable header preview: %#v", preview)
+	}
+	diff := PreviewDiff(preview)
+	if !strings.Contains(diff, "headers.Authorization") || !strings.Contains(diff, "${AUTHORIZATION}") || strings.Contains(diff, "super-secret-value") {
+		t.Fatalf("unexpected header preview diff:\n%s", diff)
+	}
+}
+
+func TestBuildPreviewProducesReviewDiffsForEndpointAndFilesystemScope(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(`[mcp_servers.local]
+url = "http://127.0.0.1:8787/mcp"
+
+[mcp_servers.files]
+command = "npx"
+args = ["@modelcontextprotocol/server-filesystem", "/Users/example"]
+`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	report := inventory.Report{Findings: []inventory.Finding{
+		{
+			ID:             "mcp_local_endpoint-111111111111",
+			Path:           path,
+			Server:         "local",
+			Rule:           "mcp_local_endpoint",
+			FixKind:        inventory.FixManualReview,
+			RequiresReview: true,
+			PatchHint:      &inventory.PatchHint{Kind: inventory.FixManualReview, Replacement: "<reviewed-portable-or-local-overlay-url>"},
+		},
+		{
+			ID:             "mcp_broad_filesystem-222222222222",
+			Path:           path,
+			Server:         "files",
+			Rule:           "mcp_broad_filesystem",
+			FixKind:        inventory.FixNarrowFilesystem,
+			RequiresReview: true,
+			PatchHint:      &inventory.PatchHint{Kind: inventory.FixNarrowFilesystem, DirectArgs: []string{"@modelcontextprotocol/server-filesystem", "<explicit-project-or-config-path>"}},
+		},
+	}}
+
+	preview := BuildPreview(report, Selector{All: true})
+	if preview.Summary.Patchable != 0 || preview.Summary.Review != 2 {
+		t.Fatalf("expected review-only previews: %#v", preview.Summary)
+	}
+	diff := PreviewDiff(preview)
+	for _, want := range []string{"<reviewed-portable-or-local-overlay-url>", "<explicit-project-or-config-path>"} {
+		if !strings.Contains(diff, want) {
+			t.Fatalf("review diff missing %q:\n%s", want, diff)
+		}
+	}
+}
+
+func TestBuildPreviewProducesReviewDiffForCredentialPath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mcp.json")
+	if err := os.WriteFile(path, []byte(`{"mcpServers":{"token":{"command":"node","args":["server.js","--token-file","/Users/example/.token"]}}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	report := inventory.Report{Findings: []inventory.Finding{
+		{
+			ID:             "mcp_local_token_path-111111111111",
+			Path:           path,
+			Server:         "token",
+			Rule:           "mcp_local_token_path",
+			FixKind:        inventory.FixManualReview,
+			RequiresReview: true,
+			PatchHint:      &inventory.PatchHint{Kind: inventory.FixManualReview, DirectArgs: []string{"server.js", "--token-file", "/Users/example/.token"}, Replacement: "<local-secret-path-kept-out-of-dotfiles>"},
+		},
+	}}
+
+	preview := BuildPreview(report, Selector{All: true})
+	if preview.Summary.Review != 1 {
+		t.Fatalf("expected review-only token path preview: %#v", preview.Summary)
+	}
+	diff := PreviewDiff(preview)
+	if strings.Contains(diff, "/Users/example/.token") || !strings.Contains(diff, "[redacted]") {
+		t.Fatalf("credential path preview was not redacted:\n%s", diff)
+	}
+}
+
 func TestBuildPreviewDoesNotGuessPackageVersions(t *testing.T) {
 	report := inventory.Report{Findings: []inventory.Finding{
 		{

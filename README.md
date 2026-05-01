@@ -149,6 +149,8 @@ nw analyze package npm:@modelcontextprotocol/server-filesystem --json
 nw trust explain mcp_unpinned_package-abc123
 nw providers list --json
 nw providers doctor --with socket --json
+nw rules list --json
+nw rules explain mcp_secret_header --json
 ```
 
 Online-capable providers remain blocked until explicitly allowed:
@@ -176,6 +178,13 @@ Generate read-only snapshot plans and compare them:
 ```sh
 nw snapshot plan --target ~/nightward-snapshots --json
 nw snapshot diff --from before.json --to after.json --json
+```
+
+Render a local static HTML report from redacted scan JSON:
+
+```sh
+nw scan --json --output /tmp/nightward-scan.json
+nw report html --input /tmp/nightward-scan.json --output /tmp/nightward-report.html
 ```
 
 Run policy checks or generate SARIF:
@@ -240,9 +249,9 @@ Secret values are never emitted in scan JSON, findings output, fix-plan JSON, Ma
 
 `nw analyze` turns scan findings and classifications into explainable signals. It does not claim a package, server, binary, or URL is safe. It reports what Nightward can prove from local structure, why it matters, and how confident the signal is.
 
-Default analysis is offline and built in. Optional providers such as `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, and `socket` are discovered by `providers doctor`; Nightward does not install them or call online services unless a user explicitly selects providers and opts into network-capable behavior.
+Default analysis is offline and built in. Optional providers such as `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, and `socket` are discovered by `providers doctor`; Nightward does not install them or call online services unless a user explicitly selects providers and opts into network-capable behavior. When explicitly selected with `--with`, supported local providers run with timeouts, output caps, and redacted metadata only. Semgrep execution requires a repo-local config file so Nightward does not use automatic rule discovery by default.
 
-Policy config can enable analysis and selected provider posture with `include_analysis`, `analysis_threshold`, `analysis_providers`, and `allow_online_providers`.
+Policy config can enable analysis and selected local provider execution with `include_analysis`, `analysis_threshold`, `analysis_providers`, and `allow_online_providers`.
 
 ```mermaid
 sequenceDiagram
@@ -251,8 +260,8 @@ sequenceDiagram
   participant LocalTool as Optional local provider
   User->>Nightward: nw analyze --all
   Nightward-->>User: offline built-in signals
-  User->>Nightward: nw providers doctor --with socket --online
-  Nightward->>LocalTool: run only after explicit provider + online opt-in
+  User->>Nightward: nw analyze --all --workspace . --with gitleaks
+  Nightward->>LocalTool: run only after explicit provider selection
   LocalTool-->>Nightward: provider signals
   Nightward-->>User: redacted analysis report
 ```
@@ -293,6 +302,18 @@ Nightward can run as a local GitHub Action in scan, policy, or SARIF mode:
 ```
 
 See [docs/action.md](docs/action.md) for inputs, outputs, and SARIF upload examples.
+
+## Website
+
+Nightward's public docs/marketing site lives in [site](site) and uses VitePress with local search. It is designed as a repo-owned static site with no analytics by default.
+
+```sh
+cd site
+npm ci
+npm run build
+```
+
+See [docs/website.md](docs/website.md) for the page map and Stitch landing-page brief.
 
 ## Trunk Plugin
 
@@ -371,6 +392,7 @@ go run ./cmd/nw findings list --json
 go run ./cmd/nw findings list --json | jq '[.[] | select(.rule=="mcp_unknown_command")]'
 go run ./cmd/nw analyze --all --json
 go run ./cmd/nw providers doctor --json
+go run ./cmd/nw rules list --json
 go run ./cmd/nw fix plan --all --json
 go run ./cmd/nw fix preview --all --format markdown
 go run ./cmd/nw policy sarif --output /tmp/nightward.sarif
@@ -399,6 +421,9 @@ make release-snapshot
 - [Support](SUPPORT.md)
 - [Roadmap](ROADMAP.md)
 - [Install and release channels](docs/install.md)
+- [Distribution plan](docs/distribution.md)
+- [Website and docs plan](docs/website.md)
+- [Growth backlog](docs/growth.md)
 - [Adapters](docs/adapters.md)
 - [Analysis](docs/analysis.md)
 - [Remediation](docs/remediation.md)

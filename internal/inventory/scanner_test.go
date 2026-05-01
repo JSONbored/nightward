@@ -240,6 +240,105 @@ func TestWorkspaceScannerFindsRepoAIConfigAndSecrets(t *testing.T) {
 	}
 }
 
+func TestScannerParsesYAMLMCPShapes(t *testing.T) {
+	home := t.TempDir()
+	writeFile(t, filepath.Join(home, ".mcp.yaml"), `mcpServers:
+  yaml-demo:
+    command: npx
+    args:
+      - "@example/server"
+    env:
+      API_TOKEN: "${API_TOKEN}"
+`)
+
+	report := NewScanner(home).Scan()
+	if report.Summary.FindingsByRule["mcp_unpinned_package"] != 1 || report.Summary.FindingsByRule["mcp_secret_env"] != 1 {
+		t.Fatalf("expected YAML MCP findings, got %#v", report.Summary.FindingsByRule)
+	}
+	if report.Summary.ItemsByTool["Generic MCP"] != 1 {
+		t.Fatalf("expected generic MCP YAML item, got %#v", report.Summary.ItemsByTool)
+	}
+}
+
+func TestWorkspaceScannerFindsExpandedCommunityShapes(t *testing.T) {
+	workspace := t.TempDir()
+	writeFile(t, filepath.Join(workspace, ".codex", "mcp.yml"), `servers:
+  codex-yaml:
+    command: node
+    args: ["server.js"]
+`)
+	writeFile(t, filepath.Join(workspace, ".cursor", "mcp.yaml"), `mcpServers:
+  cursor-yaml:
+    command: npx
+    args: ["@modelcontextprotocol/server-filesystem", "$HOME"]
+`)
+	writeFile(t, filepath.Join(workspace, ".continue", "config.yml"), `mcpServers:
+  continue-yaml:
+    headers:
+      Authorization: "${CONTINUE_TOKEN}"
+    url: https://continue.example.test/mcp
+`)
+	writeFile(t, filepath.Join(workspace, "opencode.yaml"), `servers:
+  opencode-yaml:
+    command: node
+    args: ["server.js"]
+`)
+	writeFile(t, filepath.Join(workspace, "mcp.yml"), `mcp_servers:
+  generic-yaml:
+    url: http://localhost:3000/mcp
+`)
+
+	report := NewWorkspaceScanner(workspace).Scan()
+	if report.Summary.ItemsByTool["Codex"] != 1 || report.Summary.ItemsByTool["Cursor"] != 1 || report.Summary.ItemsByTool["Continue"] != 1 || report.Summary.ItemsByTool["OpenCode"] != 1 || report.Summary.ItemsByTool["Generic MCP"] != 1 {
+		t.Fatalf("expected expanded workspace config shapes, got %#v", report.Summary.ItemsByTool)
+	}
+	if report.Summary.FindingsByRule["mcp_local_endpoint"] != 1 {
+		t.Fatalf("expected local endpoint from workspace YAML, got %#v", report.Summary.FindingsByRule)
+	}
+	if report.Summary.FindingsByRule["mcp_broad_filesystem"] != 1 || report.Summary.FindingsByRule["mcp_secret_header"] != 1 {
+		t.Fatalf("expected expanded workspace findings, got %#v", report.Summary.FindingsByRule)
+	}
+}
+
+func TestScannerHandlesMalformedHugeAndSymlinkMCPFixtures(t *testing.T) {
+	home := t.TempDir()
+	writeFile(t, filepath.Join(home, ".claude", "mcp.json"), `{"mcpServers":`)
+	writeFile(t, filepath.Join(home, ".codex", "mcp.json"), strings.Repeat(" ", maxMCPConfigBytes+1))
+	target := filepath.Join(t.TempDir(), "mcp.yaml")
+	writeFile(t, target, `mcpServers:
+  symlinked:
+    headers:
+      Authorization: "super-symlink-secret"
+    url: https://secret.example.test/mcp
+`)
+	link := filepath.Join(home, ".config", "mcp", "mcp.yaml")
+	if err := os.MkdirAll(filepath.Dir(link), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+
+	report := NewScanner(home).Scan()
+	if report.Summary.FindingsByRule["mcp_parse_failed"] != 2 {
+		t.Fatalf("expected parse findings for malformed and huge configs, got %#v", report.Summary.FindingsByRule)
+	}
+	if report.Summary.FindingsByRule["mcp_symlink_config"] != 1 {
+		t.Fatalf("expected symlink review finding, got %#v", report.Summary.FindingsByRule)
+	}
+	data, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if strings.Contains(text, "super-symlink-secret") {
+		t.Fatalf("scan followed symlink and leaked target contents: %s", text)
+	}
+	if !strings.Contains(text, "exceeds size cap") || !strings.Contains(text, "mcp_symlink_config") {
+		t.Fatalf("scan missing huge/symlink evidence: %s", text)
+	}
+}
+
 func TestScannerFindsExpandedAdaptersWithConservativeClassifications(t *testing.T) {
 	home := t.TempDir()
 	writeFile(t, filepath.Join(home, ".config", "zed", "settings.json"), `{}`)

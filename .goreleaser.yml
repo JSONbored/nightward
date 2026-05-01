@@ -63,6 +63,7 @@ signs:
       - sign-blob
       - --yes
       - --output-signature=${signature}
+      - --output-certificate=${certificate}
       - ${artifact}
 
 changelog:

@@ -54,11 +54,34 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  release-smoke:
+    name: Release smoke
+    runs-on: ubuntu-latest
+    needs: release
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      - name: Smoke published GitHub release artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: bash scripts/smoke-release-archive.sh "${REF_NAME}"
+
   npm:
     name: NPM package
     runs-on: ubuntu-latest
-    needs: release
+    needs: release-smoke
     if: ${{ vars.NPM_PUBLISH == 'true' }}
+    environment: npm-publish
     permissions:
       contents: read
       id-token: write
@@ -87,10 +110,14 @@ jobs:
           npm version --no-git-tag-version "${version}"
           npm test
           npm audit --audit-level=moderate
+          package_tarball="$(npm pack --silent)"
           npm pack --dry-run
+          tmp_prefix="$(mktemp -d)"
+          trap 'rm -rf "${tmp_prefix}"' EXIT
+          npm install --global --prefix "${tmp_prefix}" "./${package_tarball}"
+          PATH="${tmp_prefix}/bin:${PATH}" nightward --version
+          PATH="${tmp_prefix}/bin:${PATH}" nw --version
 
       - name: Publish npm package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public --provenance
         working-directory: packages/npm

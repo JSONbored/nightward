@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jsonbored/nightward/internal/inventory"
 	"github.com/pelletier/go-toml/v2"
+	"gopkg.in/yaml.v3"
 )
 
 type Preview struct {
@@ -160,6 +162,10 @@ func previewFinding(finding inventory.Finding) PatchPreview {
 		return previewExternalizeSecret(patch, parsed, finding.PatchHint)
 	case inventory.FixReplaceShellWrapper:
 		return previewReplaceShellWrapper(patch, parsed, finding.PatchHint)
+	case inventory.FixNarrowFilesystem:
+		return previewNarrowFilesystem(patch, parsed, finding.PatchHint)
+	case inventory.FixManualReview:
+		return previewManualReview(patch, parsed, finding, finding.PatchHint)
 	default:
 		return patch
 	}
@@ -173,6 +179,9 @@ func previewExternalizeSecret(patch PatchPreview, parsed parsedMCP, hint *invent
 	if hint.EnvKey == "" {
 		patch.Reason = "Patch preview blocked: env key is unknown."
 		return patch
+	}
+	if hint.HeaderKey != "" {
+		return previewExternalizeHeader(patch, parsed, hint)
 	}
 	env, ok := parsed.server["env"].(map[string]any)
 	if !ok {
@@ -188,6 +197,25 @@ func previewExternalizeSecret(patch PatchPreview, parsed parsedMCP, hint *invent
 	patch.Diff = redactedHunk(patch.Path, patch.Server,
 		[]string{fmt.Sprintf("env.%s = %q", hint.EnvKey, "[redacted]")},
 		[]string{fmt.Sprintf("env.%s = %q", hint.EnvKey, "${"+hint.EnvKey+"}")},
+	)
+	return patch
+}
+
+func previewExternalizeHeader(patch PatchPreview, parsed parsedMCP, hint *inventory.PatchHint) PatchPreview {
+	headers, ok := parsed.server["headers"].(map[string]any)
+	if !ok {
+		patch.Reason = "Patch preview blocked: server headers map is missing or unsupported."
+		return patch
+	}
+	if _, ok := headers[hint.HeaderKey]; !ok {
+		patch.Reason = "Patch preview blocked: header key was not found in the parsed server."
+		return patch
+	}
+	patch.PatchAvailable = true
+	patch.Reason = "Redacted preview replaces the inline header secret with an environment reference. Review before editing the config."
+	patch.Diff = redactedHunk(patch.Path, patch.Server,
+		[]string{fmt.Sprintf("headers.%s = %q", hint.HeaderKey, "[redacted]")},
+		[]string{fmt.Sprintf("headers.%s = %q", hint.HeaderKey, "${"+hint.EnvKey+"}")},
 	)
 	return patch
 }
@@ -216,6 +244,64 @@ func previewReplaceShellWrapper(patch PatchPreview, parsed parsedMCP, hint *inve
 	return patch
 }
 
+func previewNarrowFilesystem(patch PatchPreview, parsed parsedMCP, hint *inventory.PatchHint) PatchPreview {
+	currentArgs := redactArgs(stringSlice(parsed.server["args"]))
+	nextArgs := redactArgs(hint.DirectArgs)
+	if len(currentArgs) == 0 || len(nextArgs) == 0 {
+		patch.Reason = "Review-only preview blocked: argument shape is missing or unsupported."
+		return patch
+	}
+	patch.Reason = "Review-only preview narrows broad filesystem arguments with placeholders. Choose exact paths before editing."
+	patch.Diff = redactedHunk(patch.Path, patch.Server,
+		[]string{fmt.Sprintf("args = [%s]", quoteStrings(currentArgs))},
+		[]string{fmt.Sprintf("args = [%s]", quoteStrings(nextArgs))},
+	)
+	return patch
+}
+
+func previewManualReview(patch PatchPreview, parsed parsedMCP, finding inventory.Finding, hint *inventory.PatchHint) PatchPreview {
+	switch finding.Rule {
+	case "mcp_local_endpoint":
+		currentURL := redactString(stringValue(parsed.server["url"]))
+		if currentURL == "" {
+			patch.Reason = "Review-only preview blocked: server URL is missing or unsupported."
+			return patch
+		}
+		replacement := hint.Replacement
+		if replacement == "" {
+			replacement = "<reviewed-portable-or-local-overlay-url>"
+		}
+		patch.Reason = "Review-only preview marks the local endpoint as a portability decision. Keep machine-local URLs out of shared dotfiles."
+		patch.Diff = redactedHunk(patch.Path, patch.Server,
+			[]string{fmt.Sprintf("url = %q", currentURL)},
+			[]string{fmt.Sprintf("url = %q", replacement)},
+		)
+	case "mcp_local_token_path":
+		currentArgs := redactArgs(stringSlice(parsed.server["args"]))
+		nextArgs := redactArgs(hint.DirectArgs)
+		if len(currentArgs) == 0 || len(nextArgs) == 0 {
+			patch.Reason = "Review-only preview blocked: credential path arguments are missing or unsupported."
+			return patch
+		}
+		replacement := hint.Replacement
+		if replacement == "" {
+			replacement = "<local-secret-path-kept-out-of-dotfiles>"
+		}
+		for i, arg := range nextArgs {
+			lower := strings.ToLower(arg)
+			if strings.Contains(lower, "token") || strings.Contains(lower, "credential") || strings.Contains(lower, "secret") {
+				nextArgs[i] = replacement
+			}
+		}
+		patch.Reason = "Review-only preview keeps credential path assumptions machine-local. Choose an ignored local overlay before editing."
+		patch.Diff = redactedHunk(patch.Path, patch.Server,
+			[]string{fmt.Sprintf("args = [%s]", quoteStrings(currentArgs))},
+			[]string{fmt.Sprintf("args = [%s]", quoteStrings(nextArgs))},
+		)
+	}
+	return patch
+}
+
 func parseMCPServer(path, serverName string) (parsedMCP, error) {
 	contents, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- preview reads scanner-discovered local MCP config without mutating it.
 	if err != nil {
@@ -225,6 +311,10 @@ func parseMCPServer(path, serverName string) (parsedMCP, error) {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".toml":
 		if err := toml.Unmarshal(contents, &doc); err != nil {
+			return parsedMCP{}, err
+		}
+	case ".yaml", ".yml":
+		if err := yaml.Unmarshal(contents, &doc); err != nil {
 			return parsedMCP{}, err
 		}
 	default:
@@ -328,8 +418,7 @@ func secretFlag(value string) bool {
 func quoteStrings(values []string) string {
 	quoted := make([]string, 0, len(values))
 	for _, value := range values {
-		encoded, _ := json.Marshal(value)
-		quoted = append(quoted, string(encoded))
+		quoted = append(quoted, strconv.Quote(value))
 	}
 	return strings.Join(quoted, ", ")
 }

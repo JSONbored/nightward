@@ -5,3 +5,6 @@
 /nw
 coverage.out
 reports/
+/site/.vitepress/cache/
+/site/.vitepress/dist/
+/site/node_modules/

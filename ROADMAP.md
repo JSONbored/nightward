@@ -24,10 +24,13 @@ Nightward is intentionally staged. The scanner and policy model need to stay tru
 - Raycast screenshots, store metadata, and manual development-mode smoke after the first release candidate.
 - Golden SARIF snapshots and broader no-write tests.
 - Bubble Tea/Bubbles TUI upgrade with list, table, viewport, textinput, help, filter modal, command palette, report history, and mouse-wheel support.
-- Optional provider execution for local scanners with timeouts, file-size caps, redaction, and explicit online-provider opt-in.
+- Broader provider execution beyond the first explicit local `gitleaks`, `trufflehog`, and `semgrep` runner slice.
 - Fuzz coverage for MCP JSON/TOML/YAML parsing, URL/header redaction, symlink traversal, huge files, and malformed configs.
 - Add SLSA provenance/attestation after signed checksum and npm provenance flow are stable.
 - Screenshot and GIF assets for the README.
+- Static HTML report export before any self-hosted dashboard.
+- Rules list/explain commands and contributor fixture templates.
+- Homebrew tap after the first release proves stable.
 
 ## Later
 
@@ -35,6 +38,7 @@ Nightward is intentionally staged. The scanner and policy model need to stay tru
 - Cross-machine diff.
 - Private dotfiles integration.
 - Docker/Unraid dashboard.
+- Nix, Scoop, WinGet, mise, and aqua packages.
 - Restore workflow only after snapshot, preview, rollback, and secret-safety controls exist.
 
 ## Non-Goals For V1
