@@ -28,7 +28,7 @@ features:
 <!-- markdownlint-disable MD041 -->
 
 ```sh
-npx nightward --help
+npx @jsonbored/nightward --help
 nw doctor --json
 nw scan --workspace . --json
 nw policy sarif --workspace . --include-analysis --output nightward.sarif

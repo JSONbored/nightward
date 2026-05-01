@@ -26,7 +26,7 @@ Users who want the strongest supply-chain verification should download from GitH
 
 ## NPM
 
-The `nightward` npm package name is available and this repo includes a release-gated package under `packages/npm`.
+The npm registry rejected the unscoped `nightward` package name as too similar to an existing package, so Nightward publishes the scoped package `@jsonbored/nightward`. The installed binaries are still `nightward` and `nw`.
 
 The package is a thin launcher:
 
@@ -39,12 +39,12 @@ The package is a thin launcher:
 Example after the first release is published:
 
 ```sh
-npx nightward --help
-npm install -g nightward
+npx @jsonbored/nightward --help
+npm install -g @jsonbored/nightward
 nw scan --json
 ```
 
-Publishing is disabled by default. The release workflow publishes to npm only when `NPM_PUBLISH=true` is configured and npm trusted publishing is ready for package `nightward`, repository `JSONbored/nightward`, and workflow `.github/workflows/release.yml`.
+Publishing is disabled by default. The release workflow publishes to npm only when `NPM_PUBLISH=true` is configured and npm trusted publishing is ready for package `@jsonbored/nightward`, repository `JSONbored/nightward`, and workflow `.github/workflows/release.yml`.
 
 The package should not use a long-lived npm token. It should publish through GitHub OIDC/trusted publishing with provenance.
 

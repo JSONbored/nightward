@@ -26,7 +26,7 @@ The npm package downloads the matching GitHub Release archive on first run and v
 After install:
 
 ```sh
-npx nightward --version
+npx @jsonbored/nightward --version
 nw doctor --json
 ```
 

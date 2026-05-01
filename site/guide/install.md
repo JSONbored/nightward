@@ -25,8 +25,8 @@ After the first tagged release:
 The npm package is a launcher, not a JavaScript rewrite:
 
 ```sh
-npx nightward --help
-npm install -g nightward
+npx @jsonbored/nightward --help
+npm install -g @jsonbored/nightward
 nw scan --json
 ```
 

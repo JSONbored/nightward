@@ -5,7 +5,7 @@ Nightward distribution should optimize for trust first, then convenience.
 ## Order
 
 1. GitHub Releases with signed checksums and SBOMs.
-2. npm launcher with trusted publishing and provenance.
+2. scoped npm launcher `@jsonbored/nightward` with trusted publishing and provenance.
 3. `go install github.com/jsonbored/nightward/cmd/nw@vX.Y.Z`.
 4. Trunk plugin import from a release tag.
 5. GitHub Action release tags.
@@ -18,7 +18,7 @@ Docker is deferred until Nightward has a useful local report browser. A containe
 
 ## NPM Posture
 
-The npm package must remain a launcher:
+The npm package is `@jsonbored/nightward`. It must remain a launcher:
 
 - no `postinstall`
 - no bundled second implementation
