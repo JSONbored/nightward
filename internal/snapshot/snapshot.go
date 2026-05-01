@@ -12,10 +12,11 @@ import (
 )
 
 type Plan struct {
-	GeneratedAt time.Time `json:"generated_at"`
-	TargetRoot  string    `json:"target_root"`
-	Entries     []Entry   `json:"entries"`
-	Summary     Summary   `json:"summary"`
+	SchemaVersion int       `json:"schema_version"`
+	GeneratedAt   time.Time `json:"generated_at"`
+	TargetRoot    string    `json:"target_root"`
+	Entries       []Entry   `json:"entries"`
+	Summary       Summary   `json:"summary"`
 }
 
 type Entry struct {
@@ -35,13 +36,14 @@ type Summary struct {
 }
 
 type Diff struct {
-	GeneratedAt time.Time   `json:"generated_at"`
-	From        string      `json:"from"`
-	To          string      `json:"to"`
-	Summary     DiffSummary `json:"summary"`
-	Added       []Entry     `json:"added,omitempty"`
-	Removed     []Entry     `json:"removed,omitempty"`
-	Changed     []Change    `json:"changed,omitempty"`
+	SchemaVersion int         `json:"schema_version"`
+	GeneratedAt   time.Time   `json:"generated_at"`
+	From          string      `json:"from"`
+	To            string      `json:"to"`
+	Summary       DiffSummary `json:"summary"`
+	Added         []Entry     `json:"added,omitempty"`
+	Removed       []Entry     `json:"removed,omitempty"`
+	Changed       []Change    `json:"changed,omitempty"`
 }
 
 type DiffSummary struct {
@@ -58,7 +60,7 @@ type Change struct {
 
 func Build(report inventory.Report, targetRoot string) Plan {
 	backup := backupplan.Build(report, targetRoot)
-	plan := Plan{GeneratedAt: report.GeneratedAt, TargetRoot: targetRoot}
+	plan := Plan{SchemaVersion: 1, GeneratedAt: report.GeneratedAt, TargetRoot: targetRoot}
 	for _, backupEntry := range backup.Entries {
 		entry := Entry{
 			Source:         backupEntry.Source,
@@ -96,9 +98,10 @@ func Load(path string) (Plan, error) {
 
 func Compare(fromPath, toPath string, from, to Plan) Diff {
 	diff := Diff{
-		GeneratedAt: time.Now().UTC(),
-		From:        fromPath,
-		To:          toPath,
+		SchemaVersion: 1,
+		GeneratedAt:   time.Now().UTC(),
+		From:          fromPath,
+		To:            toPath,
 	}
 	fromEntries := indexEntries(from)
 	toEntries := indexEntries(to)

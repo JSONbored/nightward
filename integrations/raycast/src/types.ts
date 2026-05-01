@@ -73,6 +73,7 @@ export type AdapterStatus = {
 };
 
 export type ScanReport = {
+  schema_version?: number;
   generated_at: string;
   hostname: string;
   home: string;
@@ -125,6 +126,7 @@ export type ProviderStatus = {
 };
 
 export type AnalysisReport = {
+  schema_version?: number;
   generated_at: string;
   mode: string;
   workspace?: string;
@@ -160,6 +162,7 @@ export type DoctorCheck = {
 };
 
 export type SchedulePlan = {
+  schema_version?: number;
   preset: string;
   platform: string;
   report_dir: string;
@@ -169,9 +172,19 @@ export type SchedulePlan = {
   last_report?: string;
   last_run?: string;
   last_findings?: number;
+  history?: ReportRecord[];
+};
+
+export type ReportRecord = {
+  path: string;
+  mod_time: string;
+  findings: number;
+  size_bytes: number;
+  report_name: string;
 };
 
 export type DoctorReport = {
+  schema_version?: number;
   generated_at: string;
   version: string;
   home: string;
@@ -182,6 +195,7 @@ export type DoctorReport = {
 };
 
 export type FixPlan = {
+  schema_version?: number;
   generated_at: string;
   summary: {
     total: number;

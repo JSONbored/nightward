@@ -12,7 +12,7 @@ This installs `nightward` and `nw` into `~/.local/bin` by default.
 
 ## GitHub Releases
 
-After the first tagged release:
+Use GitHub Releases as the canonical binary source:
 
 1. Download the archive for your platform.
 2. Download `checksums.txt` and `checksums.txt.sig`.
@@ -32,14 +32,14 @@ nw scan --json
 
 The launcher has no `postinstall` script. On first run it downloads the matching GitHub Release archive, verifies its SHA-256 from `checksums.txt`, caches the extracted binaries, and executes `nightward` or `nw`.
 
-## Planned channels
+## Channels
 
-1. GitHub Releases.
-2. npm launcher.
-3. `go install`.
-4. Trunk plugin import.
-5. GitHub Action tags.
-6. Homebrew tap.
-7. Nix, Scoop, WinGet, mise, and aqua.
+1. GitHub Releases: shipped.
+2. npm launcher: shipped.
+3. `go install`: shipped.
+4. Trunk plugin import: shipped.
+5. GitHub Action tags: shipped.
+6. Homebrew tap: planned next.
+7. Nix, Scoop, WinGet, mise, and aqua: later.
 
 Docker is deferred until Nightward has a useful local report browser. Docker is not a good default for scanning a user's HOME directory safely.

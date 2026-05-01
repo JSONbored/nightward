@@ -97,7 +97,7 @@ This installs:
 - `nightward`: canonical project command
 - `nw`: short alias for frequent terminal/TUI use
 
-After the first tagged release, Nightward will also ship a release-gated npm launcher:
+Install the release-gated npm launcher:
 
 ```sh
 npx @jsonbored/nightward --help
@@ -196,6 +196,8 @@ Render a local static HTML report from redacted scan JSON:
 ```sh
 nw scan --json --output /tmp/nightward-scan.json
 nw report html --input /tmp/nightward-scan.json --output /tmp/nightward-report.html
+nw report diff --from /tmp/previous-scan.json --to /tmp/nightward-scan.json
+nw report history
 ```
 
 Run policy checks or generate SARIF:
@@ -309,7 +311,7 @@ Keyboard shortcuts:
 Nightward can run as a local GitHub Action in scan, policy, or SARIF mode:
 
 ```yaml
-- uses: JSONbored/nightward@v0.1.0
+- uses: JSONbored/nightward@v0.1.4
   with:
     mode: sarif
     output: nightward.sarif
@@ -331,10 +333,10 @@ See [docs/website.md](docs/website.md) for the page map and Stitch landing-page 
 
 ## Trunk Plugin
 
-Nightward includes an in-repo `plugin.yaml` for Trunk Check. After release tags exist, users can import the plugin and enable repo/workspace policy scans:
+Nightward includes an in-repo `plugin.yaml` for Trunk Check. Import a pinned release tag and enable repo/workspace policy scans:
 
 ```sh
-trunk plugins add --id nightward https://github.com/JSONbored/nightward v0.1.0
+trunk plugins add --id nightward https://github.com/JSONbored/nightward v0.1.4
 trunk check enable nightward-policy
 ```
 

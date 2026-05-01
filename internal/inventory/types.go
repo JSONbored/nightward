@@ -2,6 +2,8 @@ package inventory
 
 import "time"
 
+const ReportSchemaVersion = 1
+
 type Classification string
 
 const (
@@ -104,13 +106,14 @@ type Summary struct {
 }
 
 type Report struct {
-	GeneratedAt time.Time       `json:"generated_at"`
-	Hostname    string          `json:"hostname"`
-	Home        string          `json:"home"`
-	Workspace   string          `json:"workspace,omitempty"`
-	ScanMode    string          `json:"scan_mode,omitempty"`
-	Summary     Summary         `json:"summary"`
-	Items       []Item          `json:"items"`
-	Findings    []Finding       `json:"findings"`
-	Adapters    []AdapterStatus `json:"adapters"`
+	SchemaVersion int             `json:"schema_version"`
+	GeneratedAt   time.Time       `json:"generated_at"`
+	Hostname      string          `json:"hostname"`
+	Home          string          `json:"home"`
+	Workspace     string          `json:"workspace,omitempty"`
+	ScanMode      string          `json:"scan_mode,omitempty"`
+	Summary       Summary         `json:"summary"`
+	Items         []Item          `json:"items"`
+	Findings      []Finding       `json:"findings"`
+	Adapters      []AdapterStatus `json:"adapters"`
 }

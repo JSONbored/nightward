@@ -61,10 +61,11 @@ func (s Scanner) Scan() Report {
 		return s.scanWorkspace(now)
 	}
 	report := Report{
-		GeneratedAt: now,
-		Hostname:    s.Hostname,
-		Home:        s.Home,
-		ScanMode:    "home",
+		SchemaVersion: ReportSchemaVersion,
+		GeneratedAt:   now,
+		Hostname:      s.Hostname,
+		Home:          s.Home,
+		ScanMode:      "home",
 		Summary: Summary{
 			ItemsByClassification: map[Classification]int{},
 			ItemsByRisk:           map[RiskLevel]int{},
@@ -131,11 +132,12 @@ func (s Scanner) Scan() Report {
 
 func (s Scanner) scanWorkspace(now time.Time) Report {
 	report := Report{
-		GeneratedAt: now,
-		Hostname:    s.Hostname,
-		Home:        "",
-		Workspace:   s.Workspace,
-		ScanMode:    "workspace",
+		SchemaVersion: ReportSchemaVersion,
+		GeneratedAt:   now,
+		Hostname:      s.Hostname,
+		Home:          "",
+		Workspace:     s.Workspace,
+		ScanMode:      "workspace",
 		Summary: Summary{
 			ItemsByClassification: map[Classification]int{},
 			ItemsByRisk:           map[RiskLevel]int{},
@@ -195,6 +197,9 @@ func (s Scanner) expand(rel string) string {
 }
 
 func finalizeReport(report *Report) {
+	if report.SchemaVersion == 0 {
+		report.SchemaVersion = ReportSchemaVersion
+	}
 	sort.Slice(report.Items, func(i, j int) bool {
 		if report.Items[i].Tool == report.Items[j].Tool {
 			return report.Items[i].Path < report.Items[j].Path

@@ -2,6 +2,8 @@
 
 Nightward emits redacted JSON for automation.
 
+Public JSON objects include `schema_version` unless they predate the v0.1.4 schema contract. Pre-1.0 schema changes should stay additive whenever possible.
+
 ## Scan
 
 ```sh
@@ -33,3 +35,24 @@ nw policy check --strict --json
 ```
 
 Policy output includes pass/fail status, threshold, violations, ignored findings, and optional analysis signal violations.
+
+## Report Diff
+
+```sh
+nw report diff --from previous.json --to current.json --json
+```
+
+Report diff output includes:
+
+- `added_findings`
+- `removed_findings`
+- `changed_findings`
+- summary counts for added, removed, changed, and unchanged findings
+
+## Badge
+
+```sh
+nw policy badge --output -
+```
+
+The badge artifact keeps the Shields-compatible `schemaVersion` key and adds Nightward policy fields such as `passed`, `threshold`, `total_findings`, violation counts, and an optional SARIF URL.
