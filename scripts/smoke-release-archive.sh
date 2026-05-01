@@ -15,8 +15,7 @@ trap 'rm -rf "${tmp_dir}"' EXIT
 gh release download "${tag}" \
   --repo "${repo}" \
   --pattern checksums.txt \
-  --pattern checksums.txt.pem \
-  --pattern checksums.txt.sig \
+  --pattern checksums.txt.sigstore.json \
   --pattern "${asset}" \
   --pattern "${asset}.sbom.json" \
   --dir "${tmp_dir}"
@@ -24,11 +23,7 @@ gh release download "${tag}" \
 cd "${tmp_dir}"
 test -s "${asset}.sbom.json"
 cosign verify-blob \
-  --new-bundle-format=false \
-  --certificate-identity-regexp "https://github.com/${repo}/.github/workflows/release.yml@refs/tags/v.*" \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate checksums.txt.pem \
-  --signature checksums.txt.sig \
+  --bundle checksums.txt.sigstore.json \
   checksums.txt
 sha256sum -c checksums.txt --ignore-missing
 tar -xzf "${asset}"
