@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jsonbored/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/schedule"
 )
 
 func TestFindingsAndFixPlanViewsRenderRedactedDetails(t *testing.T) {
@@ -158,6 +159,137 @@ func TestTUIUpdateFiltersSearchAndHelp(t *testing.T) {
 	}
 }
 
+func TestTUIUpdateNavigationAndActionBranches(t *testing.T) {
+	home := t.TempDir()
+	report := inventory.Report{
+		Home: home,
+		Items: []inventory.Item{
+			{ID: "item-1", Tool: "Codex", Path: filepath.Join(home, ".codex", "config.toml"), Classification: inventory.Portable, Risk: inventory.RiskLow},
+		},
+		Findings: []inventory.Finding{
+			{
+				ID:             "mcp_secret_header-111111111111",
+				Tool:           "Codex",
+				Rule:           "mcp_secret_header",
+				Severity:       inventory.RiskHigh,
+				Message:        "Header secret",
+				Evidence:       "Authorization=super-" + "secret-value",
+				FixAvailable:   true,
+				FixKind:        inventory.FixExternalizeSecret,
+				FixSummary:     "Move header out of config.",
+				FixSteps:       []string{"Remove Authorization=super-" + "secret-value"},
+				Recommendation: "Externalize the header.",
+			},
+			{
+				ID:       "mcp_server_review-222222222222",
+				Tool:     "Cursor",
+				Rule:     "mcp_server_review",
+				Severity: inventory.RiskInfo,
+				Message:  "Review server",
+			},
+		},
+	}
+	m := model{
+		report: report,
+		schedule: schedule.Plan{
+			ReportDir: filepath.Join(home, ".local", "state", "nightward", "reports"),
+		},
+		width:  120,
+		height: 40,
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = updated.(model)
+	if m.tab != 1 {
+		t.Fatalf("expected tab navigation to inventory, got %d", m.tab)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	m = updated.(model)
+	if m.tab != 0 {
+		t.Fatalf("expected shift-tab navigation to dashboard, got %d", m.tab)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = updated.(model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	m = updated.(model)
+	if m.tab != 0 {
+		t.Fatalf("expected left navigation back to dashboard, got %d", m.tab)
+	}
+
+	updated, _ = m.Update(key("3"))
+	m = updated.(model)
+	updated, _ = m.Update(key("t"))
+	m = updated.(model)
+	if m.tool != "Codex" {
+		t.Fatalf("expected tool filter, got %q", m.tool)
+	}
+	updated, _ = m.Update(key("r"))
+	m = updated.(model)
+	if m.rule != "mcp_secret_header" {
+		t.Fatalf("expected rule filter, got %q", m.rule)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(model)
+	if m.cursor != 1 {
+		t.Fatalf("expected cursor down, got %d", m.cursor)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = updated.(model)
+	if m.cursor != 0 {
+		t.Fatalf("expected cursor up, got %d", m.cursor)
+	}
+
+	updated, _ = m.Update(key("/"))
+	m = updated.(model)
+	for _, r := range "secret" {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = updated.(model)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	m = updated.(model)
+	if m.search != "secre" {
+		t.Fatalf("expected search backspace, got %q", m.search)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlU})
+	m = updated.(model)
+	if m.search != "" {
+		t.Fatalf("expected search clear, got %q", m.search)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(model)
+	if m.searching {
+		t.Fatal("expected search mode cancelled")
+	}
+
+	updated, cmd := m.Update(key("c"))
+	m = updated.(model)
+	if cmd == nil || !strings.Contains(m.status, "copying") {
+		t.Fatalf("expected copy action status, status=%q cmd=%v", m.status, cmd)
+	}
+	updated, cmd = m.Update(key("o"))
+	m = updated.(model)
+	if cmd == nil || !strings.Contains(m.status, "opening docs") {
+		t.Fatalf("expected open-docs action status, status=%q cmd=%v", m.status, cmd)
+	}
+	updated, cmd = m.Update(key("e"))
+	m = updated.(model)
+	if cmd == nil || !strings.Contains(m.status, "exporting fix plan") {
+		t.Fatalf("expected export action status, status=%q cmd=%v", m.status, cmd)
+	}
+	msg := cmd()
+	action, ok := msg.(actionMsg)
+	if !ok || !strings.Contains(action.status, "exported fix plan") {
+		t.Fatalf("unexpected export action message: %#v", msg)
+	}
+
+	empty := model{tab: 1}
+	updated, _ = empty.Update(key("c"))
+	empty = updated.(model)
+	if empty.status != "copy: nothing selected" {
+		t.Fatalf("expected empty copy status, got %q", empty.status)
+	}
+}
+
 func TestTUIViewResponsiveWidths(t *testing.T) {
 	report := inventory.Report{
 		GeneratedAt: time.Date(2026, 4, 30, 7, 0, 0, 0, time.UTC),
@@ -206,6 +338,80 @@ func TestTUIViewResponsiveWidths(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestTUIReportDeltaAndUtilityFallbacks(t *testing.T) {
+	now := time.Date(2026, 4, 30, 8, 0, 0, 0, time.UTC)
+	if got := reportDelta(nil); got != "" {
+		t.Fatalf("expected empty delta, got %q", got)
+	}
+	if got := reportDelta([]schedule.ReportRecord{{Findings: 1, ModTime: now}, {Findings: 1, ModTime: now.Add(-time.Hour)}}); !strings.Contains(got, "no finding change") {
+		t.Fatalf("unexpected zero delta: %q", got)
+	}
+	if got := reportDelta([]schedule.ReportRecord{{Findings: 1, ModTime: now}, {Findings: 3, ModTime: now.Add(-time.Hour)}}); !strings.Contains(got, "-2 findings") {
+		t.Fatalf("unexpected negative delta: %q", got)
+	}
+	if got := byteSize(5 * 1024 * 1024); got != "5.0MB" {
+		t.Fatalf("unexpected byte size: %q", got)
+	}
+	if got := cycle("Cursor", []string{"Codex", "Cursor"}); got != "" {
+		t.Fatalf("expected cycle reset, got %q", got)
+	}
+	if got := filterLabel(""); got != "all" {
+		t.Fatalf("unexpected empty filter label: %q", got)
+	}
+	for _, risk := range []inventory.RiskLevel{inventory.RiskCritical, inventory.RiskMedium, inventory.RiskInfo, inventory.RiskLevel("unknown")} {
+		if got := severityColor(risk); got == "" {
+			t.Fatalf("expected color for %q", risk)
+		}
+	}
+}
+
+func TestDashboardShowsReportHistoryAndNextActions(t *testing.T) {
+	report := inventory.Report{
+		GeneratedAt: time.Date(2026, 4, 30, 7, 0, 0, 0, time.UTC),
+		Home:        "/tmp/nightward-home",
+		Summary: inventory.Summary{
+			TotalFindings:      1,
+			FindingsBySeverity: map[inventory.RiskLevel]int{inventory.RiskHigh: 1},
+		},
+		Findings: []inventory.Finding{
+			{ID: "one", Severity: inventory.RiskHigh, Rule: "mcp_secret_header", Message: "Header secret"},
+		},
+	}
+	m := model{
+		report: report,
+		schedule: schedule.Plan{
+			ReportDir: "/tmp/nightward-home/.local/state/nightward/reports",
+			History: []schedule.ReportRecord{
+				{
+					Path:       "/tmp/nightward-home/.local/state/nightward/reports/new.json",
+					ReportName: "new.json",
+					Findings:   2,
+					SizeBytes:  2048,
+					ModTime:    time.Date(2026, 4, 30, 8, 0, 0, 0, time.UTC),
+				},
+				{
+					Path:       "/tmp/nightward-home/.local/state/nightward/reports/old.json",
+					ReportName: "old.json",
+					Findings:   1,
+					SizeBytes:  1024,
+					ModTime:    time.Date(2026, 4, 29, 8, 0, 0, 0, time.UTC),
+				},
+			},
+		},
+		width:  120,
+		height: 40,
+	}
+	dashboard := stripANSI(m.dashboard(116))
+	for _, want := range []string{"Recent Reports", "new.json", "2.0KB", "Latest delta", "+1 findings", "What Next", "Review Findings and Fix Plan"} {
+		if !strings.Contains(dashboard, want) {
+			t.Fatalf("dashboard missing %q:\n%s", want, dashboard)
+		}
+	}
+	if got, label, ok := m.copySelection(); !ok || label != "latest report" || !strings.HasSuffix(got, "new.json") {
+		t.Fatalf("unexpected dashboard copy selection: got=%q label=%q ok=%t", got, label, ok)
 	}
 }
 

@@ -36,7 +36,8 @@
       "matchManagers": ["npm"],
       "matchFileNames": [
         "integrations/raycast/package.json",
-        "packages/npm/package.json"
+        "packages/npm/package.json",
+        "site/package.json"
       ],
       "groupName": "npm packages",
       "labels": ["dependencies", "npm"]

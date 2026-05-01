@@ -2,7 +2,9 @@ package schedule
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -56,6 +58,60 @@ func TestBuildPlanRejectsUnsupportedPreset(t *testing.T) {
 	}
 }
 
+func TestInstallAndRemoveUseGeneratedFilesWithoutSystemMutation(t *testing.T) {
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		t.Skip("automatic install/remove only supports launchd or systemd")
+	}
+	home := t.TempDir()
+	originalExecCommand := execCommand
+	execCommand = func(name string, args ...string) *exec.Cmd {
+		commandArgs := append([]string{"-test.run=TestScheduleHelperProcess", "--", name}, args...)
+		cmd := exec.Command(os.Args[0], commandArgs...)
+		cmd.Env = append(os.Environ(), "NIGHTWARD_SCHEDULE_HELPER=1")
+		return cmd
+	}
+	t.Cleanup(func() { execCommand = originalExecCommand })
+
+	plan, err := Install(home, "nightward", "nightly")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.Installed {
+		t.Fatal("expected installed plan")
+	}
+	if _, err := os.Stat(plan.ReportDir); err != nil {
+		t.Fatalf("expected report dir: %v", err)
+	}
+	if _, err := os.Stat(plan.LogDir); err != nil {
+		t.Fatalf("expected log dir: %v", err)
+	}
+	for _, file := range plan.Files {
+		if _, err := os.Stat(file.Path); err != nil {
+			t.Fatalf("expected generated schedule file %s: %v", file.Path, err)
+		}
+	}
+
+	removed, err := Remove(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed.Installed {
+		t.Fatal("expected removed plan to report not installed")
+	}
+	for _, file := range plan.Files {
+		if _, err := os.Stat(file.Path); !os.IsNotExist(err) {
+			t.Fatalf("expected generated schedule file to be removed, path=%s err=%v", file.Path, err)
+		}
+	}
+}
+
+func TestScheduleHelperProcess(t *testing.T) {
+	if os.Getenv("NIGHTWARD_SCHEDULE_HELPER") != "1" {
+		return
+	}
+	os.Exit(0)
+}
+
 func TestStatusReadsLatestReportAndFindingCount(t *testing.T) {
 	home := t.TempDir()
 	reportDir := filepath.Join(home, ".local", "state", "nightward", "reports")
@@ -78,6 +134,12 @@ func TestStatusReadsLatestReportAndFindingCount(t *testing.T) {
 	if err := os.Chtimes(newReport, newTime, newTime); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(reportDir, "notes.txt"), []byte("not a report"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(newReport, filepath.Join(reportDir, "linked.json")); err != nil {
+		t.Logf("skipping symlink fixture: %v", err)
+	}
 
 	status := Status(home)
 	if status.LastReport != newReport || status.LastRun == nil || !status.LastRun.Equal(newTime) {
@@ -85,6 +147,16 @@ func TestStatusReadsLatestReportAndFindingCount(t *testing.T) {
 	}
 	if status.LastFindings != 2 {
 		t.Fatalf("expected two findings, got %d", status.LastFindings)
+	}
+	if len(status.History) != 2 || status.History[0].ReportName != "new.json" || status.History[1].ReportName != "old.json" {
+		t.Fatalf("unexpected report history: %#v", status.History)
+	}
+	if status.History[0].Findings != 2 || status.History[1].Findings != 1 {
+		t.Fatalf("unexpected report history finding counts: %#v", status.History)
+	}
+	limited := ReportHistory(reportDir, 1)
+	if len(limited) != 1 || limited[0].Path != newReport {
+		t.Fatalf("unexpected limited report history: %#v", limited)
 	}
 }
 

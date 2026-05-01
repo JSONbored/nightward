@@ -1,0 +1,43 @@
+# Website And Docs Plan
+
+Nightward's public website lives under `site/` and uses VitePress. This mirrors Beszel's static-docs model while keeping Nightward's docs fully repo-owned.
+
+The site currently uses the latest VitePress 2 alpha because VitePress 1.x depends on a Vite/esbuild development-server chain with an unresolved moderate npm advisory. The site is static, analytics-free by default, and CI builds it with `npm audit --audit-level=moderate`.
+
+## Site Goals
+
+- Explain the problem in the first viewport.
+- Make the install path obvious.
+- Show the local-first privacy stance clearly.
+- Document CLI, TUI, policy, integrations, security, and release verification.
+- Avoid analytics, telemetry, or hosted-docs dependencies by default.
+
+## Pages
+
+- `/`
+- `/guide/what-is-nightward`
+- `/guide/getting-started`
+- `/guide/install`
+- `/guide/privacy-model`
+- `/guide/tui`
+- `/guide/cli`
+- `/guide/mcp-security`
+- `/guide/remediation`
+- `/guide/policy-and-sarif`
+- `/integrations/github-action`
+- `/integrations/trunk`
+- `/integrations/raycast`
+- `/reference/config`
+- `/reference/json-output`
+- `/reference/rules`
+- `/security/threat-model`
+- `/security/release-verification`
+- `/roadmap`
+
+## Stitch Design Brief
+
+Design one polished landing page first. Keep it dark, operator-focused, and concrete. Use terminal/TUI imagery, trust badges, a visible install command, and restrained security-tool styling. Avoid vague AI gradients, generic SaaS hero cards, and claims that Nightward mutates or backs up secrets.
+
+## Deployment
+
+The first deployment target is GitHub Pages via `.github/workflows/pages.yml`. A custom domain can be added later without changing the framework.

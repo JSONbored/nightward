@@ -7,13 +7,14 @@ GOSEC_VERSION ?= v2.26.1
 STATICCHECK_VERSION ?= v0.7.0
 GORELEASER_VERSION ?= v2.9.0
 SYFT_VERSION ?= v1.43.0
-COVERAGE_THRESHOLD ?= 80.0
+COVERAGE_THRESHOLD ?= 83.0
 RAYCAST_DIR ?= integrations/raycast
 NPM_PACKAGE_DIR ?= packages/npm
+SITE_DIR ?= site
 GO_PACKAGES ?= $(shell go list ./cmd/... ./internal/... ./tools/...)
 COVERAGE_PACKAGES ?= ./internal/...
 
-.PHONY: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage coverage-check go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify tool-syft release-snapshot verify build install-local clean-reports
+.PHONY: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage coverage-check go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify site-install site-audit site-build site-verify tool-syft release-snapshot verify build install-local clean-reports
 
 test:
 	go test $(GO_PACKAGES)
@@ -70,6 +71,7 @@ trunk-flaky-validate:
 ci-scripts-test:
 	bash scripts/test-dco.sh
 	bash scripts/test-action-paths.sh
+	bash scripts/test-release-scripts.sh
 
 raycast-install:
 	cd $(RAYCAST_DIR) && npm ci --ignore-scripts --no-audit
@@ -105,13 +107,24 @@ npm-package-pack:
 
 npm-package-verify: npm-package-install npm-package-test npm-package-audit npm-package-pack
 
+site-install:
+	cd $(SITE_DIR) && npm ci --ignore-scripts --no-audit
+
+site-audit:
+	cd $(SITE_DIR) && npm audit --audit-level=moderate
+
+site-build:
+	cd $(SITE_DIR) && npm run build
+
+site-verify: site-install site-audit site-build
+
 tool-syft:
 	go install github.com/anchore/syft/cmd/syft@$(SYFT_VERSION)
 
 release-snapshot: tool-syft
 	PATH="$$(go env GOPATH)/bin:$$PATH" go run github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION) release --snapshot --clean --skip=publish,sign
 
-verify: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage-check test-junit trunk-flaky-validate trunk-check ci-scripts-test raycast-audit raycast-lint raycast-build npm-package-verify
+verify: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage-check test-junit trunk-flaky-validate trunk-check ci-scripts-test raycast-audit raycast-lint raycast-build npm-package-verify site-verify
 
 build:
 	go build -o bin/nightward ./cmd/nightward

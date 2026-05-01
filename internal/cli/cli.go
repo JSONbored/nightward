@@ -16,6 +16,8 @@ import (
 	"github.com/jsonbored/nightward/internal/fixplan"
 	"github.com/jsonbored/nightward/internal/inventory"
 	"github.com/jsonbored/nightward/internal/policy"
+	"github.com/jsonbored/nightward/internal/reporthtml"
+	"github.com/jsonbored/nightward/internal/rules"
 	"github.com/jsonbored/nightward/internal/schedule"
 	"github.com/jsonbored/nightward/internal/snapshot"
 	"github.com/jsonbored/nightward/internal/tui"
@@ -88,6 +90,10 @@ func RunWithName(commandName string, args []string, stdout, stderr io.Writer) in
 		return runTrust(home, args[1:], stdout, stderr)
 	case "providers":
 		return runProviders(args[1:], stdout, stderr)
+	case "rules":
+		return runRules(args[1:], stdout, stderr)
+	case "report":
+		return runReport(home, args[1:], stdout, stderr)
 	case "policy":
 		return runPolicy(home, args[1:], stdout, stderr)
 	case "snapshot":
@@ -97,6 +103,94 @@ func RunWithName(commandName string, args []string, stdout, stderr io.Writer) in
 	default:
 		return fail(stderr, "unknown command %q\n\nRun `%s --help` for usage.", args[0], commandName)
 	}
+	return 0
+}
+
+func runRules(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		return fail(stderr, "usage: nightward rules <list|explain> [--json]")
+	}
+	switch args[0] {
+	case "list":
+		fs := flag.NewFlagSet("rules list", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		list := rules.List()
+		if *jsonOut {
+			return writeJSON(stdout, list, stderr)
+		}
+		for _, rule := range list {
+			fmt.Fprintf(stdout, "%-22s %-8s %s\n", rule.ID, rule.DefaultSeverity, rule.Title)
+		}
+	case "explain":
+		ordered := flagsFirst(args[1:], nil)
+		fs := flag.NewFlagSet("rules explain", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(ordered); err != nil {
+			return 2
+		}
+		if fs.NArg() != 1 {
+			return fail(stderr, "usage: nightward rules explain <rule-id> [--json]")
+		}
+		rule, ok := rules.Find(fs.Arg(0))
+		if !ok {
+			return fail(stderr, "rule not found or ambiguous: %s", fs.Arg(0))
+		}
+		if *jsonOut {
+			return writeJSON(stdout, rule, stderr)
+		}
+		fmt.Fprintf(stdout, "%s\n", rule.ID)
+		fmt.Fprintf(stdout, "  severity: %s\n", rule.DefaultSeverity)
+		fmt.Fprintf(stdout, "  category: %s\n", rule.Category)
+		fmt.Fprintf(stdout, "  title:    %s\n", rule.Title)
+		fmt.Fprintf(stdout, "\n%s\n\nRecommendation: %s\n", rule.Description, rule.Recommendation)
+		if rule.DocsURL != "" {
+			fmt.Fprintf(stdout, "Docs: %s\n", rule.DocsURL)
+		}
+	default:
+		return fail(stderr, "usage: nightward rules <list|explain> [--json]")
+	}
+	return 0
+}
+
+func runReport(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 || args[0] != "html" {
+		return fail(stderr, "usage: nightward report html --input scan.json --output report.html")
+	}
+	fs := flag.NewFlagSet("report html", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	input := fs.String("input", "", "scan JSON input path")
+	output := fs.String("output", "", "HTML report output path")
+	if err := fs.Parse(args[1:]); err != nil {
+		return 2
+	}
+	if *input == "" || *output == "" {
+		return fail(stderr, "missing required --input and --output")
+	}
+	var report inventory.Report
+	data, err := os.ReadFile(filepath.Clean(expandHome(home, *input))) // #nosec G304 -- explicit user-selected scan JSON input path.
+	if err != nil {
+		return fail(stderr, "failed to read scan JSON: %v", err)
+	}
+	if err := json.Unmarshal(data, &report); err != nil {
+		return fail(stderr, "failed to parse scan JSON: %v", err)
+	}
+	html, err := reporthtml.Render(report)
+	if err != nil {
+		return fail(stderr, "failed to render HTML report: %v", err)
+	}
+	outputPath := filepath.Clean(expandHome(home, *output))
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0700); err != nil {
+		return fail(stderr, "failed to create report directory: %v", err)
+	}
+	if err := os.WriteFile(outputPath, []byte(html), 0600); err != nil { // #nosec G306 -- explicit user-selected report output should be private by default.
+		return fail(stderr, "failed to write HTML report: %v", err)
+	}
+	fmt.Fprintf(stdout, "Wrote HTML report to %s\n", outputPath)
 	return 0
 }
 
@@ -502,7 +596,7 @@ func runProviders(args []string, stdout, stderr io.Writer) int {
 
 func runPolicy(home string, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		return fail(stderr, "usage: nightward policy <init|explain|check|sarif> [flags]")
+		return fail(stderr, "usage: nightward policy <init|explain|check|sarif|badge> [flags]")
 	}
 	switch args[0] {
 	case "init":
@@ -539,11 +633,14 @@ func runPolicy(home string, args []string, stdout, stderr io.Writer) int {
 			return fail(stderr, "failed to load policy config: %v", err)
 		}
 		report := scanReport(home, *workspace)
-		mode := "home"
-		if *workspace != "" {
-			mode = "workspace"
+		var analysisReport analysis.Report
+		if *includeAnalysis || config.IncludeAnalysis {
+			mode := "home"
+			if *workspace != "" {
+				mode = "workspace"
+			}
+			analysisReport = analysis.Run(report, analysis.Options{Mode: mode, Workspace: report.Workspace, With: config.AnalysisProviders, Online: config.AllowOnlineProviders})
 		}
-		analysisReport := analysis.Run(report, analysis.Options{Mode: mode, Workspace: report.Workspace, With: config.AnalysisProviders, Online: config.AllowOnlineProviders})
 		policyReport := policy.CheckWithOptions(report, policy.Options{Strict: *strict, Config: config, IncludeAnalysis: *includeAnalysis, Analysis: analysisReport})
 		if *jsonOut {
 			code := writeJSON(stdout, policyReport, stderr)
@@ -556,6 +653,40 @@ func runPolicy(home string, args []string, stdout, stderr io.Writer) int {
 		if !policyReport.Passed {
 			return 1
 		}
+	case "badge":
+		fs := flag.NewFlagSet("policy badge", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		output := fs.String("output", "-", "write badge JSON artifact to this path or stdout with -")
+		strict := fs.Bool("strict", false, "badge policy uses medium or higher findings")
+		configPath := fs.String("config", "", "optional .nightward.yml policy config")
+		workspace := fs.String("workspace", "", "scan a repository/workspace instead of HOME")
+		includeAnalysis := fs.Bool("include-analysis", false, "include offline analysis signals in badge status")
+		sarifURL := fs.String("sarif-url", "", "optional URL for the related SARIF artifact")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		config, err := policy.LoadConfig(expandConfigPath(home, *configPath))
+		if err != nil {
+			return fail(stderr, "failed to load policy config: %v", err)
+		}
+		report := scanReport(home, *workspace)
+		var analysisReport analysis.Report
+		if *includeAnalysis || config.IncludeAnalysis {
+			mode := "home"
+			if *workspace != "" {
+				mode = "workspace"
+			}
+			analysisReport = analysis.Run(report, analysis.Options{Mode: mode, Workspace: report.Workspace, With: config.AnalysisProviders, Online: config.AllowOnlineProviders})
+		}
+		policyReport := policy.CheckWithOptions(report, policy.Options{Strict: *strict, Config: config, IncludeAnalysis: *includeAnalysis, Analysis: analysisReport})
+		badge := policy.BuildBadge(policyReport, *sarifURL)
+		if *output == "-" {
+			return writeJSON(stdout, badge, stderr)
+		}
+		if err := policy.WriteBadge(badge, *output); err != nil {
+			return fail(stderr, "failed to write badge artifact: %v", err)
+		}
+		fmt.Fprintf(stdout, "Wrote Nightward badge artifact to %s\n", *output)
 	case "sarif":
 		fs := flag.NewFlagSet("policy sarif", flag.ContinueOnError)
 		fs.SetOutput(stderr)
@@ -590,7 +721,7 @@ func runPolicy(home string, args []string, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stdout, "Wrote SARIF policy report to %s\n", *output)
 	default:
-		return fail(stderr, "usage: nightward policy <init|explain|check|sarif> [flags]")
+		return fail(stderr, "usage: nightward policy <init|explain|check|sarif|badge> [flags]")
 	}
 	return 0
 }
@@ -779,10 +910,14 @@ Usage:
   %[1]s trust explain <finding-id> [--workspace DIR] [--json]
   %[1]s providers list [--json]
   %[1]s providers doctor [--with providers] [--online] [--json]
+  %[1]s rules list [--json]
+  %[1]s rules explain <rule-id> [--json]
+  %[1]s report html --input scan.json --output report.html
   %[1]s policy init --dry-run
   %[1]s policy explain
   %[1]s policy check [--config .nightward.yml] [--workspace DIR] [--include-analysis] [--strict] [--json]
   %[1]s policy sarif [--config .nightward.yml] [--workspace DIR] [--include-analysis] --output nightward.sarif|-
+  %[1]s policy badge [--config .nightward.yml] [--workspace DIR] [--include-analysis] [--sarif-url URL] --output badge.json|-
   %[1]s snapshot plan --target <dir> [--json]
   %[1]s snapshot diff --from <plan.json> --to <plan.json> [--json]
   %[1]s schedule plan --preset nightly [--json]

@@ -57,4 +57,15 @@ Manual smoke:
 npm run dev
 ```
 
+Manual smoke must use a fixture `Home Override`, not a real local home, before screenshots or store metadata are published. Cover at least:
+
+- Dashboard loads scan counts, schedule status, adapters, and top findings.
+- Findings search/filter/detail panes render redacted evidence and docs actions.
+- Analysis renders offline signals and provider warnings.
+- Provider Doctor shows local provider status and does not run online-capable providers without explicit opt-in.
+- Export commands copy redacted Markdown and do not mutate local config.
+- Open Reports opens only an existing reports folder.
+
+Record the fixture path, commit SHA, command result, and reviewer in `docs/screenshots.md` or adjacent release notes when screenshots/GIFs are captured.
+
 Do not run `npm run publish` unless publishing is explicitly in scope.

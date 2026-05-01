@@ -28,6 +28,27 @@ type Report struct {
 	Ignored          []IgnoredFinding    `json:"ignored,omitempty"`
 }
 
+type Badge struct {
+	SchemaVersion    int                 `json:"schemaVersion"`
+	Label            string              `json:"label"`
+	Message          string              `json:"message"`
+	Color            string              `json:"color"`
+	GeneratedAt      time.Time           `json:"generated_at"`
+	Passed           bool                `json:"passed"`
+	Threshold        inventory.RiskLevel `json:"threshold"`
+	TotalFindings    int                 `json:"total_findings"`
+	Violations       int                 `json:"violations"`
+	TotalSignals     int                 `json:"total_signals,omitempty"`
+	SignalViolations int                 `json:"signal_violations,omitempty"`
+	Ignored          int                 `json:"ignored"`
+	Critical         int                 `json:"critical"`
+	High             int                 `json:"high"`
+	Medium           int                 `json:"medium"`
+	Low              int                 `json:"low"`
+	Info             int                 `json:"info"`
+	SARIFURL         string              `json:"sarif_url,omitempty"`
+}
+
 type Summary struct {
 	TotalFindings    int `json:"total_findings"`
 	TotalSignals     int `json:"total_signals,omitempty"`
@@ -91,6 +112,35 @@ type Options struct {
 
 func Check(report inventory.Report, strict bool) Report {
 	return CheckWithOptions(report, Options{Strict: strict})
+}
+
+func BuildBadge(report Report, sarifURL string) Badge {
+	message := "passing"
+	color := "brightgreen"
+	if !report.Passed {
+		message = fmt.Sprintf("%d violations", report.Summary.Violations+report.Summary.SignalViolations)
+		color = "red"
+	}
+	return Badge{
+		SchemaVersion:    1,
+		Label:            "nightward",
+		Message:          message,
+		Color:            color,
+		GeneratedAt:      report.GeneratedAt,
+		Passed:           report.Passed,
+		Threshold:        report.Threshold,
+		TotalFindings:    report.Summary.TotalFindings,
+		Violations:       report.Summary.Violations,
+		TotalSignals:     report.Summary.TotalSignals,
+		SignalViolations: report.Summary.SignalViolations,
+		Ignored:          report.Summary.Ignored,
+		Critical:         report.Summary.Critical,
+		High:             report.Summary.High,
+		Medium:           report.Summary.Medium,
+		Low:              report.Summary.Low,
+		Info:             report.Summary.Info,
+		SARIFURL:         strings.TrimSpace(sarifURL),
+	}
 }
 
 func CheckWithOptions(report inventory.Report, options Options) Report {
@@ -161,6 +211,20 @@ func WriteSARIFWithConfig(report inventory.Report, path string, config Config) e
 
 func WriteSARIFObject(sarif map[string]any, path string) error {
 	data, err := json.MarshalIndent(sarif, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	path = filepath.Clean(path)
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil && dir != "." {
+		return err
+	}
+	return os.WriteFile(path, data, 0600)
+}
+
+func WriteBadge(badge Badge, path string) error {
+	data, err := json.MarshalIndent(badge, "", "  ")
 	if err != nil {
 		return err
 	}

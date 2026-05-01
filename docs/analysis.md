@@ -41,15 +41,27 @@ Online-capable providers remain blocked unless explicitly allowed:
 
 ```sh
 nw providers doctor --with socket --online --json
+nw analyze --all --workspace . --with trivy,osv-scanner,socket --online --json
 ```
 
-Policy/SARIF config can opt into provider posture:
+Supported local providers can be executed explicitly during analysis:
+
+```sh
+nw analyze --all --workspace . --with gitleaks --json
+nw analyze --all --workspace . --with gitleaks,trufflehog,semgrep --json
+```
+
+Provider runs use timeouts and bounded output capture. Nightward records redacted finding metadata, not raw secret values. Online-capable providers such as `trivy`, `osv-scanner`, and `socket` stay blocked unless the user also opts into online-capable behavior.
+
+`semgrep` execution is local-config only. Nightward looks for `semgrep.yml`, `semgrep.yaml`, `.semgrep.yml`, `.semgrep.yaml`, or `.semgrep/config.yml` in the scanned workspace instead of using automatic rule discovery.
+
+Policy/SARIF config can opt into provider execution:
 
 ```yaml
 include_analysis: true
 analysis_threshold: high
 analysis_providers:
-  - socket
+  - gitleaks
 allow_online_providers: false
 ```
 
@@ -61,6 +73,9 @@ Analysis signals are advisory unless included explicitly:
 nw policy check --include-analysis --json
 nw policy sarif --include-analysis --output nightward.sarif
 nw policy sarif --workspace . --include-analysis --output -
+nw policy badge --workspace . --include-analysis --sarif-url https://example.invalid/nightward.sarif --output nightward-badge.json
 ```
 
 SARIF analysis rules are emitted under `nightward/analyze/<rule>`.
+
+`policy badge` emits a Shields-compatible JSON artifact plus Nightward summary fields: pass/fail, policy threshold, finding count, policy violations, ignored count, analysis signal violations, timestamp, and an optional SARIF URL. It is an artifact command, not a gate; use `policy check` to fail CI.

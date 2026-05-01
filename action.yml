@@ -1,10 +1,10 @@
 name: Nightward
 author: JSONbored
-description: Run Nightward scan, policy, or SARIF checks in GitHub Actions.
+description: Run Nightward scan, policy, SARIF, or badge checks in GitHub Actions.
 
 inputs:
   mode:
-    description: "Run mode: scan, policy, or sarif."
+    description: "Run mode: scan, policy, sarif, or badge."
     required: false
     default: policy
   config:
@@ -31,6 +31,10 @@ inputs:
     description: Include offline analysis signals in policy or SARIF modes.
     required: false
     default: "false"
+  sarif-url:
+    description: Optional SARIF URL to include in badge mode.
+    required: false
+    default: ""
 
 outputs:
   findings-count:
@@ -63,6 +67,7 @@ runs:
         INPUT_HOME: ${{ inputs.home }}
         INPUT_WORKSPACE: ${{ inputs.workspace }}
         INPUT_INCLUDE_ANALYSIS: ${{ inputs.include-analysis }}
+        INPUT_SARIF_URL: ${{ inputs.sarif-url }}
       run: |
         set -euo pipefail
 
@@ -73,6 +78,7 @@ runs:
         scan_home="${INPUT_HOME}"
         scan_workspace="${INPUT_WORKSPACE:-}"
         include_analysis="${INPUT_INCLUDE_ANALYSIS}"
+        sarif_url="${INPUT_SARIF_URL}"
 
         if [[ -n "${scan_home}" ]]; then
           export NIGHTWARD_HOME="${scan_home}"
@@ -135,6 +141,16 @@ runs:
             fi
             echo "output-path=${summary_path}" >>"${GITHUB_OUTPUT}"
             ;;
+          badge)
+            if [[ "${output}" == "-" ]]; then
+              go run ./cmd/nw policy badge "${config_args[@]}" "${workspace_args[@]}" "${analysis_args[@]}" --sarif-url "${sarif_url}" --output - >"${summary_path}"
+              echo "output=nightward-output.json" >>"${GITHUB_OUTPUT}"
+            else
+              go run ./cmd/nw policy badge "${config_args[@]}" "${workspace_args[@]}" "${analysis_args[@]}" --sarif-url "${sarif_url}" --output "${output_path}"
+              echo "output=${output}" >>"${GITHUB_OUTPUT}"
+            fi
+            echo "output-path=${summary_path}" >>"${GITHUB_OUTPUT}"
+            ;;
           *)
             echo "unsupported mode: ${mode}" >&2
             exit 2
@@ -159,6 +175,9 @@ runs:
             ;;
           sarif)
             python3 -c 'import json, sys; data=json.load(open(sys.argv[1], encoding="utf-8")); count=sum(len(run.get("results", [])) for run in data.get("runs", [])); print(f"findings-count={count}"); print("policy-passed=")' "${{ steps.run-nightward.outputs.output-path }}" >>"${GITHUB_OUTPUT}"
+            ;;
+          badge)
+            python3 -c 'import json, sys; data=json.load(open(sys.argv[1], encoding="utf-8")); print("findings-count=%s" % data.get("total_findings", 0)); print("policy-passed=%s" % str(data.get("passed", False)).lower())' "${{ steps.run-nightward.outputs.output-path }}" >>"${GITHUB_OUTPUT}"
             ;;
         esac
 

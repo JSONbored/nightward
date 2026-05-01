@@ -31,6 +31,15 @@ func TestCheckUsesStrictThreshold(t *testing.T) {
 	if strict.Passed || len(strict.Violations) != 2 || strict.Threshold != inventory.RiskMedium {
 		t.Fatalf("unexpected strict policy report: %#v", strict)
 	}
+
+	badge := BuildBadge(standard, "https://example.invalid/nightward.sarif")
+	if badge.SchemaVersion != 1 || badge.Passed || badge.Color != "red" || badge.Message != "1 violations" || badge.SARIFURL == "" {
+		t.Fatalf("unexpected failing badge: %#v", badge)
+	}
+	passing := BuildBadge(Report{GeneratedAt: report.GeneratedAt, Passed: true, Threshold: inventory.RiskHigh}, "")
+	if !passing.Passed || passing.Color != "brightgreen" || passing.Message != "passing" {
+		t.Fatalf("unexpected passing badge: %#v", passing)
+	}
 }
 
 func TestLoadConfigRejectsUnknownKeysAndReasonlessIgnores(t *testing.T) {
@@ -89,6 +98,17 @@ func TestDefaultConfigExplainValidateAndWriteSARIF(t *testing.T) {
 	}
 	if !strings.Contains(string(data), `"2.1.0"`) {
 		t.Fatalf("unexpected SARIF file:\n%s", data)
+	}
+
+	out = filepath.Join(t.TempDir(), "nightward.sarif")
+	if err := WriteSARIF(inventory.Report{}, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteSARIFWithConfig(inventory.Report{}, filepath.Join(t.TempDir(), "nightward.sarif"), Config{SARIF: SARIFConfig{ToolName: "Custom Nightward"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteBadge(BuildBadge(Report{GeneratedAt: time.Date(2026, 4, 30, 7, 0, 0, 0, time.UTC), Passed: true, Threshold: inventory.RiskHigh}, ""), filepath.Join(t.TempDir(), "badge.json")); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -277,6 +297,56 @@ func TestGoldenSARIFForURLSecurityFindings(t *testing.T) {
 		if strings.Contains(text, leaked) {
 			t.Fatalf("SARIF leaked secret value %q: %s", leaked, text)
 		}
+	}
+}
+
+func TestGoldenSARIFForAnalysisSignals(t *testing.T) {
+	report := inventory.Report{Findings: []inventory.Finding{
+		{
+			ID:             "mcp_broad_filesystem-111111111111",
+			Tool:           "Claude Code",
+			Path:           "/tmp/nightward-golden-home/.claude/mcp.json",
+			Server:         "filesystem",
+			Severity:       inventory.RiskMedium,
+			Rule:           "mcp_broad_filesystem",
+			Message:        "MCP server \"filesystem\" can access a broad filesystem path.",
+			Evidence:       "arg=/Users/test",
+			Recommendation: "Narrow filesystem server access to specific project paths.",
+			FixAvailable:   true,
+			FixKind:        inventory.FixNarrowFilesystem,
+			Confidence:     "medium",
+			Risk:           inventory.RiskLow,
+			RequiresReview: true,
+			FixSummary:     "Replace broad filesystem arguments with the smallest project paths needed.",
+			FixSteps:       []string{"Confirm which paths this MCP server needs before syncing the config."},
+		},
+	}}
+	analysisReport := analysis.Report{Signals: []analysis.Signal{
+		{
+			ID:             "signal-provider-1",
+			Provider:       "gitleaks",
+			Rule:           "nightward/provider/gitleaks",
+			Category:       analysis.CategorySecrets,
+			SubjectID:      "workspace",
+			SubjectType:    analysis.SubjectItem,
+			Path:           "/tmp/nightward-golden-home/workspace/.env",
+			Severity:       inventory.RiskHigh,
+			Confidence:     "medium",
+			Message:        "gitleaks reported possible secret material.",
+			Evidence:       "provider=gitleaks finding=1 file=.env",
+			Recommendation: "Review gitleaks findings locally and rotate any exposed credentials.",
+			Why:            "Provider results can reveal workspace secrets outside known agent configs.",
+		},
+	}}
+
+	sarif := BuildSARIFWithAnalysis(report, analysisReport, Config{})
+	assertGoldenPolicyJSON(t, "testdata/golden/analysis-signals.sarif.golden.json", sarif)
+	data, err := json.Marshal(sarif)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "super-secret-value") {
+		t.Fatalf("SARIF leaked secret value: %s", data)
 	}
 }
 

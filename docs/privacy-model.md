@@ -8,7 +8,7 @@ Nightward is designed around local custody. The scanner inspects local file meta
 - No analytics.
 - No cloud dashboard.
 - No network calls from Nightward runtime.
-- Offline analysis is the default. Online-capable providers stay blocked unless the user explicitly passes `--online` or opts in through policy/config in a future release.
+- Offline analysis is the default. Local provider execution happens only when the user explicitly selects providers with `--with` or policy config. Online-capable providers stay blocked unless the user explicitly passes `--online` or opts in through policy/config.
 - No live backup, restore, Git push, or secret copy.
 - No agent config mutation in scan, doctor, findings, fix, policy, or backup-plan commands.
 - The TUI can copy text, export redacted fix-plan Markdown, and open docs only after explicit keypresses.
@@ -57,7 +57,7 @@ MCP argument evidence redacts secret-looking assignments and flag values, such a
 
 Remote MCP URL evidence is structural only. Nightward records scheme and host for review, strips path/query details, and does not call the endpoint.
 
-Provider doctor output is intentionally about availability and privacy posture. It does not run optional local scanners by default, install missing tools, or send package/file metadata to online services.
+Provider doctor output is intentionally about availability and privacy posture. It does not run optional local scanners by default, install missing tools, or send package/file metadata to online services. Explicit local provider runs use timeouts, bounded output capture, and redacted finding metadata.
 
 ## What Still Needs Human Review
 

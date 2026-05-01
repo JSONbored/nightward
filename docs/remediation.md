@@ -31,6 +31,14 @@ Move sensitive remote MCP header values out of agent config. Keep only header na
 
 Move loopback, private-network, or machine-local MCP URLs into local-only overlays unless the endpoint is intentionally portable and documented.
 
+### mcp_local_token_path
+
+Move local token, credential, and secret-file paths into local-only overlays. Portable config should document the prerequisite without committing the machine-specific path.
+
+### mcp_symlink_config
+
+Review symlinked MCP config targets before syncing. A portable dotfiles repo should not depend on a symlink that resolves to private or machine-local state.
+
 ### mcp_unpinned_package
 
 Pin package-executor commands such as `npx`, `uvx`, or `pipx` to reviewed package versions before syncing MCP config.

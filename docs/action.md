@@ -19,13 +19,14 @@ jobs:
 
 Inputs:
 
-- `mode`: `scan`, `policy`, or `sarif`
+- `mode`: `scan`, `policy`, `sarif`, or `badge`
 - `config`: optional `.nightward.yml`
 - `strict`: fail policy checks on medium or higher findings
 - `output`: output path for scan JSON or SARIF
 - `home`: optional HOME override for fixture scans
 - `workspace`: optional repository/workspace path to scan instead of HOME
 - `include-analysis`: include offline analysis signals in policy or SARIF modes
+- `sarif-url`: optional SARIF URL included in badge mode
 
 Outputs:
 
@@ -46,4 +47,20 @@ For repository CI, prefer workspace mode:
     workspace: ${{ github.workspace }}
     include-analysis: "true"
     output: nightward.sarif
+```
+
+To publish a small badge JSON artifact alongside SARIF:
+
+```yaml
+- uses: JSONbored/nightward@v0.1.0
+  with:
+    mode: badge
+    workspace: ${{ github.workspace }}
+    include-analysis: "true"
+    output: nightward-badge.json
+    sarif-url: https://github.com/JSONbored/nightward/security/code-scanning?query=tool%3ANightward
+- uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+  with:
+    name: nightward-badge
+    path: nightward-badge.json
 ```

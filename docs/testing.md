@@ -20,6 +20,7 @@ make trunk-check
 make ci-scripts-test
 make raycast-verify
 make npm-package-verify
+make site-verify
 make release-snapshot
 make verify
 ```
@@ -36,15 +37,17 @@ make verify
 - Adapter tests use temporary HOME directories and fixture config files.
 - CLI no-write tests prove read-only commands do not mutate HOME.
 - Redaction tests must cover scan JSON, policy output, SARIF, Markdown exports, fix previews, and TUI text.
+- Badge artifact tests must cover pass/fail shape, policy summary fields, optional SARIF URL, and no-write stdout mode.
 - Golden-style tests should stay stable for JSON/SARIF shape, not timestamps or host-specific paths. Scan-summary goldens must keep item buckets separate from finding buckets.
 - MCP fixture tests should cover command servers, URL-shaped servers, sensitive headers, local endpoints, and unsupported shapes.
 - Scheduler tests verify generated launchd, systemd user timer, and cron text without installing schedules.
 - TUI action tests cover clipboard/open command construction and private redacted fix-plan exports.
-- TUI model tests cover tab switching, search, filters, help, cursor clamping, wide detail panes, compact terminal rendering, and redaction.
+- TUI model tests cover tab switching, search, filters, help, cursor clamping, dashboard report history, what-next guidance, wide detail panes, compact terminal rendering, and redaction.
+- Scheduler tests cover report history ordering, finding counts, non-report filtering, and symlink skipping without installing timers.
 - Raycast extension tests cover pure redaction/formatting helpers and safe command execution wrappers.
 - `go vet`, `staticcheck`, `gosec`, `gitleaks`, `govulncheck`, and fuzz smoke tests are part of the local verification bar. `#nosec` comments must include a narrow reason tied to an intentional local CLI behavior.
-- `make coverage-check` enforces at least 80% combined statement coverage for `./internal/...`.
-- `make ci-scripts-test` verifies repository-maintained CI helper scripts such as DCO checking.
+- `make coverage-check` enforces at least 83% combined statement coverage for `./internal/...`.
+- `make ci-scripts-test` verifies repository-maintained CI helper scripts such as DCO checking, action path validation, and release-script input validation.
 - Raycast dependency audits run with `npm audit --audit-level=moderate`.
 - The npm launcher tests run with `make npm-package-verify`, including unit tests, `npm audit`, and `npm pack --dry-run`.
 
@@ -81,6 +84,8 @@ npm run build
 
 `npm run dev` is the manual smoke path when the Raycast CLI is available. Do not run `npm run publish` unless release/publish scope is explicit.
 
+Manual smoke and screenshots must use fixture `Home Override` data only. Keep the evidence table in `docs/screenshots.md` current before broader promotion or Raycast store metadata work.
+
 ## NPM Launcher
 
 The release-gated npm package lives under `packages/npm`.
@@ -92,5 +97,18 @@ npm test
 npm audit --audit-level=moderate
 npm run pack:dry-run
 ```
+
+## Documentation Site
+
+The public docs/marketing site lives under `site/` and uses VitePress with local search.
+
+```sh
+cd site
+npm ci
+npm audit --audit-level=moderate
+npm run build
+```
+
+`make site-verify` runs the same install/build path from the repository root. The site should not add analytics or third-party runtime scripts by default.
 
 The launcher must remain dependency-light, avoid `postinstall`, and verify downloaded GitHub Release archives against `checksums.txt` before extraction.

@@ -5,10 +5,12 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 ## Workflows
 
 - `ci.yml`: Go tests, race tests, coverage gate, `go vet`, `staticcheck`, `gosec`, fuzz smoke tests, JUnit reports, local JUnit shape validation, gated Trunk Flaky Tests uploads, explicit Trunk Check CLI execution, Raycast extension tests/build/audit, npm launcher tests/audit/package dry-run, Gitleaks, govulncheck, OSV dependency scanning, DCO checking, and GoReleaser snapshot validation.
-- `nightward-policy.yml`: generates workspace Nightward SARIF and uploads it to GitHub code scanning without scanning synthetic risky fixture homes.
+- `nightward-policy.yml`: generates workspace Nightward SARIF, uploads a Nightward badge JSON artifact, and uploads SARIF to GitHub code scanning without scanning synthetic risky fixture homes.
+- `nw policy badge`: writes a local JSON status artifact for dashboards or release evidence when a workflow explicitly requests it.
 - `plugin.yaml`: defines Trunk Check linters for workspace policy and analysis SARIF once release tags are available.
 - `scorecard.yml`: runs OpenSSF Scorecard on PRs, `main`, branch-protection changes, and a weekly schedule. PR runs do not publish results or upload SARIF; `main` and scheduled runs upload SARIF.
-- `release.yml`: publishes signed GoReleaser artifacts from strict `vX.Y.Z` tags and can publish the npm launcher only when explicitly enabled.
+- `release.yml`: publishes signed GoReleaser artifacts from strict `vX.Y.Z` tags, smokes published Linux archives, and can publish the npm launcher only through trusted publishing when explicitly enabled.
+- `pages.yml`: builds and deploys the VitePress documentation site from `site/` to GitHub Pages.
 - `renovate.json`: manages Go modules, Raycast npm packages, pinned GitHub Actions, local tool pins, and release tooling updates.
 
 ## Action Policy
@@ -28,7 +30,8 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 - Keep Trunk Flaky Tests secrets scoped to the detection/upload steps only.
 - Keep composite action output/config paths relative to `GITHUB_WORKSPACE`; reject absolute paths, parent traversal, and newlines.
 - Require DCO sign-offs on pull request commits.
-- Keep the npm package free of `postinstall`; publish only from reviewed tags with provenance.
+- Keep the npm package free of `postinstall`; publish only from reviewed tags with trusted publishing and provenance.
+- Keep the `npm-publish` and `github-pages` environments protected where repository settings allow it.
 
 ## Trunk Plugin Notes
 
@@ -46,5 +49,5 @@ trunk check enable nightward-policy
 
 ## Release Hardening Backlog
 
-- Add provenance once release artifact flow is stable.
+- Add SLSA provenance/attestations once release artifact flow is stable.
 - Defer Homebrew tap automation until the first tagged release.

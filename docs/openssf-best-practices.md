@@ -10,7 +10,7 @@ Project badge: <https://www.bestpractices.dev/projects/12713>
 - Contribution process: <https://github.com/JSONbored/nightward/blob/main/CONTRIBUTING.md>
 - Contribution requirements: <https://github.com/JSONbored/nightward/blob/main/CONTRIBUTING.md>
 - License location: <https://github.com/JSONbored/nightward/blob/main/LICENSE>
-- Documentation basics and interface docs: README plus `docs/action.md`, `docs/analysis.md`, `docs/remediation.md`, `docs/privacy-model.md`, and `docs/adapters.md`.
+- Documentation basics and interface docs: README, `site/`, plus `docs/action.md`, `docs/analysis.md`, `docs/remediation.md`, `docs/privacy-model.md`, and `docs/adapters.md`.
 - Discussion and report archive: <https://github.com/JSONbored/nightward/issues>
 - Vulnerability reporting: <https://github.com/JSONbored/nightward/blob/main/SECURITY.md>
 - Build system: `Makefile`, `go.mod`, Raycast and npm launcher `package-lock.json` files, and GitHub Actions.
@@ -19,6 +19,8 @@ Project badge: <https://www.bestpractices.dev/projects/12713>
 - Static analysis: `go vet`, `staticcheck`, `gosec`, Trunk Check, CodeQL, Gitleaks, govulncheck, OSV, and Nightward SARIF.
 - Dynamic analysis: automated tests, race tests, Raycast tests/build, and Go fuzz smoke tests.
 - Secret scanning: Gitleaks in CI and `make gitleaks`.
+- Release notes: <https://github.com/JSONbored/nightward/blob/main/CHANGELOG.md>
+- Maintained status evidence after first release: reviewed PRs, CI-green `main`, Renovate dependency updates, issue response history, and signed release tags.
 
 ## N/A Crypto Fields
 
@@ -35,7 +37,17 @@ The release pipeline uses external tools for signing release checksums and SBOM 
 - Architecture/security model: `docs/privacy-model.md`, `docs/threat-model.md`, `docs/ci-security.md`, and `docs/remediation.md`.
 - Dependency maintenance: <https://github.com/JSONbored/nightward/blob/main/docs/dependency-maintenance.md>
 - DCO: `CONTRIBUTING.md` and the CI DCO sign-off job.
-- Release readiness: `.goreleaser.yml`, `make release-snapshot`, signed checksum config, SBOM config, release workflow, and release-gated npm launcher package.
+- Release readiness: `.goreleaser.yml`, `make release-snapshot`, signed checksum config, SBOM config, release workflow, release smoke, and trusted-publishing-only npm launcher package.
+- Website/docs readiness: `site/` VitePress source and `.github/workflows/pages.yml`.
+- Distribution plan: <https://github.com/JSONbored/nightward/blob/main/docs/distribution.md>
+
+## Gold-Oriented Backlog
+
+- SLSA provenance/attestations after the first signed release.
+- Reproducible-build comparison using `CGO_ENABLED=0`, `-trimpath`, pinned Go toolchain, and rebuild verification.
+- Wider fuzz/property tests for MCP parsing, redaction, symlink traversal, huge files, malformed configs, and permission-denied paths.
+- More maintainer depth and documented two-person review coverage once the project has additional maintainers.
+- Package-manager ecosystem coverage beyond npm and GitHub Releases.
 
 ## Manual Badge Actions
 
@@ -47,3 +59,5 @@ These cannot be completed by repository files alone:
 - Let Scorecard `Maintained` age out after the repository is older than 90 days.
 - Improve Scorecard `Code-Review` through future reviewed PR history.
 - Create the first signed release only after the release candidate is reviewed.
+- Configure npm trusted publishing before setting `NPM_PUBLISH=true`.
+- Enable GitHub Pages for the repository after the site workflow is merged.
