@@ -65,6 +65,7 @@ export default function Command() {
           <DashboardActions
             onRefresh={revalidate}
             reportDir={reportsDir(runtime.homeOverride)}
+            lastReport={undefined}
           />
         }
       />
@@ -100,6 +101,7 @@ export default function Command() {
             <DashboardActions
               onRefresh={revalidate}
               reportDir={data.doctor.schedule.report_dir}
+              lastReport={data.doctor.schedule.last_report}
             />
           }
         />
@@ -131,6 +133,7 @@ export default function Command() {
             <DashboardActions
               onRefresh={revalidate}
               reportDir={data.doctor.schedule.report_dir}
+              lastReport={data.doctor.schedule.last_report}
             />
           }
         />
@@ -147,6 +150,7 @@ export default function Command() {
             <DashboardActions
               onRefresh={revalidate}
               reportDir={data.doctor.schedule.report_dir}
+              lastReport={data.doctor.schedule.last_report}
             />
           }
         />
@@ -171,6 +175,7 @@ export default function Command() {
             <DashboardActions
               onRefresh={revalidate}
               reportDir={data.doctor.schedule.report_dir}
+              lastReport={data.doctor.schedule.last_report}
             />
           }
         />
@@ -195,6 +200,7 @@ export default function Command() {
               <DashboardActions
                 onRefresh={revalidate}
                 reportDir={data.doctor.schedule.report_dir}
+                lastReport={data.doctor.schedule.last_report}
               />
             }
           />
@@ -298,7 +304,7 @@ function ScheduleDetail({ doctor }: { doctor: DoctorReport }) {
     lines.push("", "## Report History");
     for (const record of doctor.schedule.history.slice(0, 5)) {
       lines.push(
-        `- \`${record.findings}\` findings - ${record.report_name} - \`${record.mod_time}\``,
+        `- \`${record.findings}\` findings${record.highest_severity ? `, highest \`${record.highest_severity}\`` : ""} - ${record.report_name} - \`${record.mod_time}\``,
       );
     }
   }
@@ -322,16 +328,27 @@ function FixPlanDetail({ plan }: { plan: FixPlan }) {
 function DashboardActions({
   onRefresh,
   reportDir,
+  lastReport,
 }: {
   onRefresh: () => void;
   reportDir: string;
+  lastReport?: string;
 }) {
   return (
     <ActionPanel>
       <Action title="Refresh" icon={Icon.ArrowClockwise} onAction={onRefresh} />
+      {lastReport ? (
+        <Action.ShowInFinder title="Show Latest Report" path={lastReport} />
+      ) : null}
       <Action.ShowInFinder title="Open Report Folder" path={reportDir} />
       <Action.OpenInBrowser title="Open Nightward Docs" url={docsUrl} />
       <Action.CopyToClipboard title="Copy Reports Path" content={reportDir} />
+      {lastReport ? (
+        <Action.CopyToClipboard
+          title="Copy Latest Report Path"
+          content={lastReport}
+        />
+      ) : null}
     </ActionPanel>
   );
 }

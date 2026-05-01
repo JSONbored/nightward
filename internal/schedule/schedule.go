@@ -2,6 +2,7 @@ package schedule
 
 import (
 	"bytes"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -13,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jsonbored/nightward/internal/inventory"
 )
 
 const Label = "dev.nightward.scan"
@@ -42,11 +45,13 @@ type GeneratedFile struct {
 }
 
 type ReportRecord struct {
-	Path       string    `json:"path"`
-	ModTime    time.Time `json:"mod_time"`
-	Findings   int       `json:"findings"`
-	SizeBytes  int64     `json:"size_bytes"`
-	ReportName string    `json:"report_name"`
+	Path               string                      `json:"path"`
+	ModTime            time.Time                   `json:"mod_time"`
+	Findings           int                         `json:"findings"`
+	HighestSeverity    inventory.RiskLevel         `json:"highest_severity,omitempty"`
+	FindingsBySeverity map[inventory.RiskLevel]int `json:"findings_by_severity,omitempty"`
+	SizeBytes          int64                       `json:"size_bytes"`
+	ReportName         string                      `json:"report_name"`
 }
 
 func BuildPlan(home, executable, preset string) (Plan, error) {
@@ -298,12 +303,15 @@ func ReportHistory(reportDir string, limit int) []ReportRecord {
 			continue
 		}
 		path := filepath.Join(reportDir, entry.Name())
+		count, bySeverity, highest := reportFindingSummary(path)
 		history = append(history, ReportRecord{
-			Path:       path,
-			ModTime:    info.ModTime().UTC(),
-			Findings:   countFindings(path),
-			SizeBytes:  info.Size(),
-			ReportName: entry.Name(),
+			Path:               path,
+			ModTime:            info.ModTime().UTC(),
+			Findings:           count,
+			HighestSeverity:    highest,
+			FindingsBySeverity: bySeverity,
+			SizeBytes:          info.Size(),
+			ReportName:         entry.Name(),
 		})
 	}
 	sort.Slice(history, func(i, j int) bool {
@@ -316,9 +324,53 @@ func ReportHistory(reportDir string, limit int) []ReportRecord {
 }
 
 func countFindings(path string) int {
+	count, _, _ := reportFindingSummary(path)
+	return count
+}
+
+func reportFindingSummary(path string) (int, map[inventory.RiskLevel]int, inventory.RiskLevel) {
 	contents, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- path is selected from the private Nightward report directory.
 	if err != nil {
-		return 0
+		return 0, nil, ""
 	}
-	return strings.Count(string(contents), `"severity"`)
+	var parsed struct {
+		Summary struct {
+			TotalFindings      int                         `json:"total_findings"`
+			FindingsBySeverity map[inventory.RiskLevel]int `json:"findings_by_severity"`
+		} `json:"summary"`
+		Findings []struct {
+			Severity inventory.RiskLevel `json:"severity"`
+		} `json:"findings"`
+	}
+	if err := json.Unmarshal(contents, &parsed); err == nil {
+		bySeverity := parsed.Summary.FindingsBySeverity
+		if bySeverity == nil {
+			bySeverity = map[inventory.RiskLevel]int{}
+			for _, finding := range parsed.Findings {
+				if finding.Severity != "" {
+					bySeverity[finding.Severity]++
+				}
+			}
+		}
+		count := parsed.Summary.TotalFindings
+		if count == 0 {
+			for _, value := range bySeverity {
+				count += value
+			}
+			if count == 0 {
+				count = len(parsed.Findings)
+			}
+		}
+		return count, bySeverity, highestSeverity(bySeverity)
+	}
+	return strings.Count(string(contents), `"severity"`), nil, ""
+}
+
+func highestSeverity(counts map[inventory.RiskLevel]int) inventory.RiskLevel {
+	for _, severity := range []inventory.RiskLevel{inventory.RiskCritical, inventory.RiskHigh, inventory.RiskMedium, inventory.RiskLow, inventory.RiskInfo} {
+		if counts[severity] > 0 {
+			return severity
+		}
+	}
+	return ""
 }

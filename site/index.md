@@ -25,7 +25,7 @@ features:
   - title: Built for MCP-heavy machines
     details: Scans Codex, Claude, Cursor, VS Code, Cline/Roo, Goose, OpenCode, Raycast, generic MCP files, and workspace AI config.
   - title: Reviewable output
-    details: Emits redacted JSON, static HTML reports, report diffs, policy badges, SARIF, Trunk output, and Raycast status.
+    details: Emits redacted JSON, searchable static HTML reports, report diffs, policy badges, SARIF, Trunk output, and Raycast status.
 ---
 
 <!-- markdownlint-disable MD041 -->
@@ -59,7 +59,7 @@ The sample report below is generated from the committed `testdata/homes/policy` 
 | --- | --- |
 | Inventory | Portable, machine-local, secret-auth, runtime-cache, app-owned, and unknown state across HOME or a workspace. |
 | MCP security | Findings for unpinned package executors, shell wrappers, broad filesystem mounts, sensitive env/header exposure, local endpoints, token paths, symlinks, parse failures, and unknown server shapes. |
-| Report history | Compare scan JSON files, render diff-aware HTML, and generate a static local report index. |
+| Report history | Compare scan JSON files, inspect latest-report status, render filterable diff-aware HTML, and generate a static local report index. |
 | Policy and CI | Reason-required ignores, policy badges, SARIF output, GitHub Action mode, and Trunk plugin support. |
 | Providers | Local `gitleaks`, `trufflehog`, and `semgrep`; online-gated `trivy`, `osv-scanner`, and remote Socket scan creation. |
 

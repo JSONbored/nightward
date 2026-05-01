@@ -49,9 +49,10 @@ nw scan --json --output /tmp/nightward-scan.json
 nw report html --input /tmp/nightward-scan.json --output /tmp/nightward-report.html
 nw report diff --from /tmp/previous.json --to /tmp/nightward-scan.json
 nw report history
+nw report latest
 ```
 
-The HTML report is a local static file rendered from redacted scan JSON. Pass `--previous` to include added, removed, and changed findings.
+The HTML report is a local static file rendered from redacted scan JSON. Pass `--previous` to include added, removed, and changed findings. Report pages include local search and filters for severity, tool, rule, and fix type.
 
 The public demo report is generated from a committed fixture home, then scrubbed before publication:
 

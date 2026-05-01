@@ -9,6 +9,9 @@ const stalePatterns = [
   /uses:\s*JSONbored\/nightward@v0\.1\.0/i,
   /trunk .*v0\.1\.0/i,
   /semantic_version:\s*0\.1\.0/i,
+  /Static HTML report export before any self-hosted dashboard/i,
+  /Broader provider execution beyond the first explicit local/i,
+  /Rules list\/explain commands and contributor fixture templates/i,
 ];
 
 const files = execFileSync("git", [

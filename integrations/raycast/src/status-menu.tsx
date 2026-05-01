@@ -33,6 +33,7 @@ export default function Command() {
     return {
       status: menuBarStatus(report, doctorReport, analysis),
       reportDir: doctorReport.schedule.report_dir,
+      lastReport: doctorReport.schedule.last_report,
     };
   });
 
@@ -84,6 +85,7 @@ export default function Command() {
         <StatusItems
           status={status}
           reportDir={data.reportDir}
+          lastReport={data.lastReport}
           onRefresh={revalidate}
         />
       ) : (
@@ -96,10 +98,12 @@ export default function Command() {
 function StatusItems({
   status,
   reportDir,
+  lastReport,
   onRefresh,
 }: {
   status: MenuBarStatus;
   reportDir: string;
+  lastReport?: string;
   onRefresh: () => void;
 }) {
   return (
@@ -153,6 +157,14 @@ function StatusItems({
           icon={Icon.Folder}
           onAction={() => void open(reportDir)}
         />
+        {lastReport ? (
+          <MenuBarExtra.Item
+            title="Latest Report"
+            subtitle={lastReport}
+            icon={Icon.Document}
+            onAction={() => void open(lastReport)}
+          />
+        ) : null}
       </MenuBarExtra.Section>
 
       <MenuBarExtra.Section title="Actions">

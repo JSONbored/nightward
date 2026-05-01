@@ -261,8 +261,18 @@ func TestReportDiffHistoryAndIndexCommands(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("report history failed: %s", stderr)
 	}
-	if !json.Valid([]byte(stdout)) || !strings.Contains(stdout, "after.json") {
+	if !json.Valid([]byte(stdout)) || !strings.Contains(stdout, "after.json") || !strings.Contains(stdout, `"highest_severity": "critical"`) {
 		t.Fatalf("unexpected history JSON:\n%s", stdout)
+	}
+
+	stdout, stderr, code = runCLI([]string{"report", "latest"})
+	if code != 0 || !strings.Contains(stdout, "Latest Nightward report:") || !strings.Contains(stdout, "highest:  critical") {
+		t.Fatalf("unexpected latest report stdout=%s stderr=%s", stdout, stderr)
+	}
+
+	stdout, stderr, code = runCLI([]string{"report", "latest", "--json"})
+	if code != 0 || !json.Valid([]byte(stdout)) || !strings.Contains(stdout, `"report_name": "after.json"`) {
+		t.Fatalf("unexpected latest report JSON stdout=%s stderr=%s", stdout, stderr)
 	}
 
 	stdout, stderr, code = runCLI([]string{"report", "html", "--input", afterPath, "--previous", beforePath, "--output", htmlPath})
@@ -287,6 +297,9 @@ func TestReportDiffHistoryAndIndexCommands(t *testing.T) {
 	}
 	if html := string(data); !strings.Contains(html, "Nightward Report History") || !strings.Contains(html, "after.json") {
 		t.Fatalf("unexpected report index:\n%s", html)
+	}
+	if !strings.Contains(string(data), "critical") || !strings.Contains(string(data), "latest") {
+		t.Fatalf("expected severity and latest markers in report index:\n%s", string(data))
 	}
 }
 

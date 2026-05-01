@@ -171,7 +171,7 @@ func runRules(args []string, stdout, stderr io.Writer) int {
 
 func runReport(home string, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		return fail(stderr, "usage: nightward report <html|diff|history|index> [flags]")
+		return fail(stderr, "usage: nightward report <html|diff|history|latest|index> [flags]")
 	}
 	switch args[0] {
 	case "html":
@@ -253,6 +253,27 @@ func runReport(home string, args []string, stdout, stderr io.Writer) int {
 			return writeJSON(stdout, history, stderr)
 		}
 		printReportHistory(stdout, history)
+	case "latest":
+		fs := flag.NewFlagSet("report latest", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		dir := fs.String("dir", defaultReportDir(home), "Nightward report directory")
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		history := schedule.ReportHistory(filepath.Clean(expandHome(home, *dir)), 1)
+		if len(history) == 0 {
+			if *jsonOut {
+				fmt.Fprintln(stdout, "null")
+			} else {
+				fmt.Fprintln(stdout, "No Nightward reports found.")
+			}
+			return 0
+		}
+		if *jsonOut {
+			return writeJSON(stdout, history[0], stderr)
+		}
+		printReportLatest(stdout, history[0])
 	case "index":
 		fs := flag.NewFlagSet("report index", flag.ContinueOnError)
 		fs.SetOutput(stderr)
@@ -282,7 +303,7 @@ func runReport(home string, args []string, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stdout, "Wrote report history index to %s\n", outputPath)
 	default:
-		return fail(stderr, "usage: nightward report <html|diff|history|index> [flags]")
+		return fail(stderr, "usage: nightward report <html|diff|history|latest|index> [flags]")
 	}
 	return 0
 }
@@ -1090,6 +1111,7 @@ Usage:
   %[1]s report html --input scan.json --output report.html [--previous previous.json]
   %[1]s report diff --from previous.json --to current.json [--json]
   %[1]s report history [--dir reports] [--limit 10] [--json]
+  %[1]s report latest [--dir reports] [--json]
   %[1]s report index [--dir reports] --output index.html [--limit 50]
   %[1]s policy init --dry-run
   %[1]s policy explain
@@ -1220,8 +1242,32 @@ func printReportHistory(w io.Writer, history []schedule.ReportRecord) {
 		if i == 0 {
 			delta = " (latest)"
 		}
-		fmt.Fprintf(w, "  %s  findings=%d%s  %s\n", record.ModTime.Format(time.RFC3339), record.Findings, delta, record.Path)
+		highest := "none"
+		if record.HighestSeverity != "" {
+			highest = string(record.HighestSeverity)
+		}
+		fmt.Fprintf(w, "  %s  findings=%d highest=%s%s  %s\n", record.ModTime.Format(time.RFC3339), record.Findings, highest, delta, record.Path)
 		previous = record.Findings
+	}
+}
+
+func printReportLatest(w io.Writer, record schedule.ReportRecord) {
+	highest := "none"
+	if record.HighestSeverity != "" {
+		highest = string(record.HighestSeverity)
+	}
+	fmt.Fprintln(w, "Latest Nightward report:")
+	fmt.Fprintf(w, "  path:     %s\n", record.Path)
+	fmt.Fprintf(w, "  modified: %s\n", record.ModTime.Format(time.RFC3339))
+	fmt.Fprintf(w, "  findings: %d\n", record.Findings)
+	fmt.Fprintf(w, "  highest:  %s\n", highest)
+	if len(record.FindingsBySeverity) > 0 {
+		fmt.Fprintln(w, "  severity:")
+		for _, severity := range []inventory.RiskLevel{inventory.RiskCritical, inventory.RiskHigh, inventory.RiskMedium, inventory.RiskLow, inventory.RiskInfo} {
+			if count := record.FindingsBySeverity[severity]; count > 0 {
+				fmt.Fprintf(w, "    %-8s %d\n", severity, count)
+			}
+		}
 	}
 }
 
