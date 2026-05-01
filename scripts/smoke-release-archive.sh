@@ -24,6 +24,7 @@ gh release download "${tag}" \
 cd "${tmp_dir}"
 test -s "${asset}.sbom.json"
 cosign verify-blob \
+  --new-bundle-format=false \
   --certificate-identity-regexp "https://github.com/${repo}/.github/workflows/release.yml@refs/tags/v.*" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate checksums.txt.pem \
