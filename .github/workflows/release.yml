@@ -120,7 +120,11 @@ jobs:
           npm pack --dry-run
           tmp_prefix="$(mktemp -d)"
           trap 'rm -rf "${tmp_prefix}"' EXIT
-          npm install --global --prefix "${tmp_prefix}" "./${package_tarball}"
+          tar -xzf "${package_tarball}" -C "${tmp_prefix}"
+          chmod 0755 "${tmp_prefix}/package/bin/nightward.mjs"
+          mkdir -p "${tmp_prefix}/bin"
+          ln -s "${tmp_prefix}/package/bin/nightward.mjs" "${tmp_prefix}/bin/nightward"
+          ln -s "${tmp_prefix}/package/bin/nightward.mjs" "${tmp_prefix}/bin/nw"
           nightward_version="$(PATH="${tmp_prefix}/bin:${PATH}" nightward --version)"
           if [[ "${nightward_version}" != "${version}" ]]; then
             echo "nightward --version returned ${nightward_version}, expected ${version}" >&2

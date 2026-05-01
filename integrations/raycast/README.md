@@ -7,9 +7,14 @@ This extension is read-only. It runs local `nw`/`nightward` commands, renders re
 ## Commands
 
 - `Nightward Dashboard`: scan summary, schedule status, adapters, and top findings.
+- `Nightward Status`: menu-bar counter for findings, analysis signals, provider warnings, and scheduled-report state.
 - `Nightward Findings`: searchable findings with severity filters and detail panes.
+- `Nightward Analysis`: offline analysis signals and provider warnings.
+- `Nightward Provider Doctor`: optional provider status without executing online providers.
 - `Explain Nightward Finding`: detail view for a specific finding ID.
+- `Explain Nightward Signal`: detail view for the analysis signal attached to a finding ID.
 - `Export Nightward Fix Plan`: copies `nw fix export --format markdown` output.
+- `Export Nightward Analysis`: copies redacted offline analysis markdown.
 - `Open Nightward Reports`: opens `~/.local/state/nightward/reports` in Finder.
 
 ## Preferences

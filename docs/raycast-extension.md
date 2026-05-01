@@ -11,6 +11,7 @@ integrations/raycast
 ## Commands
 
 - `Nightward Dashboard`: scan counts, schedule status, adapter summary, and top findings.
+- `Nightward Status`: menu-bar counter for finding severity, analysis signals, provider warnings, and scheduled-report state.
 - `Nightward Findings`: searchable findings with a severity filter, detail pane, and copy/open-doc actions.
 - `Nightward Analysis`: offline analysis signals with severity, confidence, evidence, and recommended action.
 - `Nightward Provider Doctor`: optional provider availability and privacy posture.
@@ -41,6 +42,8 @@ The extension uses `execFile`, not a shell, for local Nightward commands. It cal
 
 It does not call schedule install/remove, backup writes, snapshot writes, restore, Git, or any config mutation command.
 
+The menu-bar command runs the same read-only scan, doctor, and offline analysis commands. It does not enable online providers or background mutation.
+
 ## Validation
 
 ```sh
@@ -60,6 +63,7 @@ npm run dev
 Manual smoke must use a fixture `Home Override`, not a real local home, before screenshots or store metadata are published. Cover at least:
 
 - Dashboard loads scan counts, schedule status, adapters, and top findings.
+- Menu-bar status shows finding, analysis, provider-warning, and schedule counters; its actions open existing read-only commands and copy a redacted summary.
 - Findings search/filter/detail panes render redacted evidence and docs actions.
 - Analysis renders offline signals and provider warnings.
 - Provider Doctor shows local provider status and does not run online-capable providers without explicit opt-in.

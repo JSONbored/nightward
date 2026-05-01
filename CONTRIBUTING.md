@@ -5,6 +5,16 @@ Nightward should stay useful to AI power users without becoming a tool that copi
 ## Development
 
 ```sh
+make test-fast
+make test-security
+make test-ux
+make test-release
+make test-prepush
+```
+
+`make test-prepush` is the full local gate and should pass before pushing release-sensitive branches. The lower-level commands below remain useful for focused iteration:
+
+```sh
 make test
 make test-junit
 make trunk-flaky-validate

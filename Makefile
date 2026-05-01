@@ -14,10 +14,26 @@ SITE_DIR ?= site
 GO_PACKAGES ?= $(shell go list ./cmd/... ./internal/... ./tools/...)
 COVERAGE_PACKAGES ?= ./internal/...
 
-.PHONY: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage coverage-check go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify site-install site-audit site-build site-verify demo-assets tool-syft release-snapshot verify build install-local clean-reports
+.PHONY: test test-fast test-security test-ux test-release test-local test-prepush test-release-install test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke fuzz-test coverage coverage-check go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify site-install site-audit site-build site-verify demo-assets tool-syft release-snapshot verify build install-local clean-reports
 
 test:
 	go test $(GO_PACKAGES)
+
+test-fast: test npm-package-test raycast-test
+
+test-security: vet staticcheck gosec gitleaks govulncheck npm-package-audit raycast-audit site-audit
+
+test-ux: raycast-verify site-verify
+
+test-release: ci-scripts-test npm-package-verify raycast-build site-build release-snapshot
+
+test-local: verify
+
+test-prepush: verify
+
+test-release-install:
+	@if [ -z "$${VERSION:-}" ]; then echo "VERSION is required, for example: make test-release-install VERSION=0.1.4" >&2; exit 2; fi
+	bash scripts/verify-npm-release.sh "$${VERSION}"
 
 test-race:
 	go test -race $(GO_PACKAGES)
@@ -39,6 +55,8 @@ govulncheck:
 
 fuzz-smoke:
 	go test ./internal/inventory -run=^$$ -fuzz=FuzzMCPConfigParsing -fuzztime=10s
+
+fuzz-test: fuzz-smoke
 
 coverage:
 	mkdir -p $(REPORTS_DIR)

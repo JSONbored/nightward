@@ -4,6 +4,30 @@ Nightward treats read-only behavior, redaction, and policy stability as release 
 
 ## Local Checks
 
+Use the suite aliases first. They are intentionally shaped around the same surfaces CI and release workflows gate, so local failures are caught before a branch is pushed.
+
+```sh
+make test-fast
+make test-security
+make test-ux
+make test-release
+make test-prepush
+```
+
+- `make test-fast` runs Go unit tests plus npm launcher and Raycast unit tests.
+- `make test-security` runs static analysis, secret/vulnerability checks, and npm audits.
+- `make test-ux` runs the Raycast and VitePress site validation paths.
+- `make test-release` runs release helper tests, npm package verification, Raycast/site builds, and a GoReleaser snapshot.
+- `make test-prepush` is the full local gate and is equivalent to `make verify`.
+
+After a package is published, verify the install path explicitly:
+
+```sh
+make test-release-install VERSION=0.1.4
+```
+
+The lower-level targets remain available for focused iteration:
+
 ```sh
 make test
 make test-race
@@ -45,7 +69,7 @@ make verify
 - TUI model tests cover tab switching, search, filters, help, cursor clamping, dashboard report history, what-next guidance, wide detail panes, compact terminal rendering, and redaction.
 - Scheduler tests cover report history ordering, finding counts, non-report filtering, and symlink skipping without installing timers.
 - Raycast extension tests cover pure redaction/formatting helpers and safe command execution wrappers.
-- `go vet`, `staticcheck`, `gosec`, `gitleaks`, `govulncheck`, and fuzz smoke tests are part of the local verification bar. `#nosec` comments must include a narrow reason tied to an intentional local CLI behavior.
+- `go vet`, `staticcheck`, `gosec`, `gitleaks`, `govulncheck`, and fuzz tests are part of the local verification bar. `#nosec` comments must include a narrow reason tied to an intentional local CLI behavior.
 - `make coverage-check` enforces at least 83% combined statement coverage for `./internal/...`.
 - `make ci-scripts-test` verifies repository-maintained CI helper scripts such as DCO checking, action path validation, and release-script input validation.
 - Raycast dependency audits run with `npm audit --audit-level=moderate`.
@@ -82,7 +106,7 @@ npm run lint
 npm run build
 ```
 
-`npm run dev` is the manual smoke path when the Raycast CLI is available. Do not run `npm run publish` unless release/publish scope is explicit.
+`npm run dev` is the manual Raycast development path when the Raycast CLI is available. Do not run `npm run publish` unless release/publish scope is explicit.
 
 Manual smoke and screenshots must use fixture `Home Override` data only. Keep the evidence table in `docs/screenshots.md` current before broader promotion or Raycast store metadata work.
 

@@ -22,8 +22,13 @@ console.log(`${metadata.name}@${metadata.version} ${metadata.dist.integrity}`);
 ' "${metadata}" "${package}" "${version}"
 
 tarball="$(npm pack "${package}@${version}" --silent --pack-destination "${tmp_dir}")"
+tar -xzf "${tmp_dir}/${tarball}" -C "${tmp_dir}"
+package_dir="${tmp_dir}/package"
 prefix="${tmp_dir}/prefix"
-npm install --global --prefix "${prefix}" "${tmp_dir}/${tarball}" --ignore-scripts --no-audit
+mkdir -p "${prefix}/bin"
+chmod 0755 "${package_dir}/bin/nightward.mjs"
+ln -s "${package_dir}/bin/nightward.mjs" "${prefix}/bin/nightward"
+ln -s "${package_dir}/bin/nightward.mjs" "${prefix}/bin/nw"
 
 PATH="${prefix}/bin:${PATH}" nightward --version | grep -Fx "${version}"
 PATH="${prefix}/bin:${PATH}" nw --version | grep -Fx "${version}"

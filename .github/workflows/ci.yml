@@ -89,8 +89,8 @@ jobs:
       - name: Gosec static analysis
         run: make gosec
 
-      - name: Fuzz smoke
-        run: make fuzz-smoke
+      - name: Fuzz test
+        run: make fuzz-test
 
       - name: Coverage gate
         run: make coverage-check
