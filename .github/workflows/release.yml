@@ -121,8 +121,16 @@ jobs:
           tmp_prefix="$(mktemp -d)"
           trap 'rm -rf "${tmp_prefix}"' EXIT
           npm install --global --prefix "${tmp_prefix}" "./${package_tarball}"
-          PATH="${tmp_prefix}/bin:${PATH}" nightward --version
-          PATH="${tmp_prefix}/bin:${PATH}" nw --version
+          nightward_version="$(PATH="${tmp_prefix}/bin:${PATH}" nightward --version)"
+          if [[ "${nightward_version}" != "${version}" ]]; then
+            echo "nightward --version returned ${nightward_version}, expected ${version}" >&2
+            exit 1
+          fi
+          nw_version="$(PATH="${tmp_prefix}/bin:${PATH}" nw --version)"
+          if [[ "${nw_version}" != "${version}" ]]; then
+            echo "nw --version returned ${nw_version}, expected ${version}" >&2
+            exit 1
+          fi
 
       - name: Publish npm package
         run: npm publish --access public --provenance

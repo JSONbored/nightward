@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { createWriteStream, existsSync } from "node:fs";
+import { createWriteStream, existsSync, realpathSync } from "node:fs";
 import { chmod, mkdir, readFile, rm } from "node:fs/promises";
 import { get } from "node:https";
 import { homedir, platform as osPlatform, tmpdir } from "node:os";
@@ -183,21 +183,31 @@ export async function ensureBinary(command = commandName()) {
 async function main() {
   const command = commandName();
   const binary = await ensureBinary(command);
-  const child = spawn(binary, process.argv.slice(2), { stdio: "inherit" });
-  child.on("exit", (code, signal) => {
-    if (signal) {
-      process.kill(process.pid, signal);
-      return;
-    }
-    process.exit(code ?? 1);
+  const result = await new Promise((resolve, reject) => {
+    const child = spawn(binary, process.argv.slice(2), { stdio: "inherit" });
+    child.on("error", reject);
+    child.on("exit", (code, signal) => resolve({ code: code ?? 1, signal }));
   });
-  child.on("error", (error) => {
-    console.error(`nightward launcher failed: ${error.message}`);
-    process.exit(1);
-  });
+
+  if (result.signal) {
+    process.kill(process.pid, result.signal);
+    return;
+  }
+  process.exit(result.code);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+function isMainModule() {
+  if (!process.argv[1]) {
+    return false;
+  }
+  try {
+    return realpathSync(modulePath) === realpathSync(process.argv[1]);
+  } catch {
+    return import.meta.url === pathToFileURL(process.argv[1]).href;
+  }
+}
+
+if (isMainModule()) {
   main().catch((error) => {
     console.error(`nightward launcher failed: ${error.message}`);
     process.exit(1);

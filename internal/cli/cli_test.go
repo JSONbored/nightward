@@ -223,6 +223,15 @@ func TestHelpVersionAndCommandErrors(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
+	oldVersion := version
+	version = "9.8.7-test"
+	t.Cleanup(func() { version = oldVersion })
+	if code := RunWithName("nightward", []string{"--version"}, &stdout, &stderr); code != 0 || strings.TrimSpace(stdout.String()) != "9.8.7-test" {
+		t.Fatalf("version override failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
 	if code := RunWithName("nw", []string{"providers", "bogus"}, &stdout, &stderr); code == 0 || !strings.Contains(stderr.String(), "usage: nightward providers") {
 		t.Fatalf("expected providers error, code=%d stderr=%q", code, stderr.String())
 	}

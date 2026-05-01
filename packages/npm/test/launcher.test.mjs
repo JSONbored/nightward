@@ -1,6 +1,8 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -57,4 +59,29 @@ test("uses invocation name and environment overrides", () => {
     delete process.env.NIGHTWARD_NPM_CACHE;
     delete process.env.NIGHTWARD_NPM_DOWNLOAD_BASE;
   }
+});
+
+test("runs through npm bin symlink and waits for child output", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "nightward-npm-bin-"));
+  const fakeBinary = path.join(dir, "fake-nightward.mjs");
+  const launcherLink = path.join(dir, "nightward");
+  const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+  await writeFile(fakeBinary, `#!/usr/bin/env node
+console.log("fake-nightward " + process.argv.slice(2).join(" "));
+`, "utf8");
+  await chmod(fakeBinary, 0o755);
+  await symlink(path.join(packageRoot, "bin/nightward.mjs"), launcherLink);
+
+  const result = spawnSync(process.execPath, [launcherLink, "--version"], {
+    cwd: packageRoot,
+    env: {
+      ...process.env,
+      NIGHTWARD_BIN: fakeBinary
+    },
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), "fake-nightward --version");
 });
