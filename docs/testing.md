@@ -46,7 +46,7 @@ make verify
 - Scheduler tests cover report history ordering, finding counts, non-report filtering, and symlink skipping without installing timers.
 - Raycast extension tests cover pure redaction/formatting helpers and safe command execution wrappers.
 - `go vet`, `staticcheck`, `gosec`, `gitleaks`, `govulncheck`, and fuzz smoke tests are part of the local verification bar. `#nosec` comments must include a narrow reason tied to an intentional local CLI behavior.
-- `make coverage-check` enforces at least 80% combined statement coverage for `./internal/...`.
+- `make coverage-check` enforces at least 83% combined statement coverage for `./internal/...`.
 - `make ci-scripts-test` verifies repository-maintained CI helper scripts such as DCO checking, action path validation, and release-script input validation.
 - Raycast dependency audits run with `npm audit --audit-level=moderate`.
 - The npm launcher tests run with `make npm-package-verify`, including unit tests, `npm audit`, and `npm pack --dry-run`.
