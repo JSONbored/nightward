@@ -313,6 +313,9 @@ func (m model) dashboard(width int) string {
 		for _, record := range m.schedule.History[:limit] {
 			lines = append(lines, fmt.Sprintf("%s  findings=%d  size=%s  %s", record.ModTime.Local().Format("2006-01-02 15:04"), record.Findings, byteSize(record.SizeBytes), record.ReportName))
 		}
+		if delta := reportDelta(m.schedule.History); delta != "" {
+			lines = append(lines, "Latest delta: "+delta)
+		}
 	}
 	lines = append(lines, "", section("What Next"))
 	lines = append(lines, m.nextActions()...)
@@ -644,6 +647,21 @@ func (m model) nextActions() []string {
 		return []string{"Compare recent reports before publishing screenshots or store metadata."}
 	}
 	return []string{"Run explicit local providers with `nw analyze --all --with gitleaks,trufflehog,semgrep --json`."}
+}
+
+func reportDelta(history []schedule.ReportRecord) string {
+	if len(history) < 2 {
+		return ""
+	}
+	delta := history[0].Findings - history[1].Findings
+	switch {
+	case delta > 0:
+		return fmt.Sprintf("+%d findings since previous report", delta)
+	case delta < 0:
+		return fmt.Sprintf("%d findings since previous report", delta)
+	default:
+		return "no finding change since previous report"
+	}
 }
 
 func (m model) currentDocsURL() (string, bool) {

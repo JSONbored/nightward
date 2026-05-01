@@ -4,11 +4,11 @@ Nightward's growth should come from practical trust and low-friction adoption, n
 
 ## Product Features
 
-- Real optional provider execution for `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, and `socket`.
+- Deeper provider normalization and fixtures for `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, and `socket`.
 - Richer static HTML reports with diff and history views.
 - Contributor-facing rule metadata beyond the initial `nw rules list` and `nw rules explain` commands.
 - Contributor fixture templates for adapters and rules.
-- Nightward badge artifact for CI users: pass/fail, finding count, policy threshold, and timestamp.
+- Richer Nightward badge examples for CI users.
 - Polished sample reports and before-syncing-dotfiles walkthroughs.
 
 ## Distribution

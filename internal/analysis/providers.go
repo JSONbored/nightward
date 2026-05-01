@@ -177,6 +177,12 @@ func providerArgs(name, root string) ([]string, bool, error) {
 			return nil, true, fmt.Errorf("semgrep local config not found; add semgrep.yml, semgrep.yaml, .semgrep.yml, .semgrep.yaml, or .semgrep/config.yml")
 		}
 		return []string{"scan", "--json", "--metrics=off", "--disable-version-check", "--config", config, root}, true, nil
+	case "trivy":
+		return []string{"filesystem", "--format", "json", "--scanners", "vuln,secret,misconfig", "--skip-version-check", root}, true, nil
+	case "osv-scanner":
+		return []string{"scan", "source", "-r", "--format", "json", root}, true, nil
+	case "socket":
+		return []string{"scan", "create", root, "--json"}, true, nil
 	default:
 		return nil, false, nil
 	}
@@ -224,6 +230,12 @@ func parseProviderOutput(name, root, output string) ([]providerFinding, error) {
 		return parseTrufflehog(root, output)
 	case "semgrep":
 		return parseSemgrep(root, output)
+	case "trivy":
+		return parseTrivy(root, output)
+	case "osv-scanner":
+		return parseOSVScanner(root, output)
+	case "socket":
+		return parseSocket(root, output)
 	default:
 		return nil, nil
 	}
@@ -318,15 +330,168 @@ func parseSemgrep(root, output string) ([]providerFinding, error) {
 }
 
 func semgrepSeverity(value string) inventory.RiskLevel {
+	return providerSeverity(value, inventory.RiskMedium)
+}
+
+func parseTrivy(root, output string) ([]providerFinding, error) {
+	if strings.TrimSpace(output) == "" {
+		return nil, nil
+	}
+	var doc struct {
+		Results []map[string]any `json:"Results"`
+	}
+	if err := json.Unmarshal([]byte(output), &doc); err != nil {
+		return nil, err
+	}
+	var findings []providerFinding
+	for _, result := range doc.Results {
+		target := relativeProviderPath(root, firstString(result, "Target", "target"))
+		for _, vuln := range mapSlice(result, "Vulnerabilities", "vulnerabilities") {
+			id := firstString(vuln, "VulnerabilityID", "vulnerabilityID", "ID", "id")
+			pkg := firstString(vuln, "PkgName", "pkgName", "Package", "package")
+			title := firstString(vuln, "Title", "title", "Description", "description")
+			severity := providerSeverity(firstString(vuln, "Severity", "severity"), inventory.RiskHigh)
+			rule := id
+			if rule == "" {
+				rule = "vulnerability"
+			}
+			if title == "" {
+				title = "Trivy reported a vulnerability."
+			}
+			evidence := fmt.Sprintf("id=%s package=%s file=%s", redactProviderText(rule), redactProviderText(pkg), redactProviderText(target))
+			findings = append(findings, providerFinding{Rule: rule, Path: target, Message: redactProviderText(title), Evidence: evidence, Severity: severity, Category: CategorySupplyChain})
+		}
+		for _, secret := range mapSlice(result, "Secrets", "secrets") {
+			rule := firstString(secret, "RuleID", "ruleID", "ID", "id", "Title", "title")
+			if rule == "" {
+				rule = "secret"
+			}
+			message := firstString(secret, "Title", "title", "Message", "message")
+			if message == "" {
+				message = "Trivy reported a secret-like value."
+			}
+			path := relativeProviderPath(root, firstString(secret, "Target", "target", "File", "file", "Path", "path"))
+			if path == "" || path == root {
+				path = target
+			}
+			evidence := fmt.Sprintf("rule=%s file=%s", redactProviderText(rule), redactProviderText(path))
+			findings = append(findings, providerFinding{Rule: rule, Path: path, Message: redactProviderText(message), Evidence: evidence, Severity: providerSeverity(firstString(secret, "Severity", "severity"), inventory.RiskHigh), Category: CategorySecrets})
+		}
+		for _, misconfig := range mapSlice(result, "Misconfigurations", "misconfigurations") {
+			rule := firstString(misconfig, "ID", "id", "AVDID", "avdID")
+			if rule == "" {
+				rule = "misconfiguration"
+			}
+			message := firstString(misconfig, "Title", "title", "Message", "message")
+			if message == "" {
+				message = "Trivy reported a misconfiguration."
+			}
+			evidence := fmt.Sprintf("id=%s file=%s", redactProviderText(rule), redactProviderText(target))
+			findings = append(findings, providerFinding{Rule: rule, Path: target, Message: redactProviderText(message), Evidence: evidence, Severity: providerSeverity(firstString(misconfig, "Severity", "severity"), inventory.RiskMedium), Category: CategoryExecution})
+		}
+	}
+	return findings, nil
+}
+
+func parseOSVScanner(root, output string) ([]providerFinding, error) {
+	if strings.TrimSpace(output) == "" {
+		return nil, nil
+	}
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(output), &doc); err != nil {
+		return nil, err
+	}
+	var findings []providerFinding
+	for _, result := range mapSlice(doc, "results", "Results") {
+		path := relativeProviderPath(root, firstString(result, "source", "path", "file", "lockfile"))
+		for _, pkg := range mapSlice(result, "packages", "Packages") {
+			pkgInfo, _ := pkg["package"].(map[string]any)
+			name := firstString(pkg, "name", "package", "PkgName")
+			if name == "" {
+				name = firstString(pkgInfo, "name", "Name")
+			}
+			for _, vuln := range mapSlice(pkg, "vulnerabilities", "Vulnerabilities") {
+				id := firstString(vuln, "id", "ID", "VulnerabilityID")
+				if id == "" {
+					id = "vulnerability"
+				}
+				summary := firstString(vuln, "summary", "Summary", "details", "Details")
+				if summary == "" {
+					summary = "OSV-Scanner reported a vulnerable dependency."
+				}
+				evidence := fmt.Sprintf("id=%s package=%s file=%s", redactProviderText(id), redactProviderText(name), redactProviderText(path))
+				findings = append(findings, providerFinding{Rule: id, Path: path, Message: redactProviderText(summary), Evidence: evidence, Severity: inventory.RiskHigh, Category: CategorySupplyChain})
+			}
+		}
+		for _, vuln := range mapSlice(result, "vulnerabilities", "Vulnerabilities") {
+			id := firstString(vuln, "id", "ID", "VulnerabilityID")
+			if id == "" {
+				id = "vulnerability"
+			}
+			summary := firstString(vuln, "summary", "Summary", "details", "Details")
+			if summary == "" {
+				summary = "OSV-Scanner reported a vulnerability."
+			}
+			evidence := fmt.Sprintf("id=%s file=%s", redactProviderText(id), redactProviderText(path))
+			findings = append(findings, providerFinding{Rule: id, Path: path, Message: redactProviderText(summary), Evidence: evidence, Severity: inventory.RiskHigh, Category: CategorySupplyChain})
+		}
+	}
+	return findings, nil
+}
+
+func parseSocket(root, output string) ([]providerFinding, error) {
+	if strings.TrimSpace(output) == "" {
+		return nil, nil
+	}
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(output), &doc); err != nil {
+		return nil, err
+	}
+	var findings []providerFinding
+	for _, key := range []string{"issues", "alerts", "vulnerabilities", "findings", "results"} {
+		for _, issue := range mapSlice(doc, key) {
+			rule := firstString(issue, "type", "category", "rule", "id", "name")
+			if rule == "" {
+				rule = "supply-chain-risk"
+			}
+			message := firstString(issue, "message", "title", "description", "name")
+			if message == "" {
+				message = "Socket reported a supply-chain risk."
+			}
+			path := relativeProviderPath(root, firstString(issue, "file", "path", "manifest"))
+			pkg := firstString(issue, "package", "pkg", "name")
+			evidence := fmt.Sprintf("rule=%s package=%s file=%s", redactProviderText(rule), redactProviderText(pkg), redactProviderText(path))
+			findings = append(findings, providerFinding{Rule: rule, Path: path, Message: redactProviderText(message), Evidence: evidence, Severity: providerSeverity(firstString(issue, "severity", "risk"), inventory.RiskMedium), Category: CategorySupplyChain})
+		}
+	}
+	if len(findings) == 0 {
+		id := firstString(doc, "id", "scanId", "scan_id")
+		if id != "" {
+			findings = append(findings, providerFinding{
+				Rule:     "scan-created",
+				Path:     root,
+				Message:  "Socket created a scan report for review.",
+				Evidence: "scan_id=" + redactProviderText(id),
+				Severity: inventory.RiskInfo,
+				Category: CategorySupplyChain,
+			})
+		}
+	}
+	return findings, nil
+}
+
+func providerSeverity(value string, fallback inventory.RiskLevel) inventory.RiskLevel {
 	switch strings.ToUpper(value) {
-	case "ERROR", "HIGH", "CRITICAL":
+	case "CRITICAL":
+		return inventory.RiskCritical
+	case "ERROR", "HIGH":
 		return inventory.RiskHigh
 	case "WARNING", "WARN", "MEDIUM":
 		return inventory.RiskMedium
 	case "INFO", "LOW":
 		return inventory.RiskLow
 	default:
-		return inventory.RiskMedium
+		return fallback
 	}
 }
 
@@ -369,6 +534,23 @@ func firstNumber(record map[string]any, keys ...string) string {
 		}
 	}
 	return ""
+}
+
+func mapSlice(record map[string]any, keys ...string) []map[string]any {
+	for _, key := range keys {
+		values, ok := record[key].([]any)
+		if !ok {
+			continue
+		}
+		out := make([]map[string]any, 0, len(values))
+		for _, value := range values {
+			if item, ok := value.(map[string]any); ok {
+				out = append(out, item)
+			}
+		}
+		return out
+	}
+	return nil
 }
 
 func nestedString(record map[string]any, keys ...string) string {

@@ -41,6 +41,7 @@ Online-capable providers remain blocked unless explicitly allowed:
 
 ```sh
 nw providers doctor --with socket --online --json
+nw analyze --all --workspace . --with trivy,osv-scanner,socket --online --json
 ```
 
 Supported local providers can be executed explicitly during analysis:
@@ -72,6 +73,9 @@ Analysis signals are advisory unless included explicitly:
 nw policy check --include-analysis --json
 nw policy sarif --include-analysis --output nightward.sarif
 nw policy sarif --workspace . --include-analysis --output -
+nw policy badge --workspace . --include-analysis --sarif-url https://example.invalid/nightward.sarif --output nightward-badge.json
 ```
 
 SARIF analysis rules are emitted under `nightward/analyze/<rule>`.
+
+`policy badge` emits a Shields-compatible JSON artifact plus Nightward summary fields: pass/fail, policy threshold, finding count, policy violations, ignored count, analysis signal violations, timestamp, and an optional SARIF URL. It is an artifact command, not a gate; use `policy check` to fail CI.

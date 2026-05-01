@@ -13,6 +13,7 @@ Nightward releases are human-gated. Do not create a tag until the release candid
 7. Confirm `npm audit signatures` where dependencies exist; the npm launcher currently has no runtime dependencies, so this may report that there is nothing to audit.
 8. Review `CHANGELOG.md` for user-facing changes, security notes, and breaking pre-1.0 behavior.
 9. Confirm the OpenSSF evidence doc is current.
+10. After publish, run the release and npm verification scripts for the released version.
 
 ## Release Protection
 
@@ -90,3 +91,9 @@ bash scripts/smoke-release-archive.sh v0.1.0
 ```
 
 The npm job then installs the packed npm tarball and runs both command names before publishing.
+
+After npm publish, verify package metadata and launcher install smoke:
+
+```sh
+bash scripts/verify-npm-release.sh 0.1.0
+```

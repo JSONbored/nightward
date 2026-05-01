@@ -596,7 +596,7 @@ func runProviders(args []string, stdout, stderr io.Writer) int {
 
 func runPolicy(home string, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		return fail(stderr, "usage: nightward policy <init|explain|check|sarif> [flags]")
+		return fail(stderr, "usage: nightward policy <init|explain|check|sarif|badge> [flags]")
 	}
 	switch args[0] {
 	case "init":
@@ -633,11 +633,14 @@ func runPolicy(home string, args []string, stdout, stderr io.Writer) int {
 			return fail(stderr, "failed to load policy config: %v", err)
 		}
 		report := scanReport(home, *workspace)
-		mode := "home"
-		if *workspace != "" {
-			mode = "workspace"
+		var analysisReport analysis.Report
+		if *includeAnalysis || config.IncludeAnalysis {
+			mode := "home"
+			if *workspace != "" {
+				mode = "workspace"
+			}
+			analysisReport = analysis.Run(report, analysis.Options{Mode: mode, Workspace: report.Workspace, With: config.AnalysisProviders, Online: config.AllowOnlineProviders})
 		}
-		analysisReport := analysis.Run(report, analysis.Options{Mode: mode, Workspace: report.Workspace, With: config.AnalysisProviders, Online: config.AllowOnlineProviders})
 		policyReport := policy.CheckWithOptions(report, policy.Options{Strict: *strict, Config: config, IncludeAnalysis: *includeAnalysis, Analysis: analysisReport})
 		if *jsonOut {
 			code := writeJSON(stdout, policyReport, stderr)
@@ -650,6 +653,40 @@ func runPolicy(home string, args []string, stdout, stderr io.Writer) int {
 		if !policyReport.Passed {
 			return 1
 		}
+	case "badge":
+		fs := flag.NewFlagSet("policy badge", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		output := fs.String("output", "-", "write badge JSON artifact to this path or stdout with -")
+		strict := fs.Bool("strict", false, "badge policy uses medium or higher findings")
+		configPath := fs.String("config", "", "optional .nightward.yml policy config")
+		workspace := fs.String("workspace", "", "scan a repository/workspace instead of HOME")
+		includeAnalysis := fs.Bool("include-analysis", false, "include offline analysis signals in badge status")
+		sarifURL := fs.String("sarif-url", "", "optional URL for the related SARIF artifact")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		config, err := policy.LoadConfig(expandConfigPath(home, *configPath))
+		if err != nil {
+			return fail(stderr, "failed to load policy config: %v", err)
+		}
+		report := scanReport(home, *workspace)
+		var analysisReport analysis.Report
+		if *includeAnalysis || config.IncludeAnalysis {
+			mode := "home"
+			if *workspace != "" {
+				mode = "workspace"
+			}
+			analysisReport = analysis.Run(report, analysis.Options{Mode: mode, Workspace: report.Workspace, With: config.AnalysisProviders, Online: config.AllowOnlineProviders})
+		}
+		policyReport := policy.CheckWithOptions(report, policy.Options{Strict: *strict, Config: config, IncludeAnalysis: *includeAnalysis, Analysis: analysisReport})
+		badge := policy.BuildBadge(policyReport, *sarifURL)
+		if *output == "-" {
+			return writeJSON(stdout, badge, stderr)
+		}
+		if err := policy.WriteBadge(badge, *output); err != nil {
+			return fail(stderr, "failed to write badge artifact: %v", err)
+		}
+		fmt.Fprintf(stdout, "Wrote Nightward badge artifact to %s\n", *output)
 	case "sarif":
 		fs := flag.NewFlagSet("policy sarif", flag.ContinueOnError)
 		fs.SetOutput(stderr)
@@ -684,7 +721,7 @@ func runPolicy(home string, args []string, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stdout, "Wrote SARIF policy report to %s\n", *output)
 	default:
-		return fail(stderr, "usage: nightward policy <init|explain|check|sarif> [flags]")
+		return fail(stderr, "usage: nightward policy <init|explain|check|sarif|badge> [flags]")
 	}
 	return 0
 }
@@ -880,6 +917,7 @@ Usage:
   %[1]s policy explain
   %[1]s policy check [--config .nightward.yml] [--workspace DIR] [--include-analysis] [--strict] [--json]
   %[1]s policy sarif [--config .nightward.yml] [--workspace DIR] [--include-analysis] --output nightward.sarif|-
+  %[1]s policy badge [--config .nightward.yml] [--workspace DIR] [--include-analysis] [--sarif-url URL] --output badge.json|-
   %[1]s snapshot plan --target <dir> [--json]
   %[1]s snapshot diff --from <plan.json> --to <plan.json> [--json]
   %[1]s schedule plan --preset nightly [--json]

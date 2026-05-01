@@ -71,6 +71,32 @@ func TestProviderDoctorHonorsOnlineGate(t *testing.T) {
 	}
 }
 
+func TestProviderDoctorEnablesOnlineProvidersOnlyWithOnlineOptIn(t *testing.T) {
+	dir := t.TempDir()
+	writeExecutable(t, filepath.Join(dir, "socket"), "#!/bin/sh\nexit 0\n")
+	t.Setenv("PATH", dir)
+
+	blocked := ProviderStatuses([]string{"socket"}, false)
+	ready := ProviderStatuses([]string{"socket"}, true)
+	var blockedStatus, readyStatus ProviderStatus
+	for _, status := range blocked {
+		if status.Name == "socket" {
+			blockedStatus = status
+		}
+	}
+	for _, status := range ready {
+		if status.Name == "socket" {
+			readyStatus = status
+		}
+	}
+	if blockedStatus.Status != "blocked" {
+		t.Fatalf("expected socket blocked without online opt-in, got %#v", blockedStatus)
+	}
+	if readyStatus.Status != "ready" || !readyStatus.Enabled || !readyStatus.Available {
+		t.Fatalf("expected socket ready with online opt-in, got %#v", readyStatus)
+	}
+}
+
 func TestProviderDoctorFindsFakeLocalProvider(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "gitleaks")
@@ -165,6 +191,30 @@ func TestProviderParsersCoverSupportedFormats(t *testing.T) {
 	if len(semgrep) != 1 || semgrep[0].Path != "main.go" || semgrep[0].Severity != inventory.RiskHigh || semgrep[0].Category != CategoryExecution {
 		t.Fatalf("unexpected semgrep parse: %#v", semgrep)
 	}
+
+	trivy, err := parseProviderOutput("trivy", root, `{"Results":[{"Target":"/tmp/workspace/package-lock.json","Vulnerabilities":[{"VulnerabilityID":"CVE-2026-0001","PkgName":"demo","Severity":"CRITICAL","Title":"demo vulnerable"}],"Misconfigurations":[{"ID":"AVD-1","Severity":"MEDIUM","Title":"bad config"}],"Secrets":[{"RuleID":"aws-access-key","Severity":"HIGH","Target":"/tmp/workspace/.env","Title":"AWS key"}]}]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(trivy) != 3 || trivy[0].Severity != inventory.RiskCritical || trivy[1].Category != CategorySecrets || trivy[2].Category != CategoryExecution {
+		t.Fatalf("unexpected trivy parse: %#v", trivy)
+	}
+
+	osv, err := parseProviderOutput("osv-scanner", root, `{"results":[{"source":"/tmp/workspace/package-lock.json","packages":[{"package":{"name":"demo"},"vulnerabilities":[{"id":"GHSA-123","summary":"bad package"}]}]}]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(osv) != 1 || osv[0].Rule != "GHSA-123" || osv[0].Path != "package-lock.json" || osv[0].Category != CategorySupplyChain {
+		t.Fatalf("unexpected osv parse: %#v", osv)
+	}
+
+	socket, err := parseProviderOutput("socket", root, `{"issues":[{"type":"malware","severity":"high","message":"API_TOKEN=super-secret-value","package":"demo","file":"package.json"}]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(socket) != 1 || socket[0].Rule != "malware" || strings.Contains(socket[0].Message, "super-secret-value") {
+		t.Fatalf("unexpected socket parse: %#v", socket)
+	}
 }
 
 func TestProviderHelpersAndOutputLimits(t *testing.T) {
@@ -177,8 +227,10 @@ func TestProviderHelpersAndOutputLimits(t *testing.T) {
 			t.Fatalf("missing provider args for %s: %#v ok=%t err=%v", name, args, ok, err)
 		}
 	}
-	if _, ok, err := providerArgs("socket", root); err != nil || ok {
-		t.Fatal("socket should not have an offline provider runner")
+	for _, name := range []string{"trivy", "osv-scanner", "socket"} {
+		if args, ok, err := providerArgs(name, root); err != nil || !ok || len(args) == 0 {
+			t.Fatalf("missing online-capable provider args for %s: %#v ok=%t err=%v", name, args, ok, err)
+		}
 	}
 	if _, ok, err := providerArgs("semgrep", t.TempDir()); !ok || err == nil {
 		t.Fatalf("semgrep should require a local config, ok=%t err=%v", ok, err)

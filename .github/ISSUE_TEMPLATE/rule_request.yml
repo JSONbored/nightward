@@ -1,0 +1,35 @@
+name: Rule or fixture request
+description: Request a new Nightward rule, fixture, or redaction test case.
+title: "rule: "
+labels:
+  - rule
+body:
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk or config shape
+      description: Describe the risky pattern with private values redacted.
+      placeholder: "Example: MCP server stores a bearer token under headers.Authorization."
+    validations:
+      required: true
+  - type: textarea
+    id: fixture
+    attributes:
+      label: Redacted fixture
+      description: Include only synthetic paths, fake tokens, and structure needed for a regression test.
+      render: json
+    validations:
+      required: true
+  - type: dropdown
+    id: output_surface
+    attributes:
+      label: Output surface
+      options:
+        - scan finding
+        - analysis signal
+        - fix preview
+        - SARIF/policy
+        - TUI/Raycast redaction
+        - unsure
+    validations:
+      required: true
