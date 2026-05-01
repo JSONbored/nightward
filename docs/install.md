@@ -18,8 +18,7 @@ Release artifacts include:
 
 - `nightward` and `nw` binaries for macOS, Linux, and Windows.
 - `checksums.txt`.
-- `checksums.txt.sig` from Cosign.
-- `checksums.txt.pem` from Cosign keyless signing.
+- `checksums.txt.sigstore.json` from Cosign keyless signing.
 - SBOM files for release archives.
 
 Users who want the strongest supply-chain verification should download from GitHub Releases and verify the signed checksum file before installing.
