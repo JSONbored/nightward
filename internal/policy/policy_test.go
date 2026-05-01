@@ -52,6 +52,46 @@ func TestLoadConfigRejectsUnknownKeysAndReasonlessIgnores(t *testing.T) {
 	}
 }
 
+func TestDefaultConfigExplainValidateAndWriteSARIF(t *testing.T) {
+	config := DefaultConfig()
+	if config.SeverityThreshold != inventory.RiskHigh || config.SARIF.ToolName != "Nightward" {
+		t.Fatalf("unexpected default config: %#v", config)
+	}
+	yamlText := DefaultConfigYAML()
+	for _, want := range []string{"severity_threshold: high", "analysis_threshold: high", "tool_name: Nightward"} {
+		if !strings.Contains(yamlText, want) {
+			t.Fatalf("default config YAML missing %q:\n%s", want, yamlText)
+		}
+	}
+	if text := Explain(); !strings.Contains(text, "KnownFields") && !strings.Contains(text, "Ignore entries must include a reason") {
+		t.Fatalf("unexpected policy explanation:\n%s", text)
+	}
+	if err := ValidateConfig(Config{SeverityThreshold: "urgent"}); err == nil {
+		t.Fatal("expected unsupported severity threshold error")
+	}
+	if err := ValidateConfig(Config{AnalysisThreshold: "urgent"}); err == nil {
+		t.Fatal("expected unsupported analysis threshold error")
+	}
+	if err := ValidateConfig(Config{IgnoreFindings: []IgnoreFinding{{Reason: "missing id"}}}); err == nil {
+		t.Fatal("expected missing ignore finding id error")
+	}
+	if err := ValidateConfig(Config{IgnoreRules: []IgnoreRule{{Reason: "missing rule"}}}); err == nil {
+		t.Fatal("expected missing ignore rule error")
+	}
+
+	out := filepath.Join(t.TempDir(), "nested", "nightward.sarif")
+	if err := WriteSARIFObject(BuildSARIF(inventory.Report{}), out); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"2.1.0"`) {
+		t.Fatalf("unexpected SARIF file:\n%s", data)
+	}
+}
+
 func TestCheckWithConfigIgnoresWithReasonAndOverridesThreshold(t *testing.T) {
 	report := inventory.Report{
 		GeneratedAt: time.Date(2026, 4, 30, 7, 0, 0, 0, time.UTC),

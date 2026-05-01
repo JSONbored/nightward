@@ -141,6 +141,90 @@ func TestBuildPreviewDoesNotGuessPackageVersions(t *testing.T) {
 	}
 }
 
+func TestBuildPreviewReplacesSimpleShellWrapperAndRedactsArgs(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(`[mcp_servers.demo]
+command = "sh"
+args = ["-c", "node server.js --api-key super-secret-value"]
+`), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	report := inventory.Report{Findings: []inventory.Finding{
+		{
+			ID:             "mcp_shell_command-111111111111",
+			Tool:           "Codex",
+			Path:           path,
+			Server:         "demo",
+			Rule:           "mcp_shell_command",
+			Severity:       inventory.RiskMedium,
+			FixKind:        inventory.FixReplaceShellWrapper,
+			RequiresReview: true,
+			PatchHint: &inventory.PatchHint{
+				Kind:          inventory.FixReplaceShellWrapper,
+				DirectCommand: "node",
+				DirectArgs:    []string{"server.js", "--api-key", "super-secret-value"},
+			},
+		},
+	}}
+
+	preview := BuildPreview(report, Selector{All: true})
+	if preview.Summary.Patchable != 1 {
+		t.Fatalf("expected shell wrapper patch: %#v", preview)
+	}
+	markdown := PreviewMarkdown(preview)
+	if !strings.Contains(markdown, `command = "node"`) || !strings.Contains(markdown, "[redacted]") {
+		t.Fatalf("unexpected shell preview markdown:\n%s", markdown)
+	}
+	if strings.Contains(markdown, "super-secret-value") {
+		t.Fatalf("shell wrapper preview leaked secret:\n%s", markdown)
+	}
+}
+
+func TestBuildPreviewExplainsUnpatchableSecretShapes(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "missing.json")
+	if err := os.WriteFile(path, []byte(`{"mcpServers":{"demo":{"env":{"API_TOKEN":"[redacted]"}}}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	report := inventory.Report{Findings: []inventory.Finding{
+		{
+			ID:        "missing-server",
+			Rule:      "mcp_secret_env",
+			PatchHint: &inventory.PatchHint{Kind: inventory.FixExternalizeSecret, EnvKey: "API_TOKEN", InlineSecret: true},
+		},
+		{
+			ID:        "missing-env-key",
+			Server:    "demo",
+			Rule:      "mcp_secret_env",
+			Path:      path,
+			PatchHint: &inventory.PatchHint{Kind: inventory.FixExternalizeSecret, InlineSecret: true},
+		},
+	}}
+
+	preview := BuildPreview(report, Selector{All: true})
+	if preview.Summary.Blocked != 2 || preview.Summary.Patchable != 0 {
+		t.Fatalf("expected blocked previews: %#v", preview.Summary)
+	}
+	combined := PreviewMarkdown(preview)
+	for _, want := range []string{"server name is unknown", "env key is unknown"} {
+		if !strings.Contains(combined, want) {
+			t.Fatalf("preview missing reason %q:\n%s", want, combined)
+		}
+	}
+}
+
+func TestPreviewMarkdownAndDiffEmptySelection(t *testing.T) {
+	preview := BuildPreview(inventory.Report{}, Selector{All: true})
+	if got := PreviewDiff(preview); !strings.Contains(got, "No redacted patch previews") {
+		t.Fatalf("unexpected empty diff: %s", got)
+	}
+	if got := PreviewMarkdown(preview); !strings.Contains(got, "No findings matched") {
+		t.Fatalf("unexpected empty markdown: %s", got)
+	}
+}
+
 func TestSelectorFiltersFindings(t *testing.T) {
 	report := inventory.Report{Findings: []inventory.Finding{
 		{ID: "mcp_shell_command-aaaaaaaaaaaa", Rule: "mcp_shell_command", FixAvailable: true},

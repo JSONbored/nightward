@@ -26,6 +26,17 @@ Use fixtures with temporary homes for adapter and policy tests. Do not add real 
 - Any new output surface must preserve redaction.
 - New adapters need classification, risk rationale, and no-write tests when practical.
 - MCP/security rules need fixture coverage and a safe remediation posture.
+- Major user-facing, security, parser, policy, adapter, and output changes need tests or a documented reason in the PR.
+
+## Developer Certificate Of Origin
+
+Nightward uses the Developer Certificate of Origin (DCO) for contributions. Every non-merge commit in a pull request must include a sign-off line:
+
+```text
+Signed-off-by: Name <email@example.com>
+```
+
+Use `git commit -s` for new commits, or `git commit --amend -s --no-edit` to add the sign-off to the latest commit. The sign-off means you certify that you have the right to submit the contribution under the project license.
 
 ## CI And Action Pinning
 
@@ -55,3 +66,5 @@ Use focused PRs. A good PR explains:
 - what user-facing behavior changed
 - what was validated
 - any remaining risk or follow-up
+
+Maintainer-authored changes should still flow through pull requests and human review unless there is an emergency security fix or repository administration task that cannot wait. Emergency exceptions should be documented after the fact.

@@ -1,6 +1,6 @@
 [
   {
-    "id": "mcp_secret_header-bcdb8f0837fd",
+    "id": "mcp_secret_header-caa3df1f711e",
     "tool": "Codex",
     "path": "/tmp/nightward-golden-home/.codex/config.toml",
     "server": "header",
@@ -29,7 +29,7 @@
     }
   },
   {
-    "id": "mcp_secret_header-eba7e3966510",
+    "id": "mcp_secret_header-5212d7dbf262",
     "tool": "Codex",
     "path": "/tmp/nightward-golden-home/.codex/config.toml",
     "server": "header",
@@ -57,7 +57,7 @@
     }
   },
   {
-    "id": "mcp_local_endpoint-cf933c07a3ec",
+    "id": "mcp_local_endpoint-a1016cb2257c",
     "tool": "Codex",
     "path": "/tmp/nightward-golden-home/.codex/config.toml",
     "server": "local",
@@ -81,7 +81,7 @@
     ]
   },
   {
-    "id": "mcp_unknown_command-a5e74f7a7e1d",
+    "id": "mcp_unknown_command-a318c5ca6d87",
     "tool": "Codex",
     "path": "/tmp/nightward-golden-home/.codex/config.toml",
     "server": "unknown",
@@ -105,7 +105,7 @@
     ]
   },
   {
-    "id": "mcp_server_review-d934e91f9921",
+    "id": "mcp_server_review-895197e30eb1",
     "tool": "Codex",
     "path": "/tmp/nightward-golden-home/.codex/config.toml",
     "server": "header",
@@ -129,7 +129,7 @@
     ]
   },
   {
-    "id": "mcp_server_review-cf933c07a3ec",
+    "id": "mcp_server_review-a1016cb2257c",
     "tool": "Codex",
     "path": "/tmp/nightward-golden-home/.codex/config.toml",
     "server": "local",
@@ -153,7 +153,7 @@
     ]
   },
   {
-    "id": "mcp_server_review-f17f9e7bd3e7",
+    "id": "mcp_server_review-ebc91cff4b17",
     "tool": "Codex",
     "path": "/tmp/nightward-golden-home/.codex/config.toml",
     "server": "remote",
@@ -177,7 +177,7 @@
     ]
   },
   {
-    "id": "mcp_server_review-a5e74f7a7e1d",
+    "id": "mcp_server_review-a318c5ca6d87",
     "tool": "Codex",
     "path": "/tmp/nightward-golden-home/.codex/config.toml",
     "server": "unknown",

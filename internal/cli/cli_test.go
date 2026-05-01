@@ -7,6 +7,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/jsonbored/nightward/internal/analysis"
+	"github.com/jsonbored/nightward/internal/backupplan"
+	"github.com/jsonbored/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/policy"
+	"github.com/jsonbored/nightward/internal/schedule"
+	"github.com/jsonbored/nightward/internal/snapshot"
 )
 
 func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
@@ -146,6 +154,34 @@ API_TOKEN = "`+secretValue+`"
 		if code == 0 {
 			t.Fatalf("%s unexpectedly succeeded", strings.Join(args, " "))
 		}
+	}
+}
+
+func TestHelpVersionAndCommandErrors(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := Run([]string{"--help"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("help failed: %d %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Usage:") || !strings.Contains(stdout.String(), "Canonical command") {
+		t.Fatalf("unexpected help output:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := RunWithName("nw", []string{"version"}, &stdout, &stderr); code != 0 || strings.TrimSpace(stdout.String()) == "" {
+		t.Fatalf("version failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := RunWithName("nw", []string{"providers", "bogus"}, &stdout, &stderr); code == 0 || !strings.Contains(stderr.String(), "usage: nightward providers") {
+		t.Fatalf("expected providers error, code=%d stderr=%q", code, stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := RunWithName("nw", []string{"bogus"}, &stdout, &stderr); code == 0 || !strings.Contains(stderr.String(), "unknown command") {
+		t.Fatalf("expected unknown command error, code=%d stderr=%q", code, stderr.String())
 	}
 }
 
@@ -303,6 +339,79 @@ func TestPolicyCheckUsesConfig(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), `"ignored": 1`) {
 		t.Fatalf("expected ignored finding in output: %s", stdout.String())
+	}
+}
+
+func TestHumanPrintersCoverPolicySnapshotAndSchedule(t *testing.T) {
+	var out bytes.Buffer
+	printPolicy(&out, policy.Report{
+		Strict:    true,
+		Passed:    false,
+		Threshold: inventory.RiskMedium,
+		Summary:   policy.Summary{TotalFindings: 2, Violations: 1, Ignored: 1},
+		Violations: []inventory.Finding{
+			{ID: "mcp_secret_env-1", Severity: inventory.RiskCritical, Rule: "mcp_secret_env", Message: "Secret env"},
+		},
+	})
+	if text := out.String(); !strings.Contains(text, "policy failed") || !strings.Contains(text, "mcp_secret_env") {
+		t.Fatalf("unexpected policy printer output:\n%s", text)
+	}
+
+	out.Reset()
+	printSnapshotPlan(&out, snapshot.Plan{
+		TargetRoot: "/tmp/snapshots",
+		Summary:    snapshot.Summary{Total: 1, Include: 1},
+		Entries: []snapshot.Entry{
+			{Source: "/tmp/config.toml", Target: "/tmp/snapshots/config.toml", Tool: "Codex", Action: backupplan.ActionInclude},
+		},
+	})
+	if text := out.String(); !strings.Contains(text, "Snapshot dry-run plan") || !strings.Contains(text, "config.toml") {
+		t.Fatalf("unexpected snapshot plan output:\n%s", text)
+	}
+
+	out.Reset()
+	printSnapshotDiff(&out, snapshot.Diff{
+		Summary: snapshot.DiffSummary{Added: 1, Removed: 1, Changed: 1},
+		Added:   []snapshot.Entry{{Source: "/tmp/new", Tool: "Codex"}},
+		Removed: []snapshot.Entry{{Source: "/tmp/old", Tool: "Claude"}},
+		Changed: []snapshot.Change{{Source: "/tmp/config", Before: snapshot.Entry{Action: backupplan.ActionReview}, After: snapshot.Entry{Tool: "Cursor", Action: backupplan.ActionInclude}}},
+	})
+	if text := out.String(); !strings.Contains(text, "added") || !strings.Contains(text, "removed") || !strings.Contains(text, "changed") {
+		t.Fatalf("unexpected snapshot diff output:\n%s", text)
+	}
+
+	now := time.Date(2026, 4, 30, 2, 17, 0, 0, time.UTC)
+	out.Reset()
+	printSchedulePlan(&out, schedule.Plan{
+		Preset:     "nightly",
+		Platform:   "darwin",
+		Command:    []string{"nw", "scan"},
+		ReportDir:  "/tmp/reports",
+		LastReport: "/tmp/reports/latest.json",
+		LastRun:    &now,
+		Files:      []schedule.GeneratedFile{{Path: "/tmp/agent.plist", Content: "<plist/>", Mode: 0644}},
+		Notes:      []string{"dry run"},
+	})
+	if text := out.String(); !strings.Contains(text, "Schedule preset") || !strings.Contains(text, "agent.plist") || !strings.Contains(text, "dry run") {
+		t.Fatalf("unexpected schedule output:\n%s", text)
+	}
+}
+
+func TestHumanAnalysisSignalPrinter(t *testing.T) {
+	var out bytes.Buffer
+	printSignal(&out, analysis.Signal{
+		ID:             "signal-1",
+		Rule:           "nightward/mcp_secret_env",
+		Severity:       inventory.RiskCritical,
+		Confidence:     "high",
+		Provider:       "nightward",
+		Path:           "/tmp/config.toml",
+		Evidence:       "env_key=API_TOKEN",
+		Recommendation: "Externalize the secret.",
+		Why:            "Secrets should not live in portable config.",
+	})
+	if text := out.String(); !strings.Contains(text, "signal-1") || !strings.Contains(text, "Externalize") || !strings.Contains(text, "Why this matters") {
+		t.Fatalf("unexpected signal output:\n%s", text)
 	}
 }
 

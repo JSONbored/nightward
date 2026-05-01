@@ -1,0 +1,48 @@
+{
+  "name": "nightward",
+  "version": "0.0.0-development",
+  "description": "Local-first TUI/CLI for auditing AI agent state, MCP config, and dotfiles backup safety.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "nightward": "bin/nightward.mjs",
+    "nw": "bin/nightward.mjs"
+  },
+  "files": [
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "pack:dry-run": "npm pack --dry-run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JSONbored/nightward.git",
+    "directory": "packages/npm"
+  },
+  "bugs": {
+    "url": "https://github.com/JSONbored/nightward/issues"
+  },
+  "homepage": "https://github.com/JSONbored/nightward#readme",
+  "keywords": [
+    "ai",
+    "agent",
+    "cli",
+    "codex",
+    "cursor",
+    "mcp",
+    "nightward",
+    "raycast",
+    "security",
+    "tui"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

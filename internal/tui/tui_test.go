@@ -306,3 +306,80 @@ func TestClipboardAndOpenCommandBuilders(t *testing.T) {
 		t.Fatalf("unexpected open command: path=%s args=%v", openCmd.Path, openCmd.Args)
 	}
 }
+
+func TestTUISelectionsForSignalFixAndBackup(t *testing.T) {
+	report := inventory.Report{
+		Home: "/tmp/nightward-home",
+		Findings: []inventory.Finding{
+			{
+				ID:             "mcp_shell_command-111111111111",
+				Rule:           "mcp_shell_command",
+				Severity:       inventory.RiskMedium,
+				FixAvailable:   true,
+				FixKind:        inventory.FixReplaceShellWrapper,
+				FixSummary:     "Replace shell wrapper.",
+				FixSteps:       []string{"Use node directly."},
+				Recommendation: "Use a direct command.",
+			},
+		},
+		Items: []inventory.Item{
+			{ID: "item-1", Tool: "Codex", Path: "/tmp/config.toml", Classification: inventory.Portable, Risk: inventory.RiskLow},
+		},
+	}
+	m := model{
+		report: report,
+		width:  120,
+		height: 40,
+	}
+
+	m.tab = 3
+	if got, ok := m.currentSignal(); !ok || got.Rule != "nightward/mcp_shell_command" {
+		t.Fatalf("unexpected current signal: %#v ok=%t", got, ok)
+	}
+	if text, label, ok := m.copySelection(); !ok || label != "analysis recommendation" || !strings.Contains(text, "Use a direct command") {
+		t.Fatalf("unexpected signal copy: %q %q %t", text, label, ok)
+	}
+
+	m.tab = 4
+	if got, ok := m.currentFix(); !ok || got.FindingID != "mcp_shell_command-111111111111" {
+		t.Fatalf("unexpected current fix: %#v ok=%t", got, ok)
+	}
+	if text, label, ok := m.copySelection(); !ok || label != "fix step" || !strings.Contains(text, "Use node directly") {
+		t.Fatalf("unexpected fix copy: %q %q %t", text, label, ok)
+	}
+
+	m.tab = 5
+	if got, ok := m.currentBackupEntry(); !ok || got.Source != "/tmp/config.toml" {
+		t.Fatalf("unexpected backup entry: %#v ok=%t", got, ok)
+	}
+	if text, label, ok := m.copySelection(); !ok || label != "backup source path" || text != "/tmp/config.toml" {
+		t.Fatalf("unexpected backup copy: %q %q %t", text, label, ok)
+	}
+}
+
+func TestTUIFiltersAndCursorHelpers(t *testing.T) {
+	report := inventory.Report{Findings: []inventory.Finding{
+		{ID: "a", Tool: "Codex", Rule: "mcp_secret_env", Severity: inventory.RiskCritical},
+		{ID: "b", Tool: "Cursor", Rule: "mcp_server_review", Severity: inventory.RiskInfo},
+	}}
+	m := model{report: report, tool: "Codex", rule: "mcp_secret_env", cursor: 10}
+	if tools := toolOptions(report.Findings); len(tools) != 2 || tools[0] != "Codex" {
+		t.Fatalf("unexpected tool options: %#v", tools)
+	}
+	if rules := ruleOptions(report.Findings); len(rules) != 2 || rules[0] != "mcp_secret_env" {
+		t.Fatalf("unexpected rule options: %#v", rules)
+	}
+	if got := cycle("", []string{"Codex", "Cursor"}); got != "Codex" {
+		t.Fatalf("unexpected cycle result: %q", got)
+	}
+	if got := severityColor(inventory.RiskLow); got == "" {
+		t.Fatal("expected low severity color")
+	}
+	filtered := m.filteredFindings()
+	if len(filtered) != 1 || filtered[0].ID != "a" {
+		t.Fatalf("unexpected filtered findings: %#v", filtered)
+	}
+	if got := clampCursor(10, 1, 5); got != 0 {
+		t.Fatalf("expected cursor clamp to zero, got %d", got)
+	}
+}
