@@ -25,6 +25,16 @@ Nightward does not mutate agent configs. It only writes explicit report/SARIF fi
 | GitHub Action | Workspace policy and SARIF checks | Writes only requested CI outputs |
 | Trunk plugin | Local workspace policy/analyze linters | Emits SARIF to stdout |
 
+## Sample Output
+
+The sample below is generated from the committed fixture home at [testdata/homes/policy](testdata/homes/policy). Hostname, HOME, local paths, timestamps, and secret-looking fixture values are scrubbed before the JSON, report, or screenshot is committed.
+
+![Scrubbed Nightward HTML report generated from fixture data](site/public/demo/nightward-sample-report.png)
+
+- [Scrubbed sample scan JSON](site/public/demo/nightward-sample-scan.json)
+- [Static HTML report](site/public/demo/nightward-sample-report.html)
+- Regenerate with `make demo-assets` using Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`
+
 ```mermaid
 flowchart LR
   configs["AI agent/devtool config"] --> scan["nw scan"]

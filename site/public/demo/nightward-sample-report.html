@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nightward Report</title>
+  <style>
+    :root { color-scheme: dark; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #071014; color: #e6fffb; }
+    body { margin: 0; padding: 32px; }
+    main { max-width: 1120px; margin: 0 auto; }
+    h1, h2 { letter-spacing: 0; }
+    .meta, .card { border: 1px solid #1f3b3d; border-radius: 8px; background: #0b171b; padding: 16px; margin: 16px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .metric { border: 1px solid #1f3b3d; border-radius: 8px; padding: 12px; background: #091317; }
+    .metric strong { display: block; color: #5eead4; font-size: 28px; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    th, td { border-bottom: 1px solid #1f3b3d; padding: 10px; text-align: left; vertical-align: top; }
+    th { color: #99f6e4; font-weight: 700; }
+    code { color: #c7f9f4; overflow-wrap: anywhere; }
+    .finding { border-left: 4px solid #5eead4; padding-left: 12px; margin: 14px 0; }
+    .severity-high, .severity-critical { border-left-color: #fb7185; }
+    .severity-medium { border-left-color: #facc15; }
+    .note { color: #b7c9ca; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Nightward Report</h1>
+  <p class="note">Generated 2026-05-01T00:00:00Z. This static report is rendered from redacted Nightward JSON.</p>
+  <section class="meta">
+    <div><strong>Host:</strong> nightward-fixture</div>
+    <div><strong>Home:</strong> <code>/tmp/nightward-fixture-home</code></div>
+
+  </section>
+  <section class="grid">
+    <div class="metric"><strong>1</strong> items</div>
+    <div class="metric"><strong>4</strong> findings</div>
+    <div class="metric"><strong>1</strong> high findings</div>
+    <div class="metric"><strong>2</strong> medium findings</div>
+  </section>
+  <section class="card">
+    <h2>Findings</h2>
+
+
+      <article class="finding severity-high">
+        <h3>mcp_unpinned_package: MCP server &#34;demo&#34; runs a package executor without an obvious pinned package version.</h3>
+        <p><strong>Severity:</strong> high · <strong>Tool:</strong> Codex</p>
+        <p><code>/tmp/nightward-fixture-home/.codex/config.toml</code></p>
+        <p><strong>Evidence:</strong> <code>command=npx args=-y @modelcontextprotocol/server-filesystem $HOME</code></p>
+        <p><strong>Recommendation:</strong> Pin package versions or replace with a trusted local binary before syncing.</p>
+      </article>
+
+      <article class="finding severity-medium">
+        <h3>mcp_secret_env: MCP server &#34;demo&#34; references a sensitive environment key.</h3>
+        <p><strong>Severity:</strong> medium · <strong>Tool:</strong> Codex</p>
+        <p><code>/tmp/nightward-fixture-home/.codex/config.toml</code></p>
+        <p><strong>Evidence:</strong> <code>env_key=API_TOKEN</code></p>
+        <p><strong>Recommendation:</strong> Keep secret values outside dotfiles and document required env names only.</p>
+      </article>
+
+      <article class="finding severity-medium">
+        <h3>mcp_broad_filesystem: MCP server &#34;demo&#34; appears to reference broad filesystem access.</h3>
+        <p><strong>Severity:</strong> medium · <strong>Tool:</strong> Codex</p>
+        <p><code>/tmp/nightward-fixture-home/.codex/config.toml</code></p>
+        <p><strong>Evidence:</strong> <code>-y @modelcontextprotocol/server-filesystem $HOME</code></p>
+        <p><strong>Recommendation:</strong> Narrow filesystem access to explicit project/config paths where possible.</p>
+      </article>
+
+      <article class="finding severity-info">
+        <h3>mcp_server_review: Review MCP server &#34;demo&#34; before syncing this config.</h3>
+        <p><strong>Severity:</strong> info · <strong>Tool:</strong> Codex</p>
+        <p><code>/tmp/nightward-fixture-home/.codex/config.toml</code></p>
+        <p><strong>Evidence:</strong> <code>command=npx</code></p>
+        <p><strong>Recommendation:</strong> Confirm the server source, permissions, and local path assumptions.</p>
+      </article>
+
+
+  </section>
+  <section class="card">
+    <h2>Inventory Sample</h2>
+    <table>
+      <thead><tr><th>Tool</th><th>Classification</th><th>Risk</th><th>Path</th></tr></thead>
+      <tbody>
+
+        <tr><td>Codex</td><td>portable</td><td>low</td><td><code>/tmp/nightward-fixture-home/.codex/config.toml</code></td></tr>
+
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

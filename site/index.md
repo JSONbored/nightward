@@ -34,6 +34,16 @@ nw scan --workspace . --json
 nw policy sarif --workspace . --include-analysis --output nightward.sarif
 ```
 
+## Real Fixture Output
+
+The sample report below is generated from the committed `testdata/homes/policy` fixture home. Hostname, HOME, local paths, timestamps, and secret-looking fixture values are scrubbed before publication.
+
+[![Scrubbed Nightward HTML report showing one fixture item and four MCP findings](/demo/nightward-sample-report.png)](/demo/nightward-sample-report.html)
+
+_Static HTML report rendered from scrubbed Nightward JSON._
+
+[Scrubbed sample JSON](/demo/nightward-sample-scan.json) · [Open the static HTML report](/demo/nightward-sample-report.html)
+
 ## Why Nightward exists
 
 AI coding tools leave useful state in config files, MCP server definitions, rules, commands, skills, editor settings, caches, and local databases. Some of that belongs in a private dotfiles repo. Some of it is machine-local. Some of it is app-owned. Some of it is credential material.
