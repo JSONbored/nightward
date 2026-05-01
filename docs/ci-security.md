@@ -25,6 +25,7 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 - Never make flaky-test quarantining a default CI behavior.
 - Use Renovate instead of Dependabot whenever possible.
 - Keep dependency PRs reviewed; do not enable broad automerge by default.
+- `main` branch protection requires two approving reviews and CODEOWNERS review. While Nightward has only one maintainer, maintainer merges require an explicit admin bypass and an issue/PR note explaining why normal review could not be satisfied.
 - Use repo-controlled `make gitleaks` and `make govulncheck` targets in CI so local and remote behavior match.
 - Install Trunk in CI from a pinned release archive with a checked SHA-256 instead of a moving launcher URL.
 - Keep Trunk Flaky Tests secrets scoped to the detection/upload steps only.
@@ -51,3 +52,17 @@ trunk check enable nightward-policy
 
 - Add SLSA provenance/attestations once release artifact flow is stable.
 - Defer Homebrew tap automation until the first tagged release.
+
+## Local Test Suites
+
+Use suite aliases before pushing:
+
+```sh
+make test-fast
+make test-security
+make test-ux
+make test-release
+make test-prepush
+```
+
+`make test-prepush` is the full local release gate. It should pass before pushing a release-sensitive branch.

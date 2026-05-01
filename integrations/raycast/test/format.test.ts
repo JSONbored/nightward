@@ -3,13 +3,21 @@ import test from "node:test";
 import {
   analysisMarkdown,
   findingMarkdown,
+  menuBarStatus,
+  menuBarStatusMarkdown,
   maxSeverity,
   redactText,
   signalMarkdown,
   sortedFindings,
   sortedSignals,
 } from "../src/format";
-import type { AnalysisReport, AnalysisSignal, Finding } from "../src/types";
+import type {
+  AnalysisReport,
+  AnalysisSignal,
+  DoctorReport,
+  Finding,
+  ScanReport,
+} from "../src/types";
 
 test("redacts obvious secret assignments and long token-like values", () => {
   const keyName = "API_" + "KEY";
@@ -129,6 +137,72 @@ test("analysis markdown redacts signal evidence", () => {
   assert.equal(sortedSignals([baseSignal("b", "low"), signal])[0]?.id, "signal-a");
   assert.doesNotMatch(signalMarkdown(signal), /1234567890abcdef/);
   assert.doesNotMatch(analysisMarkdown(report), /1234567890abcdef/);
+});
+
+test("menu bar status summarizes risk and schedule state", () => {
+  const report: ScanReport = {
+    generated_at: "2026-05-01T00:00:00Z",
+    hostname: "fixture",
+    home: "/tmp/nightward-home",
+    summary: {
+      total_items: 2,
+      total_findings: 3,
+      items_by_classification: {},
+      items_by_risk: {},
+      items_by_tool: {},
+      findings_by_severity: { critical: 1, high: 1, medium: 1 },
+      findings_by_rule: {},
+      findings_by_tool: {},
+    },
+    items: [],
+    findings: [
+      baseFinding("critical", "critical", "Codex"),
+      baseFinding("high", "high", "Claude"),
+      baseFinding("medium", "medium", "Cursor"),
+    ],
+    adapters: [],
+  };
+  const doctor: DoctorReport = {
+    generated_at: "2026-05-01T00:00:00Z",
+    version: "0.1.4",
+    home: "/tmp/nightward-home",
+    executable: "/tmp/nw",
+    checks: [],
+    adapters: [],
+    schedule: {
+      preset: "daily",
+      platform: "darwin",
+      report_dir: "/tmp/reports",
+      log_dir: "/tmp/logs",
+      installed: true,
+      last_report: "/tmp/reports/latest.json",
+      last_findings: 2,
+    },
+  };
+  const analysis: AnalysisReport = {
+    generated_at: "2026-05-01T00:00:00Z",
+    mode: "home",
+    summary: {
+      total_subjects: 2,
+      total_signals: 4,
+      signals_by_severity: { high: 1 },
+      signals_by_category: { "execution-risk": 1 },
+      signals_by_provider: { nightward: 4 },
+      highest_severity: "high",
+      provider_warnings: 1,
+      no_known_risk_signals: false,
+    },
+    providers: [],
+    subjects: [],
+    signals: [],
+  };
+
+  const status = menuBarStatus(report, doctor, analysis);
+  assert.equal(status.title, "NW 1C");
+  assert.equal(status.risk, "critical");
+  assert.match(status.tooltip, /3 findings/);
+  assert.match(status.tooltip, /1 provider warnings/);
+  assert.match(menuBarStatusMarkdown(status), /Last scheduled findings: `2`/);
 });
 
 function baseFinding(

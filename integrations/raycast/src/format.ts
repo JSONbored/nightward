@@ -3,6 +3,7 @@ import type {
   AnalysisReport,
   AnalysisSignal,
   Classification,
+  DoctorReport,
   Finding,
   FixPlan,
   RiskLevel,
@@ -250,6 +251,86 @@ export function adapterSummary(adapters: AdapterStatus[]): string {
 
 export function fixPlanSummary(plan: FixPlan): string {
   return `Safe ${plan.summary.safe} - Review ${plan.summary.review} - Blocked ${plan.summary.blocked}`;
+}
+
+export type MenuBarStatus = {
+  title: string;
+  tooltip: string;
+  risk: RiskLevel;
+  findings: number;
+  critical: number;
+  high: number;
+  medium: number;
+  signals: number;
+  providerWarnings: number;
+  scheduled: boolean;
+  lastFindings?: number;
+  lastReport?: string;
+};
+
+export function menuBarStatus(
+  report: ScanReport,
+  doctor: DoctorReport,
+  analysis: AnalysisReport,
+): MenuBarStatus {
+  const risk = maxSeverity(report.findings);
+  const critical = report.summary.findings_by_severity.critical ?? 0;
+  const high = report.summary.findings_by_severity.high ?? 0;
+  const medium = report.summary.findings_by_severity.medium ?? 0;
+  const findings = report.summary.total_findings;
+  const signals = analysis.summary.total_signals;
+  const providerWarnings = analysis.summary.provider_warnings;
+  const issueCount = findings + providerWarnings;
+  const title =
+    issueCount === 0
+      ? "NW OK"
+      : critical > 0
+        ? `NW ${critical}C`
+        : high > 0
+          ? `NW ${high}H`
+          : `NW ${issueCount}`;
+  const tooltip = [
+    `${findings} findings`,
+    `${signals} analysis signals`,
+    `${providerWarnings} provider warnings`,
+    `max risk: ${risk}`,
+    doctor.schedule.installed ? "scheduled" : "not scheduled",
+  ].join(" - ");
+
+  return {
+    title,
+    tooltip,
+    risk,
+    findings,
+    critical,
+    high,
+    medium,
+    signals,
+    providerWarnings,
+    scheduled: doctor.schedule.installed,
+    lastFindings: doctor.schedule.last_findings,
+    lastReport: doctor.schedule.last_report,
+  };
+}
+
+export function menuBarStatusMarkdown(status: MenuBarStatus): string {
+  return [
+    "# Nightward Status",
+    "",
+    `Findings: \`${status.findings}\``,
+    `Critical: \`${status.critical}\``,
+    `High: \`${status.high}\``,
+    `Medium: \`${status.medium}\``,
+    `Analysis signals: \`${status.signals}\``,
+    `Provider warnings: \`${status.providerWarnings}\``,
+    `Scheduled: \`${status.scheduled ? "yes" : "no"}\``,
+    status.lastFindings !== undefined
+      ? `Last scheduled findings: \`${status.lastFindings}\``
+      : "",
+    status.lastReport ? `Last report: \`${status.lastReport}\`` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function basename(path: string): string {

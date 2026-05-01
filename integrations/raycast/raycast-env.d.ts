@@ -20,6 +20,8 @@ declare type Preferences = ExtensionPreferences
 declare namespace Preferences {
   /** Preferences accessible in the `dashboard` command */
   export type Dashboard = ExtensionPreferences & {}
+  /** Preferences accessible in the `status-menu` command */
+  export type StatusMenu = ExtensionPreferences & {}
   /** Preferences accessible in the `findings` command */
   export type Findings = ExtensionPreferences & {}
   /** Preferences accessible in the `analysis` command */
@@ -41,6 +43,8 @@ declare namespace Preferences {
 declare namespace Arguments {
   /** Arguments passed to the `dashboard` command */
   export type Dashboard = {}
+  /** Arguments passed to the `status-menu` command */
+  export type StatusMenu = {}
   /** Arguments passed to the `findings` command */
   export type Findings = {}
   /** Arguments passed to the `analysis` command */

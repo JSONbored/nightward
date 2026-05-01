@@ -38,6 +38,13 @@
       "keywords": ["nightward", "nw", "scan", "doctor", "security"]
     },
     {
+      "name": "status-menu",
+      "title": "Nightward Status",
+      "description": "Show Nightward finding, analysis, and schedule counters in the menu bar.",
+      "mode": "menu-bar",
+      "keywords": ["nightward", "status", "monitor", "security", "findings"]
+    },
+    {
       "name": "findings",
       "title": "Nightward Findings",
       "description": "Browse redacted Nightward findings with severity filters and fix guidance.",

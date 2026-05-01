@@ -1,1 +1,3 @@
+# Nightward is currently single-maintainer. Keep ownership explicit so branch
+# protection can require CODEOWNERS review as additional maintainers are added.
 * @JSONbored
