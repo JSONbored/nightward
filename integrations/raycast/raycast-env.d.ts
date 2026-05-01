@@ -10,8 +10,10 @@
 type ExtensionPreferences = {
   /** Nightward Command - Path or command name used to run Nightward locally. */
   "nightwardPath": string,
-  /** Home Override - Optional HOME-equivalent directory passed as NIGHTWARD_HOME for testing. */
-  "homeOverride"?: string
+  /** Home Override - Optional HOME-equivalent path passed as NIGHTWARD_HOME for testing fixture homes. */
+  "homeOverride"?: string,
+  /** Allow Online Providers - Allow selected online-capable providers in Raycast Analysis. Socket creates a remote scan artifact. */
+  "allowOnlineProviders": boolean
 }
 
 /** Preferences accessible in all the extension's commands */

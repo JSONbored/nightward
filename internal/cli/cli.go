@@ -1064,7 +1064,7 @@ func maybeWriteReport(report inventory.Report, output, outputDir string) error {
 }
 
 func printHelp(w io.Writer, commandName string) {
-	fmt.Fprintf(w, `Nightward watches local AI agent state before it leaks into dotfiles.
+	fmt.Fprintf(w, `Nightward shows what your AI tools would leak before you sync dotfiles.
 
 Usage:
   %[1]s                                Open the TUI

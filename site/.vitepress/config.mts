@@ -4,7 +4,7 @@ const base = process.env.NIGHTWARD_SITE_BASE ?? "/nightward/";
 
 export default defineConfig({
   title: "Nightward",
-  description: "Local-first security posture for AI agent state, MCP config, and dotfiles backup safety.",
+  description: "See what your AI tools would leak before syncing dotfiles.",
   base,
   cleanUrls: true,
   lastUpdated: true,
@@ -16,7 +16,7 @@ export default defineConfig({
     ["meta", { name: "theme-color", content: "#0f172a" }],
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:title", content: "Nightward" }],
-    ["meta", { property: "og:description", content: "Audit AI agent state before it leaks into dotfiles." }],
+    ["meta", { property: "og:description", content: "See MCP risk, local-only state, secret exposure, and reviewable fix plans before syncing dotfiles." }],
   ],
   themeConfig: {
     logo: "/logo.svg",

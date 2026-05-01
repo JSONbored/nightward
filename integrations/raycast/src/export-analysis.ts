@@ -1,10 +1,12 @@
 import { Clipboard, Toast, getPreferenceValues, showToast } from "@raycast/api";
 import { exportAnalysisMarkdown, normalizePreferences } from "./nightward";
+import { readSelectedProviders } from "./provider-settings";
 
 export default async function Command() {
   const runtime = normalizePreferences(getPreferenceValues());
   try {
-    const markdown = await exportAnalysisMarkdown(runtime);
+    const selectedProviders = await readSelectedProviders();
+    const markdown = await exportAnalysisMarkdown(runtime, selectedProviders);
     await Clipboard.copy(markdown);
     await showToast({
       style: Toast.Style.Success,

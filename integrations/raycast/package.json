@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "title": "Nightward",
-  "description": "Review local AI agent state, findings, and redacted fix plans from Raycast.",
+  "description": "Audit AI agent, MCP, and dotfiles risk from Raycast without mutating local config.",
   "icon": "icon.png",
   "author": "jsonbored",
   "platforms": ["macOS"],
@@ -24,9 +24,19 @@
     {
       "name": "homeOverride",
       "title": "Home Override",
-      "description": "Optional HOME-equivalent directory passed as NIGHTWARD_HOME for testing.",
-      "type": "directory",
-      "required": false
+      "description": "Optional HOME-equivalent path passed as NIGHTWARD_HOME for testing fixture homes.",
+      "type": "textfield",
+      "required": false,
+      "placeholder": "/Users/alice/fixture-home"
+    },
+    {
+      "name": "allowOnlineProviders",
+      "title": "Allow Online Providers",
+      "label": "Allow selected online-capable providers in Raycast Analysis",
+      "description": "Allow selected online-capable providers in Raycast Analysis. Socket creates a remote scan artifact.",
+      "type": "checkbox",
+      "required": false,
+      "default": false
     }
   ],
   "commands": [
@@ -54,14 +64,14 @@
     {
       "name": "analysis",
       "title": "Nightward Analysis",
-      "description": "Browse offline analysis signals and provider status.",
+      "description": "Browse built-in and selected-provider analysis signals.",
       "mode": "view",
       "keywords": ["analysis", "signals", "security", "privacy", "trust"]
     },
     {
       "name": "provider-doctor",
       "title": "Nightward Provider Doctor",
-      "description": "Check optional local and online-capable analysis providers.",
+      "description": "Check provider status and select providers for Raycast Analysis.",
       "mode": "view",
       "keywords": ["providers", "doctor", "security", "privacy"]
     },

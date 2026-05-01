@@ -19,7 +19,6 @@ import {
   scan,
 } from "./nightward";
 import type { MenuBarStatus } from "./format";
-import type { RiskLevel } from "./types";
 
 const docsUrl = "https://github.com/JSONbored/nightward#readme";
 
@@ -40,8 +39,8 @@ export default function Command() {
   if (error) {
     return (
       <MenuBarExtra
-        title="NW !"
-        icon={{ source: Icon.Warning, tintColor: Color.Red }}
+        title="!"
+        icon={{ source: Icon.ExclamationMark, tintColor: Color.Red }}
         tooltip={`Nightward failed: ${error.message}`}
         isLoading={isLoading}
       >
@@ -73,9 +72,9 @@ export default function Command() {
   const status = data?.status;
   return (
     <MenuBarExtra
-      title={status?.title ?? "NW"}
+      title={status?.title ?? ""}
       icon={{
-        source: statusIcon(status?.risk ?? "info"),
+        source: Icon.Shield,
         tintColor: severityColor(status?.risk ?? "info"),
       }}
       tooltip={status?.tooltip ?? "Loading Nightward status"}
@@ -175,12 +174,6 @@ function StatusItems({
       </MenuBarExtra.Section>
     </>
   );
-}
-
-function statusIcon(risk: RiskLevel): Icon {
-  if (risk === "critical" || risk === "high") return Icon.ExclamationMark;
-  if (risk === "medium") return Icon.Warning;
-  return Icon.Shield;
 }
 
 async function openCommand(name: string) {

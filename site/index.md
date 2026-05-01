@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: Nightward
-  text: Audit AI agent state before it leaks into dotfiles.
-  tagline: Local-first TUI and CLI for MCP security, AI devtool inventory, report history, policy output, and plan-only remediation.
+  text: See what your AI tools would leak before syncing dotfiles.
+  tagline: Find MCP risks, local-only state, secret exposure, and reviewable fix plans without telemetry or live config mutation.
   image:
     src: /logo.svg
     alt: Nightward logo

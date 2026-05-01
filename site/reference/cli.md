@@ -3,7 +3,7 @@
 This page is generated from `go run ./cmd/nw --help`.
 
 ```text
-Nightward watches local AI agent state before it leaks into dotfiles.
+Nightward shows what your AI tools would leak before you sync dotfiles.
 
 Usage:
   nw                                Open the TUI

@@ -78,14 +78,34 @@ export function sortedFindings(findings: Finding[]): Finding[] {
 }
 
 export function findingTitle(finding: Finding): string {
-  return `${finding.severity.toUpperCase()} ${finding.rule}`;
+  return humanizeIdentifier(finding.rule);
 }
 
 export function findingSubtitle(finding: Finding): string {
   const parts = [finding.tool];
-  if (finding.server) parts.push(finding.server);
-  parts.push(basename(finding.path));
+  if (finding.server) parts.push(`server ${finding.server}`);
+  const file = basename(finding.path);
+  if (file) parts.push(file);
   return parts.join(" - ");
+}
+
+export function findingFixLabel(finding: Finding): string {
+  if (!finding.fix_available) return "review";
+  if (!finding.fix_kind) return "fix";
+  switch (finding.fix_kind) {
+    case "pin-package":
+      return "pin";
+    case "externalize-secret":
+      return "secret";
+    case "replace-shell-wrapper":
+      return "shell";
+    case "narrow-filesystem":
+      return "scope";
+    case "ignore-with-reason":
+      return "ignore";
+    case "manual-review":
+      return "review";
+  }
 }
 
 export function findingKeywords(finding: Finding): string[] {
@@ -103,7 +123,7 @@ export function findingKeywords(finding: Finding): string[] {
 
 export function findingMarkdown(finding: Finding): string {
   const lines = [
-    `# ${escapeMarkdown(finding.rule)}`,
+    `# ${escapeMarkdown(findingTitle(finding))}`,
     "",
     redactText(finding.message),
     "",
@@ -154,7 +174,7 @@ export function sortedSignals(signals: AnalysisSignal[]): AnalysisSignal[] {
 
 export function signalMarkdown(signal: AnalysisSignal): string {
   return [
-    `# ${escapeMarkdown(signal.rule)}`,
+    `# ${escapeMarkdown(humanizeIdentifier(signal.rule))}`,
     "",
     redactText(signal.message),
     "",
@@ -167,17 +187,27 @@ export function signalMarkdown(signal: AnalysisSignal): string {
     redactText(signal.recommended_action),
     "",
     "## Metadata",
-    `Provider: \`${signal.provider}\``,
-    `Category: \`${signal.category}\``,
-    `Severity: \`${signal.severity}\``,
-    `Confidence: \`${signal.confidence}\``,
-    signal.path ? `Path: ${markdownCode(signal.path)}` : "",
+    `- Provider: \`${signal.provider}\``,
+    `- Category: \`${signal.category}\``,
+    `- Severity: \`${signal.severity}\``,
+    `- Confidence: \`${signal.confidence}\``,
+    signal.path ? `- Path: ${markdownCode(signal.path)}` : "",
     signal.why_this_matters ? "" : "",
     signal.why_this_matters ? "## Why This Matters" : "",
     signal.why_this_matters ? redactText(signal.why_this_matters) : "",
   ]
     .filter((line) => line !== "")
     .join("\n");
+}
+
+export function signalTitle(signal: AnalysisSignal): string {
+  return humanizeIdentifier(signal.rule);
+}
+
+export function signalSubtitle(signal: AnalysisSignal): string {
+  const parts = [signal.provider, signal.category.replace(/-/g, " ")];
+  if (signal.path) parts.push(basename(signal.path));
+  return parts.join(" - ");
 }
 
 export function analysisMarkdown(report: AnalysisReport): string {
@@ -290,14 +320,15 @@ export function menuBarStatus(
   const providerWarnings = analysis.summary.provider_warnings;
   const historyDelta = reportHistoryDelta(doctor.schedule.history);
   const issueCount = findings + providerWarnings;
-  const title =
-    issueCount === 0
-      ? "NW OK"
-      : critical > 0
-        ? `NW ${critical}C`
-        : high > 0
-          ? `NW ${high}H`
-          : `NW ${issueCount}`;
+  const topCount =
+    critical > 0
+      ? critical
+      : high > 0
+        ? high
+        : medium > 0
+          ? medium
+          : issueCount;
+  const title = issueCount === 0 ? "" : String(topCount);
   const tooltip = [
     `${findings} findings`,
     `${signals} analysis signals`,
@@ -388,6 +419,20 @@ function escapeMarkdown(value: string): string {
   return escaped.join("");
 }
 
+function humanizeIdentifier(value: string): string {
+  const raw = value.split("/").pop() ?? value;
+  return raw
+    .replace(/[_-]+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => {
+      const lower = word.toLowerCase();
+      if (uppercaseTokens.has(lower)) return lower.toUpperCase();
+      return `${lower.charAt(0).toUpperCase()}${lower.slice(1)}`;
+    })
+    .join(" ");
+}
+
 function maxBacktickRun(value: string): number {
   let max = 0;
   let current = 0;
@@ -421,4 +466,17 @@ const markdownSpecialChars = new Set([
   "|",
   ">",
   "~",
+]);
+
+const uppercaseTokens = new Set([
+  "ai",
+  "api",
+  "ci",
+  "id",
+  "json",
+  "mcp",
+  "sarif",
+  "toml",
+  "url",
+  "yaml",
 ]);
