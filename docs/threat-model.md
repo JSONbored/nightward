@@ -14,7 +14,7 @@ Nightward inspects local AI agent and devtool state, so its primary risk is acci
 
 - Local filesystem input is untrusted. Config files may be malformed, hostile, huge, symlinked, or privacy-sensitive.
 - CLI/TUI/Raycast output is a disclosure boundary. Secret values must not cross it.
-- Optional providers are execution boundaries. They are discovered but not installed or run online by default.
+- Optional providers are execution boundaries. They are discovered but not installed or run online by default. Socket is treated as online-capable because it creates a remote scan artifact from dependency manifest metadata.
 - GitHub Actions and Trunk integrations treat repository contents and PR input as untrusted.
 - Scheduler install/remove is an explicit write boundary and must stay user-level.
 - Release automation and npm publishing are privileged publishing boundaries.

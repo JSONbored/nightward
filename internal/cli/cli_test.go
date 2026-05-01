@@ -436,18 +436,30 @@ func TestAnalyzeWithOnlineProvidersRequiresExplicitOnline(t *testing.T) {
 	writeTestFile(t, filepath.Join(workspace, "package.json"), `{"dependencies":{"demo":"1.0.0"}}`)
 	binDir := t.TempDir()
 	writeTestFile(t, filepath.Join(binDir, "trivy"), `#!/bin/sh
+if [ "$PWD" != "$7" ] || [ "$1" != "filesystem" ] || [ "$2" != "--format" ] || [ "$3" != "json" ] || [ "$4" != "--scanners" ] || [ "$5" != "vuln,secret,misconfig" ] || [ "$6" != "--skip-version-check" ]; then
+  echo "unexpected trivy args: $*" >&2
+  exit 2
+fi
 printf '{"Results":[{"Target":"package.json","Vulnerabilities":[{"VulnerabilityID":"CVE-2026-0001","PkgName":"demo","Severity":"HIGH","Title":"demo vulnerable"}]}]}'
 `)
 	if err := os.Chmod(filepath.Join(binDir, "trivy"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	writeTestFile(t, filepath.Join(binDir, "osv-scanner"), `#!/bin/sh
+if [ "$PWD" != "$6" ] || [ "$1" != "scan" ] || [ "$2" != "source" ] || [ "$3" != "-r" ] || [ "$4" != "--format" ] || [ "$5" != "json" ]; then
+  echo "unexpected osv-scanner args: $*" >&2
+  exit 2
+fi
 printf '{"results":[{"source":"package.json","packages":[{"package":{"name":"demo"},"vulnerabilities":[{"id":"GHSA-123","summary":"bad package"}]}]}]}'
 `)
 	if err := os.Chmod(filepath.Join(binDir, "osv-scanner"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	writeTestFile(t, filepath.Join(binDir, "socket"), `#!/bin/sh
+if [ "$PWD" != "$3" ] || [ "$1" != "scan" ] || [ "$2" != "create" ] || [ "$4" != "--json" ]; then
+  echo "unexpected socket args: $*" >&2
+  exit 2
+fi
 printf '{"issues":[{"type":"malware","severity":"high","message":"API_TOKEN=super-secret-value","package":"demo","file":"package.json"}]}'
 `)
 	if err := os.Chmod(filepath.Join(binDir, "socket"), 0700); err != nil {

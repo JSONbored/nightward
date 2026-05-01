@@ -26,4 +26,6 @@ Scheduled scans write redacted reports under `~/.local/state/nightward/reports/`
 
 ## Optional providers
 
-Provider execution is opt-in. Online-capable providers require explicit `--online` or policy opt-in. Nightward should explain provider privacy impact before using tools that may contact external services.
+Provider execution is opt-in. Local providers (`gitleaks`, `trufflehog`, and repo-configured `semgrep`) require explicit `--with`. Online-capable providers (`trivy`, `osv-scanner`, and `socket`) require explicit `--with` plus `--online` or policy opt-in.
+
+`socket` creates a remote Socket scan artifact from dependency manifest metadata. Nightward records only redacted returned metadata and does not fetch remote Socket reports in v1.
