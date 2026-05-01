@@ -61,4 +61,4 @@ Design one polished landing page first. Keep it dark, operator-focused, and conc
 
 ## Deployment
 
-The first deployment target is GitHub Pages via `.github/workflows/pages.yml`. A custom domain can be added later without changing the framework.
+The current deployment target is GitHub Pages via `.github/workflows/pages.yml`: <https://jsonbored.github.io/nightward/>. A custom domain can be added later without changing the framework.
