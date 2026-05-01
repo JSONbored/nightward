@@ -24,7 +24,7 @@ Use these repository settings before the first public release:
 - Protect release tags from force-push and deletion.
 - Require signed tags for releases.
 - Use a protected `npm-publish` environment with at least one reviewer.
-- Configure npm trusted publishing for package `nightward`, repository `JSONbored/nightward`, workflow `.github/workflows/release.yml`.
+- Configure npm trusted publishing for package `@jsonbored/nightward`, repository `JSONbored/nightward`, workflow `.github/workflows/release.yml`.
 
 ## Tagging
 
@@ -62,7 +62,7 @@ sha256sum -c checksums.txt --ignore-missing
 
 The npm package is release-gated, trusted-publishing only, and disabled by default. To publish it:
 
-1. Configure npm trusted publishing for package `nightward`.
+1. Configure npm trusted publishing for package `@jsonbored/nightward`.
 2. Set repository variable `NPM_PUBLISH=true`.
 3. Push a reviewed, signed release tag.
 
@@ -73,10 +73,10 @@ The npm package should remain a launcher for GitHub Release binaries. Do not add
 After publish, verify:
 
 ```sh
-npm view nightward version dist.integrity repository
-npm view nightward --json | jq '.dist'
-npx nightward --version
-npm install -g nightward
+npm view @jsonbored/nightward version dist.integrity repository
+npm view @jsonbored/nightward --json | jq '.dist'
+npx @jsonbored/nightward --version
+npm install -g @jsonbored/nightward
 nw doctor --json
 ```
 

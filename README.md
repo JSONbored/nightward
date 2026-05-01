@@ -100,8 +100,8 @@ This installs:
 After the first tagged release, Nightward will also ship a release-gated npm launcher:
 
 ```sh
-npx nightward --help
-npm install -g nightward
+npx @jsonbored/nightward --help
+npm install -g @jsonbored/nightward
 nw scan --json
 ```
 

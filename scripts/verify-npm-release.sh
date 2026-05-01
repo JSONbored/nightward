@@ -2,7 +2,7 @@
 set -euo pipefail
 
 version="${1:?package version required, for example 0.1.0}"
-package="${NPM_PACKAGE:-nightward}"
+package="${NPM_PACKAGE:-@jsonbored/nightward}"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 

@@ -1,5 +1,5 @@
 {
-  "name": "nightward",
+  "name": "@jsonbored/nightward",
   "version": "0.0.0-development",
   "description": "Local-first TUI/CLI for auditing AI agent state, MCP config, and dotfiles backup safety.",
   "license": "MIT",
