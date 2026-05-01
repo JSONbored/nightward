@@ -11,7 +11,7 @@ integrations/raycast
 ## Commands
 
 - `Nightward Dashboard`: scan counts, schedule status, adapter summary, and top findings.
-- `Nightward Status`: menu-bar counter for finding severity, analysis signals, provider warnings, and scheduled-report state.
+- `Nightward Status`: menu-bar counter for finding severity, analysis signals, provider warnings, scheduled-report state, and latest-report access.
 - `Nightward Findings`: searchable findings with a severity filter, detail pane, and copy/open-doc actions.
 - `Nightward Analysis`: built-in offline signals plus explicitly selected providers.
 - `Nightward Provider Doctor`: optional provider availability, privacy posture, and Raycast Analysis enable/disable controls.
@@ -19,7 +19,7 @@ integrations/raycast
 - `Explain Nightward Signal`: analysis signal view for a known finding ID.
 - `Export Nightward Fix Plan`: copies `nw fix export --all --format markdown`.
 - `Export Nightward Analysis`: copies a redacted offline analysis Markdown report.
-- `Open Nightward Reports`: opens `~/.local/state/nightward/reports` when it already exists.
+- `Open Nightward Reports`: opens `~/.local/state/nightward/reports` when it already exists. Dashboard and menu-bar actions can reveal/open the latest report when `nw doctor --json` reports one.
 
 ## Preferences
 
@@ -64,7 +64,7 @@ npm run dev
 Manual smoke must use a fixture `Home Override`, not a real local home, before screenshots or store metadata are published. Cover at least:
 
 - Dashboard loads scan counts, schedule status, adapters, and top findings.
-- Menu-bar status shows finding, analysis, provider-warning, and schedule counters; its actions open existing read-only commands and copy a redacted summary.
+- Menu-bar status shows finding, analysis, provider-warning, and schedule counters; its actions open existing read-only commands, open the latest report when present, and copy a redacted summary.
 - Findings search/filter/detail panes render redacted evidence and docs actions.
 - Analysis renders built-in signals, selected provider output, provider warnings, and blocked-online-provider state.
 - Provider Doctor shows provider status and lets users enable or disable providers for Raycast Analysis without running online-capable providers unless explicit opt-in is enabled.

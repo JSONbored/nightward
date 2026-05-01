@@ -198,6 +198,7 @@ nw scan --json --output /tmp/nightward-scan.json
 nw report html --input /tmp/nightward-scan.json --output /tmp/nightward-report.html
 nw report diff --from /tmp/previous-scan.json --to /tmp/nightward-scan.json
 nw report history
+nw report latest
 ```
 
 Run policy checks or generate SARIF:

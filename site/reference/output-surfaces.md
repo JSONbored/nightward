@@ -5,6 +5,8 @@
 | Scan JSON | `nw scan --json` or `--output` | stdout unless an explicit output path is provided |
 | HTML report | `nw report html --input scan.json --output report.html` | explicit local HTML file |
 | Report diff | `nw report diff --from previous.json --to current.json` | stdout only |
+| Latest report | `nw report latest` | stdout only |
+| Report history | `nw report history` | stdout only |
 | History index | `nw report index --output index.html` | explicit local HTML file |
 | Policy report | `nw policy check --json` | stdout only |
 | SARIF | `nw policy sarif --output nightward.sarif` | explicit SARIF file or stdout with `-` |

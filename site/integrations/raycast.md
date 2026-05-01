@@ -17,7 +17,7 @@ Nightward's Raycast extension is a read-only macOS companion for checking AI-age
 
 The extension shells out to `nw` or `nightward`, renders redacted output, and never mutates agent configs.
 
-The dashboard and menu-bar status include scheduled report counts when `nw doctor --json` reports history. Use this to notice when new findings appear after a scheduled scan.
+The dashboard and menu-bar status include scheduled report counts when `nw doctor --json` reports history. They can also reveal or open the latest report when one exists, so users can move from the menu-bar counter to the underlying local JSON quickly.
 
 ## Preferences
 

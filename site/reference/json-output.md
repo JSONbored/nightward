@@ -40,6 +40,8 @@ Policy output includes pass/fail status, threshold, violations, ignored findings
 
 ```sh
 nw report diff --from previous.json --to current.json --json
+nw report history --json
+nw report latest --json
 ```
 
 Report diff output includes:
@@ -48,6 +50,8 @@ Report diff output includes:
 - `removed_findings`
 - `changed_findings`
 - summary counts for added, removed, changed, and unchanged findings
+
+Report history records include `path`, `report_name`, `mod_time`, `findings`, `highest_severity`, `findings_by_severity`, and `size_bytes`.
 
 ## Badge
 

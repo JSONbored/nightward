@@ -29,6 +29,7 @@ Usage:
   nw report html --input scan.json --output report.html [--previous previous.json]
   nw report diff --from previous.json --to current.json [--json]
   nw report history [--dir reports] [--limit 10] [--json]
+  nw report latest [--dir reports] [--json]
   nw report index [--dir reports] --output index.html [--limit 50]
   nw policy init --dry-run
   nw policy explain

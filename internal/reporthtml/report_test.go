@@ -39,11 +39,31 @@ func TestRenderEscapesHTML(t *testing.T) {
 	if !strings.Contains(html, "mcp_secret_header") {
 		t.Fatalf("expected finding rule in report: %s", html)
 	}
+	for _, want := range []string{"finding-search", "severity-filter", "data-finding-card", "Filters run locally"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected interactive review affordance %q in report:\n%s", want, html)
+		}
+	}
 }
 
 func TestRenderIndexEscapesReportHistory(t *testing.T) {
 	html, err := RenderIndex([]schedule.ReportRecord{
-		{Path: "/tmp/<report>.json", ReportName: "<report>.json", Findings: 2, SizeBytes: 123, ModTime: time.Date(2026, 5, 1, 1, 0, 0, 0, time.UTC)},
+		{
+			Path:               "/tmp/<report>.json",
+			ReportName:         "<report>.json",
+			Findings:           2,
+			HighestSeverity:    inventory.RiskHigh,
+			FindingsBySeverity: map[inventory.RiskLevel]int{inventory.RiskHigh: 2},
+			SizeBytes:          123,
+			ModTime:            time.Date(2026, 5, 1, 1, 0, 0, 0, time.UTC),
+		},
+		{
+			Path:       "/tmp/older.json",
+			ReportName: "older.json",
+			Findings:   1,
+			SizeBytes:  100,
+			ModTime:    time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -51,12 +71,55 @@ func TestRenderIndexEscapesReportHistory(t *testing.T) {
 	if strings.Contains(html, "/tmp/<report>.json") || !strings.Contains(html, "Nightward Report History") {
 		t.Fatalf("expected escaped report history index:\n%s", html)
 	}
+	for _, want := range []string{"Highest", "high", "latest", "-1 vs newer", "&lt;report&gt;.json"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected richer report history field %q:\n%s", want, html)
+		}
+	}
 	empty, err := RenderIndex(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(empty, "No JSON reports found.") {
 		t.Fatalf("expected empty report history copy:\n%s", empty)
+	}
+}
+
+func TestRenderIncludesFixFilters(t *testing.T) {
+	html, err := Render(inventory.Report{
+		Home: "/tmp/home",
+		Summary: inventory.Summary{
+			TotalFindings:      2,
+			FindingsBySeverity: map[inventory.RiskLevel]int{inventory.RiskHigh: 2},
+		},
+		Findings: []inventory.Finding{
+			{
+				ID:           "fixable",
+				Tool:         "Codex",
+				Path:         "/tmp/config.toml",
+				Severity:     inventory.RiskHigh,
+				Rule:         "mcp_secret_header",
+				Message:      "header secret",
+				FixAvailable: true,
+				FixKind:      inventory.FixExternalizeSecret,
+			},
+			{
+				ID:       "manual",
+				Tool:     "Codex",
+				Path:     "/tmp/config.toml",
+				Severity: inventory.RiskHigh,
+				Rule:     "mcp_server_review",
+				Message:  "review",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`data-fix="externalize-secret"`, `data-fix="manual review"`, `<option value="externalize-secret">externalize-secret</option>`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected fix filter marker %q:\n%s", want, html)
+		}
 	}
 }
 

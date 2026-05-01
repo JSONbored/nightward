@@ -154,9 +154,38 @@ func TestStatusReadsLatestReportAndFindingCount(t *testing.T) {
 	if status.History[0].Findings != 2 || status.History[1].Findings != 1 {
 		t.Fatalf("unexpected report history finding counts: %#v", status.History)
 	}
+	if status.History[0].HighestSeverity != "high" || status.History[0].FindingsBySeverity["high"] != 1 {
+		t.Fatalf("unexpected report history severity summary: %#v", status.History[0])
+	}
 	limited := ReportHistory(reportDir, 1)
 	if len(limited) != 1 || limited[0].Path != newReport {
 		t.Fatalf("unexpected limited report history: %#v", limited)
+	}
+}
+
+func TestReportFindingSummaryFallbacks(t *testing.T) {
+	dir := t.TempDir()
+	summaryOnly := filepath.Join(dir, "summary.json")
+	if err := os.WriteFile(summaryOnly, []byte(`{"summary":{"total_findings":3,"findings_by_severity":{"critical":1,"info":2}}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	count, bySeverity, highest := reportFindingSummary(summaryOnly)
+	if count != 3 || bySeverity["critical"] != 1 || highest != "critical" || countFindings(summaryOnly) != 3 {
+		t.Fatalf("unexpected summary-only report parsing count=%d bySeverity=%#v highest=%s", count, bySeverity, highest)
+	}
+
+	malformed := filepath.Join(dir, "malformed.json")
+	if err := os.WriteFile(malformed, []byte(`{"severity":"high"}{"severity":"medium"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	count, bySeverity, highest = reportFindingSummary(malformed)
+	if count != 2 || bySeverity != nil || highest != "" {
+		t.Fatalf("unexpected malformed report fallback count=%d bySeverity=%#v highest=%s", count, bySeverity, highest)
+	}
+
+	count, bySeverity, highest = reportFindingSummary(filepath.Join(dir, "missing.json"))
+	if count != 0 || bySeverity != nil || highest != "" {
+		t.Fatalf("unexpected missing report summary count=%d bySeverity=%#v highest=%s", count, bySeverity, highest)
 	}
 }
 

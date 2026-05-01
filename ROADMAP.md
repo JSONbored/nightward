@@ -14,30 +14,35 @@ Nightward is intentionally staged. The scanner and policy model need to stay tru
 - SARIF and policy output for CI.
 - GitHub Action wrapper for repository policy checks.
 - Release-gated npm launcher package with checksum verification and no postinstall.
-- Read-only Raycast extension for scan summaries, findings, redacted fix-plan export, and report-folder access.
+- Read-only Raycast extension for scan summaries, menu-bar status, findings, provider controls, redacted fix-plan export, and report-folder access.
 - User-level nightly schedule generation.
 - Trunk Check and Trunk Flaky Tests JUnit validation.
+- Explicit provider execution for local `gitleaks`, `trufflehog`, and `semgrep`, plus online-gated `trivy`, `osv-scanner`, and `socket`.
+- Static HTML reports, report diffs, report history, generated reference docs, sample reports, and fixture-only demo assets.
+- Rules and adapter list/explain/template commands for contributors.
 
 ## Next
 
 - More MCP config shapes for Codex, Claude Code, and editor integrations.
-- Raycast screenshots, store metadata, and manual development-mode smoke after the first release candidate.
+- Raycast screenshots, store metadata, and manual development-mode smoke evidence.
 - Golden SARIF snapshots and broader no-write tests.
 - Bubble Tea/Bubbles TUI upgrade with list, table, viewport, textinput, help, filter modal, command palette, report history, and mouse-wheel support.
-- Broader provider execution beyond the first explicit local `gitleaks`, `trufflehog`, and `semgrep` runner slice.
+- Deeper provider normalization, provider-specific fixtures, and clearer skip/timeout/output-cap reporting across CLI, TUI, Raycast, SARIF, policy, and HTML.
 - Fuzz coverage for MCP JSON/TOML/YAML parsing, URL/header redaction, symlink traversal, huge files, and malformed configs.
 - Add SLSA provenance/attestation after signed checksum and npm provenance flow are stable.
-- Screenshot and GIF assets for the README.
-- Static HTML report export before any self-hosted dashboard.
-- Rules list/explain commands and contributor fixture templates.
+- Report-history comparison as a first-class workflow across TUI, Raycast, CLI, and HTML.
+- Richer local HTML review artifacts with search/filtering, evidence grouping, provider-warning summaries, policy status, and report-to-report comparisons.
+- Screenshot and GIF assets for the README and Raycast store listing.
+- Generated public JSON schemas for scan, analysis, policy badge, report diff/history, provider status, rules, and adapters.
 - Homebrew tap after the first release proves stable.
 
 ## Later
 
+- Local read-only report browser before any Docker-first dashboard positioning.
 - Encrypted local snapshots.
 - Cross-machine diff.
 - Private dotfiles integration.
-- Docker/Unraid dashboard.
+- Docker/Unraid dashboard only after report browsing is useful outside the host shell.
 - Nix, Scoop, WinGet, mise, and aqua packages.
 - Restore workflow only after snapshot, preview, rollback, and secret-safety controls exist.
 

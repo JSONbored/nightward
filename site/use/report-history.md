@@ -7,6 +7,7 @@ Nightward can compare scan reports without mutating live config.
 ```sh
 nw scan --json --output-dir ~/.local/state/nightward/reports
 nw report history
+nw report latest
 ```
 
 ## Compare Reports
@@ -25,4 +26,6 @@ nw report html --input current.json --previous previous.json --output current.ht
 nw report index --dir ~/.local/state/nightward/reports --output index.html
 ```
 
-HTML reports include severity sections, collapsible evidence, remediation groups, and optional report-to-report changes.
+HTML reports include local finding search, severity/tool/rule/fix filters, collapsible evidence, remediation groups, and optional report-to-report changes. The filter controls run entirely inside the static HTML file.
+
+The history index summarizes local report files with finding totals, highest severity, severity badges, and deltas against the next-newer report.
