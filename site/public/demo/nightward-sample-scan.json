@@ -1,0 +1,392 @@
+{
+  "generated_at": "2026-05-01T00:00:00Z",
+  "hostname": "nightward-fixture",
+  "home": "/tmp/nightward-fixture-home",
+  "scan_mode": "home",
+  "summary": {
+    "total_items": 1,
+    "total_findings": 4,
+    "items_by_classification": {
+      "portable": 1
+    },
+    "items_by_risk": {
+      "low": 1
+    },
+    "items_by_tool": {
+      "Codex": 1
+    },
+    "findings_by_severity": {
+      "high": 1,
+      "info": 1,
+      "medium": 2
+    },
+    "findings_by_rule": {
+      "mcp_broad_filesystem": 1,
+      "mcp_secret_env": 1,
+      "mcp_server_review": 1,
+      "mcp_unpinned_package": 1
+    },
+    "findings_by_tool": {
+      "Codex": 4
+    }
+  },
+  "items": [
+    {
+      "id": "0630440dc5dc",
+      "tool": "Codex",
+      "path": "/tmp/nightward-fixture-home/.codex/config.toml",
+      "kind": "file",
+      "classification": "portable",
+      "risk": "low",
+      "reason": "Codex preferences and MCP server definitions.",
+      "recommended_action": "Review and sync through a private dotfiles repo if paths are portable.",
+      "exists": true,
+      "size_bytes": 152,
+      "mod_time": "2026-05-01T00:00:00Z",
+      "metadata": {
+        "source": "nightward-adapter"
+      }
+    }
+  ],
+  "findings": [
+    {
+      "id": "mcp_unpinned_package-fe1f27ea32db",
+      "tool": "Codex",
+      "path": "/tmp/nightward-fixture-home/.codex/config.toml",
+      "server": "demo",
+      "severity": "high",
+      "rule": "mcp_unpinned_package",
+      "message": "MCP server \"demo\" runs a package executor without an obvious pinned package version.",
+      "evidence": "command=npx args=-y @modelcontextprotocol/server-filesystem $HOME",
+      "recommended_action": "Pin package versions or replace with a trusted local binary before syncing.",
+      "impact": "A future package publish or dependency change can alter code that the AI client executes locally.",
+      "why_this_matters": "Unpinned package execution makes config restores non-reproducible and widens the supply-chain attack surface.",
+      "fix_available": true,
+      "fix_kind": "pin-package",
+      "confidence": "high",
+      "risk": "medium",
+      "requires_review": true,
+      "fix_summary": "Pin @modelcontextprotocol/server-filesystem to an explicit version before syncing this MCP config.",
+      "fix_steps": [
+        "Choose a reviewed version for @modelcontextprotocol/server-filesystem.",
+        "Change the package arg from \"@modelcontextprotocol/server-filesystem\" to \"@modelcontextprotocol/server-filesystem@<version>\".",
+        "Commit only the pinned package reference, not any local credential or cache files."
+      ],
+      "patch_hint": {
+        "kind": "pin-package",
+        "package": "@modelcontextprotocol/server-filesystem"
+      }
+    },
+    {
+      "id": "mcp_secret_env-909634ba142a",
+      "tool": "Codex",
+      "path": "/tmp/nightward-fixture-home/.codex/config.toml",
+      "server": "demo",
+      "severity": "medium",
+      "rule": "mcp_secret_env",
+      "message": "MCP server \"demo\" references a sensitive environment key.",
+      "evidence": "env_key=API_TOKEN",
+      "recommended_action": "Keep secret values outside dotfiles and document required env names only.",
+      "impact": "Credential material in agent config can leak through dotfiles, backups, screenshots, or support bundles.",
+      "why_this_matters": "Agent tools often bridge local files and remote models, so secrets should stay in dedicated local secret stores.",
+      "fix_available": true,
+      "fix_kind": "externalize-secret",
+      "confidence": "medium",
+      "risk": "low",
+      "requires_review": true,
+      "fix_summary": "Document API_TOKEN as a local prerequisite without committing its value.",
+      "fix_steps": [
+        "Confirm API_TOKEN is only referenced by name or environment interpolation.",
+        "Document how to provide the secret locally without adding the value to dotfiles.",
+        "Keep the real value in a password manager, OS keychain, or machine-local env file excluded from Git."
+      ],
+      "patch_hint": {
+        "kind": "externalize-secret",
+        "env_key": "API_TOKEN"
+      }
+    },
+    {
+      "id": "mcp_broad_filesystem-fe1f27ea32db",
+      "tool": "Codex",
+      "path": "/tmp/nightward-fixture-home/.codex/config.toml",
+      "server": "demo",
+      "severity": "medium",
+      "rule": "mcp_broad_filesystem",
+      "message": "MCP server \"demo\" appears to reference broad filesystem access.",
+      "evidence": "-y @modelcontextprotocol/server-filesystem $HOME",
+      "recommended_action": "Narrow filesystem access to explicit project/config paths where possible.",
+      "impact": "A broad mount can expose unrelated personal files or credentials to an MCP server.",
+      "why_this_matters": "Least-privilege filesystem scope reduces accidental disclosure and makes portable configs easier to review.",
+      "fix_available": true,
+      "fix_kind": "narrow-filesystem",
+      "confidence": "medium",
+      "risk": "medium",
+      "requires_review": true,
+      "fix_summary": "Replace broad filesystem arguments with the smallest project or config paths that server actually needs.",
+      "fix_steps": [
+        "List the exact directories this MCP server needs for your workflow.",
+        "Replace broad paths such as $HOME, ~, /, or full user roots with those explicit directories.",
+        "Do not guess missing paths; rerun the tool workflow after narrowing scope."
+      ],
+      "patch_hint": {
+        "kind": "narrow-filesystem",
+        "direct_args": [
+          "-y",
+          "@modelcontextprotocol/server-filesystem",
+          "<explicit-project-or-config-path>"
+        ]
+      }
+    },
+    {
+      "id": "mcp_server_review-fe1f27ea32db",
+      "tool": "Codex",
+      "path": "/tmp/nightward-fixture-home/.codex/config.toml",
+      "server": "demo",
+      "severity": "info",
+      "rule": "mcp_server_review",
+      "message": "Review MCP server \"demo\" before syncing this config.",
+      "evidence": "command=npx",
+      "recommended_action": "Confirm the server source, permissions, and local path assumptions.",
+      "impact": "This server may execute local code or expose local files when an AI client invokes it.",
+      "why_this_matters": "MCP configs are executable trust boundaries, so portable backups should preserve intent without hiding local-only risk.",
+      "fix_available": true,
+      "fix_kind": "ignore-with-reason",
+      "confidence": "medium",
+      "risk": "low",
+      "requires_review": true,
+      "fix_summary": "Keep the server only if its source, permissions, and local assumptions are understood.",
+      "fix_steps": [
+        "Identify the server package, binary, or script owner.",
+        "Confirm the command and arguments are expected for this machine.",
+        "Document why this server is safe to keep or exclude it from portable dotfiles."
+      ]
+    }
+  ],
+  "adapters": [
+    {
+      "name": "Codex",
+      "description": "OpenAI Codex CLI and desktop agent state.",
+      "available": true,
+      "checked": [
+        "/tmp/nightward-fixture-home/.codex/AGENTS.md",
+        "/tmp/nightward-fixture-home/.codex/auth.json",
+        "/tmp/nightward-fixture-home/.codex/automations",
+        "/tmp/nightward-fixture-home/.codex/cache",
+        "/tmp/nightward-fixture-home/.codex/config.toml",
+        "/tmp/nightward-fixture-home/.codex/mcp.json",
+        "/tmp/nightward-fixture-home/.codex/mcp.yaml",
+        "/tmp/nightward-fixture-home/.codex/mcp.yml",
+        "/tmp/nightward-fixture-home/.codex/sessions",
+        "/tmp/nightward-fixture-home/.codex/skills",
+        "/tmp/nightward-fixture-home/.codex/sqlite"
+      ],
+      "found": [
+        "/tmp/nightward-fixture-home/.codex/config.toml"
+      ]
+    },
+    {
+      "name": "Claude",
+      "description": "Claude Code and Claude Desktop configuration.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.claude.json",
+        "/tmp/nightward-fixture-home/.claude/.credentials.json",
+        "/tmp/nightward-fixture-home/.claude/agents",
+        "/tmp/nightward-fixture-home/.claude/commands",
+        "/tmp/nightward-fixture-home/.claude/mcp.json",
+        "/tmp/nightward-fixture-home/.claude/mcp.yaml",
+        "/tmp/nightward-fixture-home/.claude/mcp.yml",
+        "/tmp/nightward-fixture-home/.claude/projects",
+        "/tmp/nightward-fixture-home/.claude/settings.json",
+        "/tmp/nightward-fixture-home/Library/Application Support/Claude/Code Cache",
+        "/tmp/nightward-fixture-home/Library/Application Support/Claude/claude_desktop_config.json"
+      ]
+    },
+    {
+      "name": "Cursor",
+      "description": "Cursor editor settings, rules, projects, and MCP state.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.cursor/ai-tracking",
+        "/tmp/nightward-fixture-home/.cursor/extensions",
+        "/tmp/nightward-fixture-home/.cursor/mcp.json",
+        "/tmp/nightward-fixture-home/.cursor/mcp.yaml",
+        "/tmp/nightward-fixture-home/.cursor/mcp.yml",
+        "/tmp/nightward-fixture-home/.cursor/projects",
+        "/tmp/nightward-fixture-home/.cursor/rules",
+        "/tmp/nightward-fixture-home/.cursor/skills-cursor",
+        "/tmp/nightward-fixture-home/Library/Application Support/Cursor/User/keybindings.json",
+        "/tmp/nightward-fixture-home/Library/Application Support/Cursor/User/mcp.json",
+        "/tmp/nightward-fixture-home/Library/Application Support/Cursor/User/mcp.yaml",
+        "/tmp/nightward-fixture-home/Library/Application Support/Cursor/User/mcp.yml",
+        "/tmp/nightward-fixture-home/Library/Application Support/Cursor/User/settings.json"
+      ]
+    },
+    {
+      "name": "Windsurf",
+      "description": "Windsurf editor settings and MCP state.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.windsurf/mcp.json",
+        "/tmp/nightward-fixture-home/.windsurf/mcp.yaml",
+        "/tmp/nightward-fixture-home/.windsurf/mcp.yml",
+        "/tmp/nightward-fixture-home/.windsurf/rules",
+        "/tmp/nightward-fixture-home/Library/Application Support/Windsurf/User/keybindings.json",
+        "/tmp/nightward-fixture-home/Library/Application Support/Windsurf/User/mcp.json",
+        "/tmp/nightward-fixture-home/Library/Application Support/Windsurf/User/mcp.yaml",
+        "/tmp/nightward-fixture-home/Library/Application Support/Windsurf/User/mcp.yml",
+        "/tmp/nightward-fixture-home/Library/Application Support/Windsurf/User/settings.json"
+      ]
+    },
+    {
+      "name": "VS Code",
+      "description": "VS Code settings, extension exports, and MCP state.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.vscode/extensions",
+        "/tmp/nightward-fixture-home/.vscode/vscode-extensions",
+        "/tmp/nightward-fixture-home/Library/Application Support/Code/User/keybindings.json",
+        "/tmp/nightward-fixture-home/Library/Application Support/Code/User/mcp.json",
+        "/tmp/nightward-fixture-home/Library/Application Support/Code/User/mcp.yaml",
+        "/tmp/nightward-fixture-home/Library/Application Support/Code/User/mcp.yml",
+        "/tmp/nightward-fixture-home/Library/Application Support/Code/User/settings.json",
+        "/tmp/nightward-fixture-home/Library/Application Support/Code/User/snippets"
+      ]
+    },
+    {
+      "name": "Raycast",
+      "description": "Raycast extension and local app state.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.config/raycast",
+        "/tmp/nightward-fixture-home/Library/Application Support/com.raycast.macos",
+        "/tmp/nightward-fixture-home/Library/Application Support/com.raycast.shared"
+      ]
+    },
+    {
+      "name": "JetBrains",
+      "description": "JetBrains IDE settings, plugins, and AI assistant state.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/Library/Application Support/JetBrains",
+        "/tmp/nightward-fixture-home/Library/Caches/JetBrains",
+        "/tmp/nightward-fixture-home/Library/Logs/JetBrains"
+      ]
+    },
+    {
+      "name": "Zed",
+      "description": "Zed editor settings, keymaps, snippets, and assistant state.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.config/zed/keymap.json",
+        "/tmp/nightward-fixture-home/.config/zed/settings.json",
+        "/tmp/nightward-fixture-home/.config/zed/snippets",
+        "/tmp/nightward-fixture-home/Library/Application Support/Zed"
+      ]
+    },
+    {
+      "name": "Continue",
+      "description": "Continue.dev assistant configuration and local indexes.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.continue/config.json",
+        "/tmp/nightward-fixture-home/.continue/config.ts",
+        "/tmp/nightward-fixture-home/.continue/config.yaml",
+        "/tmp/nightward-fixture-home/.continue/config.yml",
+        "/tmp/nightward-fixture-home/.continue/index",
+        "/tmp/nightward-fixture-home/.continue/sessions"
+      ]
+    },
+    {
+      "name": "Cline/Roo",
+      "description": "Cline and Roo Code extension storage inside VS Code-compatible editors.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline",
+        "/tmp/nightward-fixture-home/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev",
+        "/tmp/nightward-fixture-home/Library/Application Support/Cursor/User/globalStorage/rooveterinaryinc.roo-cline",
+        "/tmp/nightward-fixture-home/Library/Application Support/Cursor/User/globalStorage/saoudrizwan.claude-dev"
+      ]
+    },
+    {
+      "name": "Aider",
+      "description": "Aider CLI preferences, model settings, and generated caches.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.aider.chat.history.md",
+        "/tmp/nightward-fixture-home/.aider.conf.yml",
+        "/tmp/nightward-fixture-home/.aider.model.settings.yml",
+        "/tmp/nightward-fixture-home/.aider.tags.cache.v4"
+      ]
+    },
+    {
+      "name": "OpenCode",
+      "description": "OpenCode configuration and local state.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.config/opencode/opencode.json",
+        "/tmp/nightward-fixture-home/.config/opencode/opencode.yaml",
+        "/tmp/nightward-fixture-home/.config/opencode/opencode.yml",
+        "/tmp/nightward-fixture-home/.local/share/opencode",
+        "/tmp/nightward-fixture-home/.opencode.json",
+        "/tmp/nightward-fixture-home/.opencode.yaml",
+        "/tmp/nightward-fixture-home/.opencode.yml"
+      ]
+    },
+    {
+      "name": "Goose",
+      "description": "Block Goose agent configuration and local state.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.config/goose",
+        "/tmp/nightward-fixture-home/.config/goose/config.yaml",
+        "/tmp/nightward-fixture-home/.local/share/goose"
+      ]
+    },
+    {
+      "name": "LM Studio",
+      "description": "LM Studio model, server, and application state.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.lmstudio/config.json",
+        "/tmp/nightward-fixture-home/.lmstudio/models",
+        "/tmp/nightward-fixture-home/Library/Application Support/LM Studio"
+      ]
+    },
+    {
+      "name": "Ollama/Open WebUI",
+      "description": "Local model runtime and Open WebUI state.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.config/open-webui",
+        "/tmp/nightward-fixture-home/.ollama/config.json",
+        "/tmp/nightward-fixture-home/.ollama/id_ed25519",
+        "/tmp/nightward-fixture-home/.ollama/models",
+        "/tmp/nightward-fixture-home/.open-webui"
+      ]
+    },
+    {
+      "name": "Neovim",
+      "description": "Neovim configuration and AI plugin state.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.cache/nvim",
+        "/tmp/nightward-fixture-home/.config/nvim",
+        "/tmp/nightward-fixture-home/.local/share/nvim"
+      ]
+    },
+    {
+      "name": "Generic MCP",
+      "description": "Common standalone MCP config files.",
+      "available": false,
+      "checked": [
+        "/tmp/nightward-fixture-home/.config/mcp/mcp.json",
+        "/tmp/nightward-fixture-home/.config/mcp/mcp.yaml",
+        "/tmp/nightward-fixture-home/.config/mcp/mcp.yml",
+        "/tmp/nightward-fixture-home/.mcp.json",
+        "/tmp/nightward-fixture-home/.mcp.yaml",
+        "/tmp/nightward-fixture-home/.mcp.yml"
+      ]
+    }
+  ]
+}

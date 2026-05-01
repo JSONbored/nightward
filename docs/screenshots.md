@@ -19,7 +19,7 @@ Nightward should have visual proof before broader promotion.
 - Keep terminal width around 120 columns for README screenshots.
 - Prefer short GIFs that show filtering and detail navigation, not long demos.
 - Review every captured frame for private state before committing it.
-- Do not publish screenshots, GIFs, or Raycast store metadata until the evidence table below is filled from fixture runs.
+- Do not publish a screenshot, GIF, or Raycast store metadata surface until the matching evidence row below is filled from fixture runs.
 
 ## Suggested Fixture Run
 
@@ -33,6 +33,7 @@ For Raycast, set the extension `Home Override` preference to the same fixture ho
 
 | Surface | Fixture-only source | Required evidence | Status |
 | --- | --- | --- | --- |
+| Static HTML report | `testdata/homes/policy` | Scrubbed scan JSON, static HTML report, and PNG screenshot generated from fixture output | captured in `site/public/demo/` with `node scripts/generate-demo-assets.mjs`; no local paths or secret values found |
 | TUI dashboard | `testdata/homes/policy` or another committed fixture home | Screenshot shows counts, schedule status, report history, and what-next text | pending manual capture |
 | TUI findings/fix plan | committed MCP/security fixtures only | GIF or screenshots show filters, detail pane, redacted evidence, and fix plan | pending manual capture |
 | Raycast Dashboard | fixture `Home Override` | Screenshot shows counts and top findings from synthetic data | pending `ray develop` smoke |

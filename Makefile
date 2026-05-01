@@ -14,7 +14,7 @@ SITE_DIR ?= site
 GO_PACKAGES ?= $(shell go list ./cmd/... ./internal/... ./tools/...)
 COVERAGE_PACKAGES ?= ./internal/...
 
-.PHONY: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage coverage-check go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify site-install site-audit site-build site-verify tool-syft release-snapshot verify build install-local clean-reports
+.PHONY: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage coverage-check go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify site-install site-audit site-build site-verify demo-assets tool-syft release-snapshot verify build install-local clean-reports
 
 test:
 	go test $(GO_PACKAGES)
@@ -117,6 +117,9 @@ site-build:
 	cd $(SITE_DIR) && npm run build
 
 site-verify: site-install site-audit site-build
+
+demo-assets:
+	node scripts/generate-demo-assets.mjs
 
 tool-syft:
 	go install github.com/anchore/syft/cmd/syft@$(SYFT_VERSION)

@@ -4,6 +4,15 @@ Nightward's public website lives under `site/` and uses VitePress. This mirrors 
 
 The site currently uses the latest VitePress 2 alpha because VitePress 1.x depends on a Vite/esbuild development-server chain with an unresolved moderate npm advisory. The site is static, analytics-free by default, and CI builds it with `npm audit --audit-level=moderate`.
 
+Public sample output lives under `site/public/demo/` and is generated from committed fixture data:
+
+```sh
+make demo-assets
+```
+
+The generator rewrites hostname, HOME, local paths, timestamps, and secret-looking fixture values before writing the sample scan JSON, static HTML report, and PNG screenshot.
+Screenshot capture requires Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`.
+
 ## Site Goals
 
 - Explain the problem in the first viewport.

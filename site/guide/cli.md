@@ -48,3 +48,8 @@ nw report html --input /tmp/nightward-scan.json --output /tmp/nightward-report.h
 ```
 
 The HTML report is a local static file rendered from redacted scan JSON.
+
+The public demo report is generated from a committed fixture home, then scrubbed before publication:
+
+- [Scrubbed sample scan JSON](/demo/nightward-sample-scan.json)
+- [Static HTML sample report](/demo/nightward-sample-report.html)
