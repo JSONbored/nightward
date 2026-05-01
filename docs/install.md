@@ -43,7 +43,7 @@ npm install -g @jsonbored/nightward
 nw scan --json
 ```
 
-Publishing is disabled by default. The release workflow publishes to npm only when `NPM_PUBLISH=true` is configured and npm trusted publishing is ready for package `@jsonbored/nightward`, repository `JSONbored/nightward`, and workflow `.github/workflows/release.yml`.
+Publishing is release-gated. The release workflow publishes to npm only when `NPM_PUBLISH=true` is configured for a release tag and npm trusted publishing is configured for package `@jsonbored/nightward`, repository `JSONbored/nightward`, and workflow `.github/workflows/release.yml`.
 
 The package should not use a long-lived npm token. It should publish through GitHub OIDC/trusted publishing with provenance.
 

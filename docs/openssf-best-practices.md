@@ -20,7 +20,7 @@ Project badge: <https://www.bestpractices.dev/projects/12713>
 - Dynamic analysis: automated tests, race tests, Raycast tests/build, and Go fuzz smoke tests.
 - Secret scanning: Gitleaks in CI and `make gitleaks`.
 - Release notes: <https://github.com/JSONbored/nightward/blob/main/CHANGELOG.md>
-- Maintained status evidence: reviewed PRs, CI-green `main`, Renovate dependency updates, issue response history, and signed release tags.
+- Maintained status evidence: CI-green `main`, Renovate dependency updates, issue response history, immutable signed release tags, and published release artifacts. Scorecard's repository-age portion still needs time to age out.
 
 ## N/A Crypto Fields
 
@@ -40,6 +40,8 @@ The release pipeline uses external tools for signing release checksums and SBOM 
 - Release readiness: `.goreleaser.yml`, `make release-snapshot`, signed checksum config, SBOM config, release workflow, release smoke, and trusted-publishing-only npm launcher package.
 - Website/docs readiness: `site/` VitePress source and `.github/workflows/pages.yml`.
 - Distribution plan: <https://github.com/JSONbored/nightward/blob/main/docs/distribution.md>
+- npm provenance: `@jsonbored/nightward` publishes through trusted publishing/OIDC with provenance and no long-lived npm token.
+- GitHub Pages: <https://jsonbored.github.io/nightward/>
 
 ## Gold-Oriented Backlog
 
@@ -57,6 +59,4 @@ These cannot be completed by repository files alone:
 - Keep GitHub branch protection/rulesets requiring reviewed PRs and status checks.
 - Keep maintainer 2FA enabled.
 - Let Scorecard `Maintained` age out after the repository is older than 90 days.
-- Improve Scorecard `Code-Review` through future reviewed PR history.
-- Configure npm trusted publishing before setting `NPM_PUBLISH=true`.
-- Enable GitHub Pages for the repository after the site workflow is merged.
+- Improve Scorecard `Code-Review` through future reviewed PR history once a second reviewer or maintainer exists.
