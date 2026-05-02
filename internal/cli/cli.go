@@ -171,39 +171,62 @@ func runRules(args []string, stdout, stderr io.Writer) int {
 
 func runReport(home string, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		return fail(stderr, "usage: nightward report <html|diff|history|latest|index> [flags]")
+		return fail(stderr, "usage: nightward report <html|diff|changes|history|latest|index> [flags]")
 	}
 	switch args[0] {
 	case "html":
 		fs := flag.NewFlagSet("report html", flag.ContinueOnError)
 		fs.SetOutput(stderr)
-		input := fs.String("input", "", "scan JSON input path")
-		output := fs.String("output", "", "HTML report output path")
+		input := fs.String("input", "", "scan JSON input path; defaults to latest saved report or a fresh scan")
+		output := fs.String("output", "", "HTML report output path; defaults to the Nightward report directory")
 		previous := fs.String("previous", "", "optional previous scan JSON for report-to-report diff")
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
-		if *input == "" || *output == "" {
-			return fail(stderr, "missing required --input and --output")
+		reportDir := defaultReportDir(home)
+		inputPath := strings.TrimSpace(*input)
+		previousPath := strings.TrimSpace(*previous)
+		if inputPath == "" {
+			history := schedule.ReportHistory(reportDir, 2)
+			if len(history) > 0 {
+				inputPath = history[0].Path
+				if previousPath == "" && len(history) > 1 {
+					previousPath = history[1].Path
+				}
+			}
 		}
-		report, err := readInventoryReport(home, *input)
-		if err != nil {
-			return fail(stderr, "failed to load scan JSON: %v", err)
+		var report inventory.Report
+		var err error
+		if inputPath == "" {
+			report = scanReport(home, "")
+		} else {
+			report, err = readInventoryReport(home, inputPath)
+			if err != nil {
+				return fail(stderr, "failed to load scan JSON: %v", err)
+			}
 		}
 		var options reporthtml.Options
-		if *previous != "" {
-			before, err := readInventoryReport(home, *previous)
+		if previousPath != "" {
+			before, err := readInventoryReport(home, previousPath)
 			if err != nil {
 				return fail(stderr, "failed to load previous scan JSON: %v", err)
 			}
-			diff := reportdiff.Compare(*previous, *input, before, report)
+			toLabel := inputPath
+			if toLabel == "" {
+				toLabel = "fresh scan"
+			}
+			diff := reportdiff.Compare(previousPath, toLabel, before, report)
 			options.Diff = &diff
 		}
 		html, err := reporthtml.RenderWithOptions(report, options)
 		if err != nil {
 			return fail(stderr, "failed to render HTML report: %v", err)
 		}
-		outputPath := filepath.Clean(expandHome(home, *output))
+		outputPath := strings.TrimSpace(*output)
+		if outputPath == "" {
+			outputPath = defaultHTMLReportPath(home, report.GeneratedAt)
+		}
+		outputPath = filepath.Clean(expandHome(home, outputPath))
 		if err := os.MkdirAll(filepath.Dir(outputPath), 0700); err != nil {
 			return fail(stderr, "failed to create report directory: %v", err)
 		}
@@ -214,24 +237,61 @@ func runReport(home string, args []string, stdout, stderr io.Writer) int {
 	case "diff":
 		fs := flag.NewFlagSet("report diff", flag.ContinueOnError)
 		fs.SetOutput(stderr)
-		fromPath := fs.String("from", "", "previous scan JSON")
-		toPath := fs.String("to", "", "new scan JSON")
+		fromPath := fs.String("from", "", "previous scan JSON; omit with --to to compare latest two saved reports")
+		toPath := fs.String("to", "", "new scan JSON; omit with --from to compare latest two saved reports")
+		dir := fs.String("dir", defaultReportDir(home), "Nightward report directory when --from/--to are omitted")
 		jsonOut := fs.Bool("json", false, "print JSON output")
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
-		if *fromPath == "" || *toPath == "" {
-			return fail(stderr, "missing required --from and --to")
+		var diff reportdiff.Diff
+		if *fromPath == "" && *toPath == "" {
+			var ok bool
+			var err error
+			diff, ok, err = latestReportDiff(home, *dir)
+			if err != nil {
+				return fail(stderr, "failed to compare latest reports: %v", err)
+			}
+			if !ok {
+				return fail(stderr, "need at least two saved reports in %s", filepath.Clean(expandHome(home, *dir)))
+			}
+		} else if *fromPath == "" || *toPath == "" {
+			return fail(stderr, "provide both --from and --to, or omit both to compare the latest two reports")
+		} else {
+			before, err := readInventoryReport(home, *fromPath)
+			if err != nil {
+				return fail(stderr, "failed to load --from scan JSON: %v", err)
+			}
+			after, err := readInventoryReport(home, *toPath)
+			if err != nil {
+				return fail(stderr, "failed to load --to scan JSON: %v", err)
+			}
+			diff = reportdiff.Compare(*fromPath, *toPath, before, after)
 		}
-		before, err := readInventoryReport(home, *fromPath)
+		if *jsonOut {
+			return writeJSON(stdout, diff, stderr)
+		}
+		printReportDiff(stdout, diff)
+	case "changes":
+		fs := flag.NewFlagSet("report changes", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		dir := fs.String("dir", defaultReportDir(home), "Nightward report directory")
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		diff, ok, err := latestReportDiff(home, *dir)
 		if err != nil {
-			return fail(stderr, "failed to load --from scan JSON: %v", err)
+			return fail(stderr, "failed to compare latest reports: %v", err)
 		}
-		after, err := readInventoryReport(home, *toPath)
-		if err != nil {
-			return fail(stderr, "failed to load --to scan JSON: %v", err)
+		if !ok {
+			if *jsonOut {
+				fmt.Fprintln(stdout, "null")
+			} else {
+				fmt.Fprintf(stdout, "Need at least two saved reports in %s.\n", filepath.Clean(expandHome(home, *dir)))
+			}
+			return 0
 		}
-		diff := reportdiff.Compare(*fromPath, *toPath, before, after)
 		if *jsonOut {
 			return writeJSON(stdout, diff, stderr)
 		}
@@ -303,7 +363,7 @@ func runReport(home string, args []string, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stdout, "Wrote report history index to %s\n", outputPath)
 	default:
-		return fail(stderr, "usage: nightward report <html|diff|history|latest|index> [flags]")
+		return fail(stderr, "usage: nightward report <html|diff|changes|history|latest|index> [flags]")
 	}
 	return 0
 }
@@ -387,6 +447,22 @@ func runScan(home string, args []string, stdout, stderr io.Writer) int {
 }
 
 func runDoctor(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "fix-hints" {
+		fs := flag.NewFlagSet("doctor fix-hints", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		jsonOut := fs.Bool("json", false, "print JSON output")
+		workspace := fs.String("workspace", "", "scan a repository/workspace instead of HOME")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		report := scanReport(home, *workspace)
+		plan := fixplan.Build(report, fixplan.Selector{All: true})
+		if *jsonOut {
+			return writeJSON(stdout, plan, stderr)
+		}
+		printFixHints(stdout, plan)
+		return 0
+	}
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	jsonOut := fs.Bool("json", false, "print JSON output")
@@ -403,17 +479,17 @@ func runDoctor(home string, args []string, stdout, stderr io.Writer) int {
 
 func runPlan(home string, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || args[0] != "backup" {
-		return fail(stderr, "usage: nightward plan backup --target <repo> [--json]")
+		return fail(stderr, "usage: nightward plan backup [--target <repo>] [--json]")
 	}
 	fs := flag.NewFlagSet("plan backup", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	target := fs.String("target", "", "private dotfiles repo or backup target root")
+	target := fs.String("target", "", "private dotfiles repo or backup target root; defaults to ~/dotfiles")
 	jsonOut := fs.Bool("json", false, "print JSON output")
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
 	}
 	if *target == "" {
-		return fail(stderr, "missing required --target")
+		*target = filepath.Join(home, "dotfiles")
 	}
 	absTarget := expandHome(home, *target)
 	report := inventory.NewScanner(home).Scan()
@@ -665,16 +741,13 @@ func runAnalyze(home string, args []string, stdout, stderr io.Writer) int {
 
 	fs := flag.NewFlagSet("analyze", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	all := fs.Bool("all", false, "analyze all discovered subjects")
+	_ = fs.Bool("all", false, "accepted for compatibility; analyze all discovered subjects")
 	jsonOut := fs.Bool("json", false, "print JSON output")
 	workspace := fs.String("workspace", "", "scan a repository/workspace instead of HOME")
 	with := fs.String("with", "", "comma-separated optional providers to enable")
 	online := fs.Bool("online", false, "allow explicitly selected network-capable providers")
 	if err := fs.Parse(args); err != nil {
 		return 2
-	}
-	if !*all {
-		return fail(stderr, "usage: nightward analyze --all [--json]")
 	}
 	_, analysisReport := analyzeReport(home, *workspace, analysis.Options{With: splitCSV(*with), Online: *online})
 	if *jsonOut {
@@ -763,12 +836,9 @@ func runPolicy(home string, args []string, stdout, stderr io.Writer) int {
 	case "init":
 		fs := flag.NewFlagSet("policy init", flag.ContinueOnError)
 		fs.SetOutput(stderr)
-		dryRun := fs.Bool("dry-run", false, "print default policy config without writing")
+		_ = fs.Bool("dry-run", false, "accepted for compatibility; policy init prints without writing in v1")
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
-		}
-		if !*dryRun {
-			return fail(stderr, "policy init is dry-run only in this release; rerun with --dry-run")
 		}
 		fmt.Fprint(stdout, policy.DefaultConfigYAML())
 	case "explain":
@@ -1049,8 +1119,31 @@ func readInventoryReport(home, path string) (inventory.Report, error) {
 	return report, nil
 }
 
+func latestReportDiff(home, dir string) (reportdiff.Diff, bool, error) {
+	history := schedule.ReportHistory(filepath.Clean(expandHome(home, dir)), 2)
+	if len(history) < 2 {
+		return reportdiff.Diff{}, false, nil
+	}
+	after, err := readInventoryReport(home, history[0].Path)
+	if err != nil {
+		return reportdiff.Diff{}, false, err
+	}
+	before, err := readInventoryReport(home, history[1].Path)
+	if err != nil {
+		return reportdiff.Diff{}, false, err
+	}
+	return reportdiff.Compare(history[1].Path, history[0].Path, before, after), true, nil
+}
+
 func defaultReportDir(home string) string {
 	return filepath.Join(home, ".local", "state", "nightward", "reports")
+}
+
+func defaultHTMLReportPath(home string, generatedAt time.Time) string {
+	if generatedAt.IsZero() {
+		generatedAt = time.Now().UTC()
+	}
+	return filepath.Join(defaultReportDir(home), "nightward-report-"+generatedAt.UTC().Format("20060102-150405Z")+".html")
 }
 
 func maybeWriteReport(report inventory.Report, output, outputDir string) error {
@@ -1085,13 +1178,14 @@ func maybeWriteReport(report inventory.Report, output, outputDir string) error {
 }
 
 func printHelp(w io.Writer, commandName string) {
-	fmt.Fprintf(w, `Nightward shows what your AI tools would leak before you sync dotfiles.
+	fmt.Fprintf(w, `Nightward finds AI-tool risks before you sync.
 
 Usage:
   %[1]s                                Open the TUI
   %[1]s scan [--json] [--workspace DIR] [--output FILE|-] [--output-dir DIR]
   %[1]s doctor [--json]
-  %[1]s plan backup --target <repo> [--json]
+  %[1]s doctor fix-hints [--workspace DIR] [--json]
+  %[1]s plan backup [--target <repo>] [--json]
   %[1]s adapters list [--workspace DIR] [--json]
   %[1]s adapters explain <adapter-name> [--workspace DIR] [--json]
   %[1]s adapters template <adapter-name> [--workspace DIR] [--json]
@@ -1100,7 +1194,7 @@ Usage:
   %[1]s fix plan [--finding <id>|--rule <rule>|--all] [--json]
   %[1]s fix preview [--finding <id>|--rule <rule>|--all] [--format diff|json|markdown]
   %[1]s fix export --format markdown|json
-  %[1]s analyze --all [--workspace DIR] [--with providers] [--online] [--json]
+  %[1]s analyze [--all] [--workspace DIR] [--with providers] [--online] [--json]
   %[1]s analyze finding <finding-id> [--workspace DIR] [--json]
   %[1]s analyze package <package> [--with providers] [--online] [--json]
   %[1]s trust explain <finding-id> [--workspace DIR] [--json]
@@ -1108,12 +1202,13 @@ Usage:
   %[1]s providers doctor [--with providers] [--online] [--json]
   %[1]s rules list [--json]
   %[1]s rules explain <rule-id> [--json]
-  %[1]s report html --input scan.json --output report.html [--previous previous.json]
-  %[1]s report diff --from previous.json --to current.json [--json]
+  %[1]s report html [--input scan.json] [--output report.html] [--previous previous.json]
+  %[1]s report diff [--from previous.json --to current.json] [--dir reports] [--json]
+  %[1]s report changes [--dir reports] [--json]
   %[1]s report history [--dir reports] [--limit 10] [--json]
   %[1]s report latest [--dir reports] [--json]
   %[1]s report index [--dir reports] --output index.html [--limit 50]
-  %[1]s policy init --dry-run
+  %[1]s policy init [--dry-run]
   %[1]s policy explain
   %[1]s policy check [--config .nightward.yml] [--workspace DIR] [--include-analysis] [--strict] [--json]
   %[1]s policy sarif [--config .nightward.yml] [--workspace DIR] [--include-analysis] --output nightward.sarif|-
@@ -1327,6 +1422,32 @@ func printFixPlan(w io.Writer, plan fixplan.Plan) {
 			fmt.Fprintf(w, "    %s\n", fix.Summary)
 		}
 	}
+}
+
+func printFixHints(w io.Writer, plan fixplan.Plan) {
+	fmt.Fprintf(w, "Nightward fix hints: total=%d safe=%d review=%d blocked=%d\n", plan.Summary.Total, plan.Summary.Safe, plan.Summary.Review, plan.Summary.Blocked)
+	if len(plan.Fixes) == 0 {
+		fmt.Fprintln(w, "  No fix hints available for the current scan.")
+		return
+	}
+	limit := len(plan.Fixes)
+	if limit > 8 {
+		limit = 8
+	}
+	for _, fix := range plan.Fixes[:limit] {
+		status := fix.Status
+		if status == "" {
+			status = "review"
+		}
+		fmt.Fprintf(w, "  [%s] %s %s\n", status, fix.Rule, fix.FindingID)
+		if fix.Summary != "" {
+			fmt.Fprintf(w, "    %s\n", fix.Summary)
+		}
+		if len(fix.Steps) > 0 {
+			fmt.Fprintf(w, "    next: %s\n", fix.Steps[0])
+		}
+	}
+	fmt.Fprintln(w, "\nUse `nw fix preview --all` for redacted diffs and `nw fix export` for review material.")
 }
 
 func printPolicy(w io.Writer, report policy.Report) {

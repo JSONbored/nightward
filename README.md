@@ -6,7 +6,7 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12713/badge)](https://www.bestpractices.dev/projects/12713)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-Nightward shows what your AI tools would leak if you synced your dotfiles: MCP risk, local-only state, secret exposure, and reviewable fix plans, all locally.
+Nightward finds AI-tool risks before you sync: MCP risk, local-only state, secret exposure, and reviewable fix plans, all locally.
 
 It scans common Codex, Claude, Cursor, Windsurf, VS Code, Raycast, JetBrains, Zed, Continue, Cline/Roo, Aider, OpenCode, Goose, LM Studio, Ollama/Open WebUI, Neovim, MCP config locations, and repo/workspace AI config; classifies what is portable versus local-only or secret; highlights MCP security findings; and produces redacted analysis signals, fix plans, fix previews, SARIF policy output, snapshot plans, and dry-run backup plans.
 
@@ -84,7 +84,7 @@ Nightward answers the practical questions first:
 - OpenSSF-oriented project hygiene: DCO, governance docs, threat model, coverage gate, pinned CI actions, release snapshot checks, signed release configuration, and security reporting policy.
 
 > [!TIP]
-> A practical first pass is `nw doctor --json`, then `nw scan --json`, then `nw fix plan --all --json`.
+> A practical first pass is `nw`, then `nw scan`, then `nw doctor fix-hints`.
 
 ## Install
 
@@ -131,6 +131,7 @@ Check local assumptions:
 
 ```sh
 nw doctor --json
+nw doctor fix-hints
 ```
 
 List and explain findings:
@@ -143,7 +144,7 @@ nw findings explain mcp_unpinned_package-abc123
 Generate a plan-only fix report:
 
 ```sh
-nw fix plan --all --json
+nw fix plan --json
 nw fix plan --rule mcp_secret_env
 nw fix preview --rule mcp_secret_env --format diff
 nw fix preview --all --format markdown
@@ -153,8 +154,8 @@ nw fix export --format markdown
 Run offline analysis and provider checks:
 
 ```sh
-nw analyze --all --json
-nw analyze --all --workspace . --json
+nw analyze --json
+nw analyze --workspace . --json
 nw analyze package npm:@modelcontextprotocol/server-filesystem --json
 nw trust explain mcp_unpinned_package-abc123
 nw providers list --json
@@ -167,13 +168,13 @@ Online-capable providers remain blocked until explicitly allowed:
 
 ```sh
 nw providers doctor --with socket --online --json
-nw analyze --all --workspace . --with trivy,osv-scanner,socket --online --json
+nw analyze --workspace . --with trivy,osv-scanner,socket --online --json
 ```
 
 Create or explain policy config:
 
 ```sh
-nw policy init --dry-run
+nw policy init
 nw policy explain
 nw policy check --config .nightward.yml --strict --json
 ```
@@ -181,7 +182,7 @@ nw policy check --config .nightward.yml --strict --json
 Generate a dry-run backup plan:
 
 ```sh
-nw plan backup --target ~/dotfiles
+nw plan backup
 ```
 
 Generate read-only snapshot plans and compare them:
@@ -197,6 +198,8 @@ Render a local static HTML report from redacted scan JSON:
 nw scan --json --output /tmp/nightward-scan.json
 nw report html --input /tmp/nightward-scan.json --output /tmp/nightward-report.html
 nw report diff --from /tmp/previous-scan.json --to /tmp/nightward-scan.json
+nw report html
+nw report changes
 nw report history
 nw report latest
 ```
@@ -275,9 +278,9 @@ sequenceDiagram
   participant User
   participant Nightward
   participant LocalTool as Optional local provider
-  User->>Nightward: nw analyze --all
+  User->>Nightward: nw analyze
   Nightward-->>User: offline built-in signals
-  User->>Nightward: nw analyze --all --workspace . --with gitleaks
+  User->>Nightward: nw analyze --workspace . --with gitleaks
   Nightward->>LocalTool: run only after explicit provider selection
   LocalTool-->>Nightward: provider signals
   Nightward-->>User: redacted analysis report
@@ -407,10 +410,10 @@ go run ./cmd/nw scan --workspace . --json
 go run ./cmd/nw scan --json | jq '.summary'
 go run ./cmd/nw findings list --json
 go run ./cmd/nw findings list --json | jq '[.[] | select(.rule=="mcp_unknown_command")]'
-go run ./cmd/nw analyze --all --json
+go run ./cmd/nw analyze --json
 go run ./cmd/nw providers doctor --json
 go run ./cmd/nw rules list --json
-go run ./cmd/nw fix plan --all --json
+go run ./cmd/nw fix plan --json
 go run ./cmd/nw fix preview --all --format markdown
 go run ./cmd/nw policy sarif --output /tmp/nightward.sarif
 go run ./cmd/nw policy sarif --workspace . --include-analysis --output -

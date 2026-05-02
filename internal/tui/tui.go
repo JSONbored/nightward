@@ -22,19 +22,21 @@ import (
 )
 
 type model struct {
-	report    inventory.Report
-	schedule  schedule.Plan
-	tab       int
-	cursor    int
-	width     int
-	height    int
-	severity  string
-	tool      string
-	rule      string
-	search    string
-	status    string
-	searching bool
-	showHelp  bool
+	report        inventory.Report
+	schedule      schedule.Plan
+	tab           int
+	cursor        int
+	width         int
+	height        int
+	severity      string
+	tool          string
+	rule          string
+	search        string
+	status        string
+	searching     bool
+	showHelp      bool
+	palette       bool
+	paletteCursor int
 }
 
 type actionMsg struct {
@@ -77,6 +79,12 @@ var (
 var tabs = []string{"Dashboard", "Inventory", "Findings", "Analysis", "Fix Plan", "Backup Plan"}
 var compactTabs = []string{"Dash", "Inv", "Find", "Analysis", "Fix", "Backup"}
 var tinyTabs = []string{"D", "I", "F", "A", "X", "B"}
+
+type paletteCommand struct {
+	Title  string
+	Detail string
+	Action string
+}
 
 const remediationDocsURL = "https://github.com/JSONbored/nightward/blob/main/docs/remediation.md"
 const analysisDocsURL = "https://github.com/JSONbored/nightward/blob/main/docs/analysis.md"
@@ -124,11 +132,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		if m.palette {
+			switch msg.String() {
+			case "esc", "p":
+				m.palette = false
+			case "enter":
+				commands := m.paletteCommands()
+				if len(commands) == 0 {
+					m.palette = false
+					return m, nil
+				}
+				if m.paletteCursor >= len(commands) {
+					m.paletteCursor = len(commands) - 1
+				}
+				selected := commands[m.paletteCursor]
+				m.palette = false
+				return m.applyPaletteCommand(selected)
+			case "up", "k":
+				if m.paletteCursor > 0 {
+					m.paletteCursor--
+				}
+			case "down", "j":
+				if m.paletteCursor < len(m.paletteCommands())-1 {
+					m.paletteCursor++
+				}
+			}
+			return m, nil
+		}
 		switch msg.String() {
 		case "ctrl+c", "q", "esc":
 			return m, tea.Quit
 		case "?":
 			m.showHelp = !m.showHelp
+		case "p":
+			m.palette = true
+			m.paletteCursor = 0
+			m.showHelp = false
+			m.status = "command palette"
 		case "tab", "right", "l":
 			m.tab = (m.tab + 1) % len(tabs)
 			m.cursor = 0
@@ -223,10 +263,16 @@ func (m model) View() string {
 	if m.showHelp {
 		bodyText = m.help(bodyWidth - 6)
 	}
+	if m.palette {
+		bodyText = m.commandPalette(bodyWidth-6, bodyHeight-2)
+	}
 	body := panelStyle.Width(bodyWidth).Height(bodyHeight).Render(bodyText)
-	footerText := "1-6 tabs  arrows/hjkl navigate  / search  s/t/r filters  x clear  c copy  e export  o docs  ? help  q quit"
+	footerText := "1-6 tabs  p palette  arrows/hjkl navigate  / search  s/t/r filters  x clear  c copy  e export  o docs  ? help  q quit"
 	if m.searching {
 		footerText = "search: " + m.search
+	}
+	if m.palette {
+		footerText = "palette: enter run  arrows navigate  esc close"
 	}
 	if m.status != "" {
 		footerText += "  " + m.status
@@ -315,6 +361,9 @@ func (m model) dashboard(width int) string {
 		}
 		if delta := reportDelta(m.schedule.History); delta != "" {
 			lines = append(lines, "Latest delta: "+delta)
+			if severity := reportSeverityDelta(m.schedule.History); severity != "" {
+				lines = append(lines, "Severity delta: "+severity)
+			}
 		}
 	}
 	lines = append(lines, "", section("What Next"))
@@ -409,7 +458,7 @@ func (m model) fixPlan(width, height int) string {
 		}
 		lines = append(lines, fmt.Sprintf("%s%-7s %-20s %-22s %s", prefix, fix.Status, fix.FixKind, fix.Rule, fix.Summary))
 	}
-	lines = append(lines, "", "Use `nw fix plan --all --json` or `nw fix export --format markdown` for full steps.")
+	lines = append(lines, "", "Use `nw fix plan --json` or `nw fix export --format markdown` for full steps.")
 	left := fitLines(lines, listWidth)
 	if detailWidth <= 0 {
 		return left
@@ -448,7 +497,7 @@ func (m model) analysis(width, height int) string {
 		}
 		lines = append(lines, fmt.Sprintf("%s%-8s %-30s %s", prefix, signal.Severity, signal.Rule, signal.Message))
 	}
-	lines = append(lines, "", "Use `nw analyze --all --json` or `nw providers doctor --json` for full details.")
+	lines = append(lines, "", "Use `nw analyze --json` or `nw providers doctor --json` for full details.")
 	left := fitLines(lines, listWidth)
 	if detailWidth <= 0 {
 		return left
@@ -476,7 +525,7 @@ func (m model) backupPlan(width, height int) string {
 		}
 		lines = append(lines, fmt.Sprintf("%s%-7s %-12s %s", prefix, entry.Action, entry.Tool, entry.Source))
 	}
-	lines = append(lines, "", "Use `nightward plan backup --target <repo>` for exact JSON or shell output.")
+	lines = append(lines, "", "Use `nw plan backup --json` for exact JSON output, or add `--target` for a custom repo.")
 	return fitLines(lines, width)
 }
 
@@ -520,6 +569,7 @@ func (m model) help(width int) string {
 	lines := []string{
 		section("Help"),
 		"1-6 or tab: switch tabs",
+		"p: open command palette",
 		"arrows or h/j/k/l: navigate rows",
 		"s/t/r: cycle severity, tool, and rule filters in Findings",
 		"/: search findings",
@@ -533,6 +583,115 @@ func (m model) help(width int) string {
 		"Nightward TUI actions do not mutate agent configs.",
 	}
 	return fitLines(lines, width)
+}
+
+func (m model) commandPalette(width, height int) string {
+	commands := m.paletteCommands()
+	lines := []string{
+		section("Command Palette"),
+		"Choose an action. Nothing here mutates agent config.",
+		"",
+	}
+	visible := max(1, height-4)
+	if m.paletteCursor >= len(commands) {
+		m.paletteCursor = len(commands) - 1
+	}
+	if m.paletteCursor < 0 {
+		m.paletteCursor = 0
+	}
+	start := clampCursor(m.paletteCursor, len(commands), visible)
+	for i := start; i < len(commands) && len(lines) < visible+3; i++ {
+		command := commands[i]
+		prefix := "  "
+		if i == m.paletteCursor {
+			prefix = "> "
+		}
+		line := fmt.Sprintf("%s%-24s %s", prefix, command.Title, command.Detail)
+		lines = append(lines, line)
+	}
+	return fitLines(lines, width)
+}
+
+func (m model) paletteCommands() []paletteCommand {
+	commands := []paletteCommand{
+		{Title: "Dashboard", Detail: "show scan summary and next actions", Action: "tab:0"},
+		{Title: "Inventory", Detail: "review discovered config paths", Action: "tab:1"},
+		{Title: "Findings", Detail: "filter and inspect MCP/config risks", Action: "tab:2"},
+		{Title: "Analysis", Detail: "review normalized signals", Action: "tab:3"},
+		{Title: "Fix Plan", Detail: "review plan-only remediation", Action: "tab:4"},
+		{Title: "Backup Plan", Detail: "preview dotfiles backup choices", Action: "tab:5"},
+		{Title: "Copy Selection", Detail: "copy selected redacted action or path", Action: "copy"},
+		{Title: "Export Fix Plan", Detail: "write redacted markdown review material", Action: "export"},
+	}
+	if _, ok := m.currentDocsURL(); ok {
+		commands = append(commands, paletteCommand{Title: "Open Docs", Detail: "open docs for selected row", Action: "docs"})
+	}
+	if m.tab == 2 {
+		commands = append(commands,
+			paletteCommand{Title: "Search Findings", Detail: "filter by rule, path, server, or evidence", Action: "search"},
+			paletteCommand{Title: "Cycle Severity", Detail: "advance severity filter", Action: "filter:severity"},
+			paletteCommand{Title: "Cycle Tool", Detail: "advance tool filter", Action: "filter:tool"},
+			paletteCommand{Title: "Cycle Rule", Detail: "advance rule filter", Action: "filter:rule"},
+		)
+		if m.search != "" || m.severity != "" || m.tool != "" || m.rule != "" {
+			commands = append(commands, paletteCommand{Title: "Clear Filters", Detail: "reset finding filters and search", Action: "filters:clear"})
+		}
+	}
+	return commands
+}
+
+func (m model) applyPaletteCommand(command paletteCommand) (model, tea.Cmd) {
+	switch command.Action {
+	case "tab:0", "tab:1", "tab:2", "tab:3", "tab:4", "tab:5":
+		tab := int(command.Action[len(command.Action)-1] - '0')
+		if tab >= 0 && tab < len(tabs) {
+			m.tab = tab
+			m.cursor = 0
+			m.status = "opened " + tabs[tab]
+		}
+	case "copy":
+		value, label, ok := m.copySelection()
+		if !ok {
+			m.status = "copy: nothing selected"
+			return m, nil
+		}
+		m.status = "copying " + label + "..."
+		return m, copyToClipboardCmd(value, label)
+	case "export":
+		m.status = "exporting fix plan..."
+		return m, exportFixPlanCmd(m.report)
+	case "docs":
+		docsURL, ok := m.currentDocsURL()
+		if !ok {
+			m.status = "open docs: no docs URL for selected row"
+			return m, nil
+		}
+		m.status = "opening docs..."
+		return m, openURLCmd(docsURL)
+	case "search":
+		m.searching = true
+		m.status = "type search, enter to keep, esc to cancel"
+	case "filter:severity":
+		m.severity = cycle(m.severity, riskOptions(m.report.Findings))
+		m.cursor = 0
+		m.status = "severity: " + filterLabel(m.severity)
+	case "filter:tool":
+		m.tool = cycle(m.tool, toolOptions(m.report.Findings))
+		m.cursor = 0
+		m.status = "tool: " + filterLabel(m.tool)
+	case "filter:rule":
+		m.rule = cycle(m.rule, ruleOptions(m.report.Findings))
+		m.cursor = 0
+		m.status = "rule: " + filterLabel(m.rule)
+	case "filters:clear":
+		m.search = ""
+		m.severity = ""
+		m.tool = ""
+		m.rule = ""
+		m.cursor = 0
+		m.status = "filters cleared"
+	}
+	return m, nil
 }
 
 func (m model) currentSignal() (analysis.Signal, bool) {
@@ -646,7 +805,7 @@ func (m model) nextActions() []string {
 	if len(m.schedule.History) > 1 {
 		return []string{"Compare recent reports before publishing screenshots or store metadata."}
 	}
-	return []string{"Run explicit local providers with `nw analyze --all --with gitleaks,trufflehog,semgrep --json`."}
+	return []string{"Run explicit local providers with `nw analyze --with gitleaks,trufflehog,semgrep --json`."}
 }
 
 func reportDelta(history []schedule.ReportRecord) string {
@@ -662,6 +821,21 @@ func reportDelta(history []schedule.ReportRecord) string {
 	default:
 		return "no finding change since previous report"
 	}
+}
+
+func reportSeverityDelta(history []schedule.ReportRecord) string {
+	if len(history) < 2 {
+		return ""
+	}
+	var parts []string
+	for _, severity := range []inventory.RiskLevel{inventory.RiskCritical, inventory.RiskHigh, inventory.RiskMedium, inventory.RiskLow, inventory.RiskInfo} {
+		delta := history[0].FindingsBySeverity[severity] - history[1].FindingsBySeverity[severity]
+		if delta == 0 {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s %+d", severity, delta))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func (m model) currentDocsURL() (string, bool) {

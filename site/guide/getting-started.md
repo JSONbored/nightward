@@ -26,7 +26,7 @@ Run the first safe CLI checks:
 nw doctor --json
 nw scan --json
 nw findings list
-nw fix plan --all
+nw fix plan
 ```
 
 For a repository or dotfiles workspace:

@@ -5,7 +5,7 @@ Nightward can enforce local policy in CI while keeping runtime local and redacte
 ## Policy config
 
 ```sh
-nw policy init --dry-run
+nw policy init
 nw policy explain
 nw policy check --config .nightward.yml --strict --json
 ```

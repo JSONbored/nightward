@@ -35,9 +35,9 @@ The extension uses `execFile`, not a shell, for local Nightward commands. It cal
 - `doctor --json`
 - `findings list --json`
 - `findings explain <id> --json`
-- `fix plan --all --json`
+- `fix plan --json`
 - `fix export --all --format markdown`
-- `analyze --all [--with providers] [--online] --json`
+- `analyze [--with providers] [--online] --json`
 - `analyze finding <id> --json`
 - `providers doctor [--with providers] [--online] --json`
 

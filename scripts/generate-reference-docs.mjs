@@ -27,7 +27,7 @@ const help = runNightward(["--help"]);
 const providers = parseJSON(["providers", "list", "--json"]);
 const rules = parseJSON(["rules", "list", "--json"]);
 const policyExplain = runNightward(["policy", "explain"]);
-const defaultPolicy = runNightward(["policy", "init", "--dry-run"]);
+const defaultPolicy = runNightward(["policy", "init"]);
 
 write(
   "cli.md",
@@ -100,7 +100,7 @@ write(
   "config.md",
   `# Config Reference
 
-This page is generated from \`nw policy explain\` and \`nw policy init --dry-run\`.
+This page is generated from \`nw policy explain\` and \`nw policy init\`.
 
 ## Policy Behavior
 
