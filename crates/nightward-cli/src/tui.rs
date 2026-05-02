@@ -10,12 +10,12 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 const VIEWS: [&str; 7] = [
-    "Dashboard",
+    "Overview",
     "Findings",
     "Analysis",
     "Fix Plan",
-    "History",
-    "Providers",
+    "Inventory",
+    "Backup",
     "Help",
 ];
 
@@ -154,30 +154,19 @@ impl<'a> TuiState<'a> {
             return;
         }
 
-        self.render_header(buffer, width);
-        self.render_footer(buffer, width, height);
-
-        let content_y = 4;
-        let content_h = height.saturating_sub(6);
-        let sidebar_w = (width / 5).clamp(22, 30);
-        let main_x = sidebar_w + 1;
-        let main_w = width.saturating_sub(main_x + 1);
-
-        self.render_sidebar(
+        let sidebar_w = 30.min(width.saturating_sub(74));
+        let main_x = sidebar_w + 2;
+        let main_w = width.saturating_sub(main_x + 2);
+        self.render_sidebar(buffer, Area::new(0, 0, sidebar_w, height));
+        self.render_header(buffer, Area::new(main_x, 1, main_w, 7));
+        self.render_content(
             buffer,
-            Area::new(1, content_y, sidebar_w.saturating_sub(1), content_h),
+            Area::new(main_x, 9, main_w, height.saturating_sub(12)),
         );
-
-        let top_h = 7.min(content_h / 3).max(5);
-        let lower_y = content_y + top_h + 1;
-        let lower_h = content_h.saturating_sub(top_h + 1);
-        self.render_metrics(buffer, Area::new(main_x, content_y, main_w, top_h));
-
-        let list_w = (main_w * 45 / 100).clamp(32, main_w.saturating_sub(36));
-        let detail_x = main_x + list_w + 1;
-        let detail_w = main_w.saturating_sub(list_w + 1);
-        self.render_findings(buffer, Area::new(main_x, lower_y, list_w, lower_h));
-        self.render_detail(buffer, Area::new(detail_x, lower_y, detail_w, lower_h));
+        self.render_footer(
+            buffer,
+            Area::new(main_x, height.saturating_sub(3), main_w, 2),
+        );
     }
 
     fn render_tiny(&self, buffer: &mut OptimizedBuffer, width: u32, height: u32) {
@@ -215,105 +204,174 @@ impl<'a> TuiState<'a> {
         }
     }
 
-    fn render_header(&self, buffer: &mut OptimizedBuffer, width: u32) {
-        buffer.fill_rect(0, 0, width, 3, self.palette.header);
+    fn render_header(&self, buffer: &mut OptimizedBuffer, area: Area) {
         draw_text(
             buffer,
-            2,
-            0,
-            "Nightward",
-            Style::fg(self.palette.cyan).with_bold(),
-        );
-        draw_text(
-            buffer,
-            13,
-            0,
-            "Audit AI tool configs before they leak, drift, or sync badly.",
+            area.x,
+            area.y,
+            "Review what AI tools can read, run, and accidentally sync.",
             Style::fg(self.palette.white),
         );
         draw_text(
             buffer,
-            2,
-            1,
-            "local-first  no telemetry  read-only scans  redacted evidence",
+            area.x,
+            area.y + 1,
+            &format!(
+                "generated {}",
+                self.report.generated_at.format("%-m/%-d/%Y, %-I:%M:%S %p")
+            ),
             Style::fg(self.palette.muted),
         );
 
-        let status = compact_status_label(self.report);
-        let status_w = text_width(&status).saturating_add(6).min(30);
-        let status_x = width.saturating_sub(status_w + 2);
-        draw_chip(
-            buffer,
-            status_x,
-            1,
-            status_w,
-            &status,
-            severity_color(&self.palette, max_risk(&self.report.findings)),
-            self.palette.bg,
-        );
+        let card_w = area.w.saturating_sub(3) / 4;
+        let cards = [
+            (
+                "findings",
+                self.report.summary.total_findings.to_string(),
+                severity_color(&self.palette, max_risk(&self.report.findings)),
+            ),
+            (
+                "items",
+                self.report.summary.total_items.to_string(),
+                self.palette.blue,
+            ),
+            (
+                "mode",
+                if self.report.scan_mode.is_empty() {
+                    if self.report.workspace.is_empty() {
+                        "home".to_string()
+                    } else {
+                        "workspace".to_string()
+                    }
+                } else {
+                    self.report.scan_mode.clone()
+                },
+                self.palette.magenta,
+            ),
+            (
+                "active",
+                VIEWS[self.active_view].to_string(),
+                self.palette.green,
+            ),
+        ];
+        for (idx, (label, value, color)) in cards.iter().enumerate() {
+            let x = area.x + u32::try_from(idx).unwrap_or(0) * (card_w + 1);
+            old_stat_card(
+                buffer,
+                Area::new(x, area.y + 3, card_w, 4),
+                label,
+                value,
+                *color,
+                &self.palette,
+            );
+        }
+        draw_hline(buffer, area.x, area.y + area.h, area.w, self.palette.line);
     }
 
-    fn render_footer(&self, buffer: &mut OptimizedBuffer, width: u32, height: u32) {
-        let y = height.saturating_sub(2);
-        buffer.fill_rect(0, y, width, 2, self.palette.header);
+    fn render_footer(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        draw_hline(buffer, area.x, area.y, area.w, self.palette.line);
+        let y = area.y + 1;
         let hints = [
-            ("1-7", "views"),
-            ("j/k", "move"),
-            ("tab", "next view"),
-            ("/", "filter"),
-            ("e", "export plan"),
+            ("tab/1-7", "navigate"),
+            ("/", "search"),
+            ("s", "severity"),
+            ("x", "clear"),
             ("q", "quit"),
         ];
-        let mut x = 2;
+        let mut x = area.x;
         for (key, label) in hints {
             draw_text(buffer, x, y, key, Style::fg(self.palette.cyan).with_bold());
             x += text_width(key) + 1;
             draw_text(buffer, x, y, label, Style::fg(self.palette.muted));
             x += text_width(label) + 3;
         }
-        let version = format!("schema v{}", self.report.schema_version);
-        draw_text(
-            buffer,
-            width.saturating_sub(text_width(&version) + 2),
-            y,
-            &version,
-            Style::fg(self.palette.muted),
-        );
     }
 
     fn render_sidebar(&self, buffer: &mut OptimizedBuffer, area: Area) {
-        draw_panel(
+        buffer.fill_rect(area.x, area.y, area.w, area.h, self.palette.sidebar);
+        draw_vline(
             buffer,
-            area,
-            "Command Center",
-            self.palette.cyan,
-            self.palette.panel,
+            area.x + area.w.saturating_sub(1),
+            area.y,
+            area.h,
+            self.palette.line,
         );
+        let x = area.x + 1;
         let mut row = area.y + 2;
+        draw_text(
+            buffer,
+            x,
+            row,
+            "NIGHTWARD",
+            Style::fg(self.palette.green).with_bold(),
+        );
+        row += 1;
+        draw_text(
+            buffer,
+            x,
+            row,
+            "AI config risk console",
+            Style::fg(self.palette.muted),
+        );
+        row += 3;
+
+        let risk = max_risk(&self.report.findings);
+        plain_box(
+            buffer,
+            Area::new(x, row, area.w.saturating_sub(5), 3),
+            severity_color(&self.palette, risk),
+            self.palette.sidebar,
+        );
+        draw_text(
+            buffer,
+            x + 2,
+            row + 1,
+            &format!("RISK {}", risk_label(risk)),
+            Style::fg(severity_color(&self.palette, risk)).with_bold(),
+        );
+        row += 4;
+        draw_text(
+            buffer,
+            x,
+            row,
+            &format!("{} findings", self.report.summary.total_findings),
+            Style::fg(self.palette.white),
+        );
+        row += 1;
+        draw_text(
+            buffer,
+            x,
+            row,
+            &format!(
+                "{} critical  {} high",
+                count_severity(self.report, RiskLevel::Critical),
+                count_severity(self.report, RiskLevel::High)
+            ),
+            Style::fg(self.palette.muted),
+        );
+        row += 3;
         for (idx, view) in VIEWS.iter().enumerate() {
             let active = idx == self.active_view;
-            let color = view_color(&self.palette, idx);
+            let color = if active {
+                self.palette.green
+            } else {
+                self.palette.line
+            };
+            draw_text(buffer, x, row, "│", Style::fg(color));
             if active {
                 buffer.fill_rect(
-                    area.x + 1,
+                    x + 1,
                     row,
-                    area.w.saturating_sub(2),
+                    area.w.saturating_sub(4),
                     1,
-                    color.with_alpha(0.18),
+                    self.palette.sidebar,
                 );
             }
             draw_text(
                 buffer,
-                area.x + 2,
+                x + 2,
                 row,
-                if active { "▶" } else { "•" },
-                Style::fg(color).with_bold(),
-            );
-            draw_text(
-                buffer,
-                area.x + 5,
-                row,
-                view,
+                &format!("{} {view}", idx + 1),
                 if active {
                     Style::fg(self.palette.white).with_bold()
                 } else {
@@ -323,68 +381,233 @@ impl<'a> TuiState<'a> {
             row += 2;
         }
 
-        let risk = max_risk(&self.report.findings);
-        let posture_y = area.y + area.h.saturating_sub(8);
+        let posture_y = row + 1;
+        if posture_y + 8 >= area.y + area.h {
+            return;
+        }
         draw_text(
             buffer,
-            area.x + 2,
+            x,
             posture_y,
-            "Posture",
+            "filters",
             Style::fg(self.palette.muted),
         );
         draw_text(
             buffer,
-            area.x + 2,
+            x,
             posture_y + 1,
-            &status_label(risk, self.report.summary.total_findings),
-            Style::fg(severity_color(&self.palette, risk)).with_bold(),
+            "severity  all",
+            Style::fg(self.palette.white),
         );
         draw_text(
             buffer,
-            area.x + 2,
-            posture_y + 3,
-            "Plan-only remediation",
-            Style::fg(self.palette.green),
+            x,
+            posture_y + 2,
+            "search    none",
+            Style::fg(self.palette.white),
         );
         draw_text(
             buffer,
-            area.x + 2,
-            posture_y + 4,
-            "No config writes",
-            Style::fg(self.palette.green),
+            x,
+            posture_y + 5,
+            "keys",
+            Style::fg(self.palette.muted),
+        );
+        draw_text(
+            buffer,
+            x,
+            posture_y + 6,
+            "tab/1-7 navigate",
+            Style::fg(self.palette.muted),
+        );
+        draw_text(
+            buffer,
+            x,
+            posture_y + 7,
+            "/ search  s severity",
+            Style::fg(self.palette.muted),
+        );
+        draw_text(
+            buffer,
+            x,
+            posture_y + 8,
+            "q quit",
+            Style::fg(self.palette.muted),
         );
     }
 
-    fn render_metrics(&self, buffer: &mut OptimizedBuffer, area: Area) {
-        let gap = 1;
-        let card_w = area.w.saturating_sub(gap * 3) / 4;
-        let metrics = [
-            ("Items", self.report.summary.total_items, self.palette.cyan),
-            (
-                "Findings",
-                self.report.summary.total_findings,
-                severity_color(&self.palette, max_risk(&self.report.findings)),
-            ),
-            (
-                "Critical",
-                count_severity(self.report, RiskLevel::Critical),
-                self.palette.red,
-            ),
-            (
-                "High",
-                count_severity(self.report, RiskLevel::High),
-                self.palette.orange,
-            ),
-        ];
-        for (idx, (label, value, color)) in metrics.iter().enumerate() {
-            let cx = area.x + u32::try_from(idx).unwrap_or(0) * (card_w + gap);
-            metric_card(
+    fn render_content(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        match self.active_view {
+            0 => self.render_overview(buffer, area),
+            1 => {
+                let list_w = (area.w * 48 / 100).clamp(34, area.w.saturating_sub(36));
+                self.render_findings(buffer, Area::new(area.x, area.y, list_w, area.h));
+                self.render_detail(
+                    buffer,
+                    Area::new(
+                        area.x + list_w + 2,
+                        area.y,
+                        area.w.saturating_sub(list_w + 2),
+                        area.h,
+                    ),
+                );
+            }
+            _ => self.render_placeholder(buffer, area, VIEWS[self.active_view]),
+        }
+    }
+
+    fn render_overview(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        let left_w = (area.w * 39 / 100).clamp(30, area.w.saturating_sub(42));
+        let right_x = area.x + left_w + 2;
+        let right_w = area.w.saturating_sub(left_w + 2);
+        self.render_risk_posture(
+            buffer,
+            Area::new(area.x, area.y + 1, left_w, area.h.saturating_sub(2)),
+        );
+        self.render_recent_findings(
+            buffer,
+            Area::new(right_x, area.y + 1, right_w, area.h.saturating_sub(2)),
+        );
+    }
+
+    fn render_risk_posture(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        let risk = max_risk(&self.report.findings);
+        plain_box(
+            buffer,
+            area,
+            severity_color(&self.palette, risk),
+            self.palette.panel,
+        );
+        let mut row = area.y + 2;
+        draw_text(
+            buffer,
+            area.x + 2,
+            row,
+            "risk posture",
+            Style::fg(self.palette.white).with_bold(),
+        );
+        row += 3;
+        let total = self.report.summary.total_findings.max(1);
+        for severity in [
+            RiskLevel::Critical,
+            RiskLevel::High,
+            RiskLevel::Medium,
+            RiskLevel::Low,
+            RiskLevel::Info,
+        ] {
+            let count = count_severity(self.report, severity);
+            let label = risk_word(severity);
+            let bar = ascii_bar(count, total, 20);
+            draw_text(
                 buffer,
-                Area::new(cx, area.y, card_w, area.h),
-                label,
-                *value,
-                *color,
-                &self.palette,
+                area.x + 2,
+                row,
+                &format!("{label:<9} {bar} {count}"),
+                Style::fg(severity_color(&self.palette, severity)),
+            );
+            row += 1;
+        }
+        row += 1;
+        draw_text(
+            buffer,
+            area.x + 2,
+            row,
+            "next action",
+            Style::fg(self.palette.green).with_bold(),
+        );
+        row += 1;
+        for line in wrap(&next_action(self.report), area.w.saturating_sub(4) as usize)
+            .into_iter()
+            .take(3)
+        {
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                &line,
+                Style::fg(self.palette.white),
+            );
+            row += 1;
+        }
+        row += 1;
+        draw_text(
+            buffer,
+            area.x + 2,
+            row,
+            "safe defaults",
+            Style::fg(self.palette.green).with_bold(),
+        );
+        row += 1;
+        for line in [
+            "read-only scan",
+            "redacted outputs",
+            "offline unless requested",
+        ] {
+            draw_text(buffer, area.x + 2, row, line, Style::fg(self.palette.white));
+            row += 1;
+        }
+    }
+
+    fn render_recent_findings(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        plain_box(buffer, area, self.palette.blue, self.palette.panel);
+        let mut row = area.y + 2;
+        draw_text(
+            buffer,
+            area.x + 2,
+            row,
+            "recent findings",
+            Style::fg(self.palette.white).with_bold(),
+        );
+        row += 3;
+        let max_rows = area.h.saturating_sub(13) as usize / 3;
+        for finding in self.report.findings.iter().take(max_rows.clamp(3, 5)) {
+            let color = severity_color(&self.palette, finding.severity);
+            draw_text(
+                buffer,
+                area.x + 3,
+                row,
+                severity_badge(finding.severity),
+                Style::fg(color).with_bold(),
+            );
+            draw_text(
+                buffer,
+                area.x + 12,
+                row,
+                &truncate(&finding.rule, area.w.saturating_sub(16) as usize),
+                Style::fg(color).with_bold(),
+            );
+            row += 1;
+            draw_text(
+                buffer,
+                area.x + 3,
+                row,
+                &truncate(&finding.message, area.w.saturating_sub(6) as usize),
+                Style::fg(self.palette.muted),
+            );
+            row += 2;
+        }
+        let flow_y = area.y + area.h.saturating_sub(8);
+        draw_text(
+            buffer,
+            area.x + 2,
+            flow_y,
+            "review flow",
+            Style::fg(self.palette.green).with_bold(),
+        );
+        for (idx, line) in [
+            "inspect finding evidence",
+            "export plan-only fix preview",
+            "apply changes manually after review",
+        ]
+        .iter()
+        .enumerate()
+        {
+            draw_text(
+                buffer,
+                area.x + 2,
+                flow_y + 1 + u32::try_from(idx).unwrap_or(0),
+                &format!("{}. {line}", idx + 1),
+                Style::fg(self.palette.white),
             );
         }
     }
@@ -573,15 +796,46 @@ impl<'a> TuiState<'a> {
             );
         }
     }
+
+    fn render_placeholder(&self, buffer: &mut OptimizedBuffer, area: Area, title: &str) {
+        plain_box(
+            buffer,
+            area,
+            view_color(&self.palette, self.active_view),
+            self.palette.panel,
+        );
+        draw_text(
+            buffer,
+            area.x + 2,
+            area.y + 2,
+            title,
+            Style::fg(self.palette.white).with_bold(),
+        );
+        draw_text(
+            buffer,
+            area.x + 2,
+            area.y + 4,
+            "This Rust/OpenTUI comparison branch keeps the visual shell stable while deeper panes are rebuilt.",
+            Style::fg(self.palette.muted),
+        );
+        draw_text(
+            buffer,
+            area.x + 2,
+            area.y + 6,
+            "Use the CLI JSON commands for complete data during review.",
+            Style::fg(self.palette.muted),
+        );
+    }
 }
 
 #[derive(Clone, Copy)]
 struct Palette {
     bg: Rgba,
-    header: Rgba,
+    sidebar: Rgba,
     panel: Rgba,
     surface: Rgba,
     code_bg: Rgba,
+    line: Rgba,
     white: Rgba,
     muted: Rgba,
     cyan: Rgba,
@@ -596,19 +850,20 @@ struct Palette {
 impl Palette {
     fn new() -> Self {
         Self {
-            bg: color("#090b12"),
-            header: color("#101624"),
-            panel: color("#111827"),
-            surface: color("#172033"),
-            code_bg: color("#0b1020"),
-            white: color("#f8fafc"),
-            muted: color("#8b93ad"),
-            cyan: color("#67e8f9"),
-            green: color("#5eead4"),
-            amber: color("#facc15"),
-            red: color("#fb7185"),
-            orange: color("#fb923c"),
-            magenta: color("#e879f9"),
+            bg: color("#070A12"),
+            sidebar: color("#151817"),
+            panel: color("#171A19"),
+            surface: color("#20262C"),
+            code_bg: color("#111827"),
+            line: color("#26324A"),
+            white: color("#E8EEF8"),
+            muted: color("#8E9097"),
+            cyan: color("#2DD4BF"),
+            green: color("#34D399"),
+            amber: color("#FFD166"),
+            red: color("#FF4D6D"),
+            orange: color("#FF8A3D"),
+            magenta: color("#A78BFA"),
             blue: color("#60a5fa"),
         }
     }
@@ -639,51 +894,38 @@ fn draw_panel(buffer: &mut OptimizedBuffer, area: Area, title: &str, border: Rgb
     buffer.draw_box_with_options(area.x, area.y, area.w, area.h, options);
 }
 
-fn metric_card(
+fn plain_box(buffer: &mut OptimizedBuffer, area: Area, border: Rgba, fill: Rgba) {
+    if area.w < 4 || area.h < 3 {
+        return;
+    }
+    let mut options = BoxOptions::new(BoxStyle::rounded(Style::fg(border)));
+    options.fill = Some(fill.with_alpha(0.94));
+    buffer.draw_box_with_options(area.x, area.y, area.w, area.h, options);
+}
+
+fn old_stat_card(
     buffer: &mut OptimizedBuffer,
     area: Area,
     label: &str,
-    value: usize,
+    value: &str,
     color: Rgba,
     palette: &Palette,
 ) {
-    draw_panel(buffer, area, label, color, palette.panel);
-    let value_s = value.to_string();
+    plain_box(buffer, area, color, palette.panel);
+    draw_text(
+        buffer,
+        area.x + 2,
+        area.y + 1,
+        label,
+        Style::fg(palette.muted),
+    );
     draw_text(
         buffer,
         area.x + 2,
         area.y + 2,
-        &value_s,
+        &truncate(value, area.w.saturating_sub(4) as usize),
         Style::fg(color).with_bold(),
     );
-    draw_text(
-        buffer,
-        area.x + 2,
-        area.y + 3,
-        match label {
-            "Items" => "tracked configs",
-            "Findings" => "review items",
-            "Critical" => "fix first",
-            _ => "needs pinning",
-        },
-        Style::fg(palette.muted),
-    );
-    let bar_w = area.w.saturating_sub(4);
-    if area.h > 5 && bar_w > 4 {
-        let filled = if value == 0 {
-            1
-        } else {
-            (u32::try_from(value.min(12)).unwrap_or(1) * bar_w / 12).max(1)
-        };
-        buffer.fill_rect(area.x + 2, area.y + area.h - 2, bar_w, 1, palette.surface);
-        buffer.fill_rect(
-            area.x + 2,
-            area.y + area.h - 2,
-            filled.min(bar_w),
-            1,
-            color.with_alpha(0.55),
-        );
-    }
 }
 
 fn draw_chip(
@@ -707,6 +949,18 @@ fn draw_chip(
         &text,
         Style::fg(fg).with_bg(bg).with_bold(),
     );
+}
+
+fn draw_hline(buffer: &mut OptimizedBuffer, x: u32, y: u32, width: u32, color: Rgba) {
+    for offset in 0..width {
+        draw_text(buffer, x + offset, y, "─", Style::fg(color));
+    }
+}
+
+fn draw_vline(buffer: &mut OptimizedBuffer, x: u32, y: u32, height: u32, color: Rgba) {
+    for offset in 0..height {
+        draw_text(buffer, x, y + offset, "│", Style::fg(color));
+    }
 }
 
 fn section_label(buffer: &mut OptimizedBuffer, x: u32, y: u32, label: &str, color: Rgba) {
@@ -752,20 +1006,48 @@ fn severity_badge(risk: RiskLevel) -> &'static str {
     }
 }
 
-fn compact_status_label(report: &Report) -> String {
-    let critical = count_severity(report, RiskLevel::Critical);
-    let high = count_severity(report, RiskLevel::High);
-    let medium = count_severity(report, RiskLevel::Medium);
-    if critical > 0 {
-        return format!("{critical}C {high}H / {}", report.summary.total_findings);
+fn risk_label(risk: RiskLevel) -> &'static str {
+    match risk {
+        RiskLevel::Critical => "CRITICAL",
+        RiskLevel::High => "HIGH",
+        RiskLevel::Medium => "MEDIUM",
+        RiskLevel::Low => "LOW",
+        RiskLevel::Info => "INFO",
     }
-    if high > 0 {
-        return format!("{high}H {medium}M / {}", report.summary.total_findings);
+}
+
+fn risk_word(risk: RiskLevel) -> &'static str {
+    match risk {
+        RiskLevel::Critical => "critical",
+        RiskLevel::High => "high",
+        RiskLevel::Medium => "medium",
+        RiskLevel::Low => "low",
+        RiskLevel::Info => "info",
     }
-    if medium > 0 {
-        return format!("{medium}M / {}", report.summary.total_findings);
+}
+
+fn ascii_bar(value: usize, total: usize, width: usize) -> String {
+    let filled = if total == 0 {
+        0
+    } else {
+        value.saturating_mul(width) / total
+    };
+    format!(
+        "{}{}",
+        "#".repeat(filled),
+        "-".repeat(width.saturating_sub(filled))
+    )
+}
+
+fn next_action(report: &Report) -> String {
+    match max_risk(&report.findings) {
+        RiskLevel::Critical => {
+            "Externalize inline secrets before syncing these configs.".to_string()
+        }
+        RiskLevel::High => "Pin package executors and review remote MCP wrappers.".to_string(),
+        RiskLevel::Medium => "Review local endpoints and machine-specific paths.".to_string(),
+        _ => "Keep this report as the clean baseline for future diffs.".to_string(),
     }
-    "OK".to_string()
 }
 
 fn status_label(risk: RiskLevel, total: usize) -> String {

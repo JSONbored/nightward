@@ -38,5 +38,5 @@ Type "7"
 Sleep 700ms
 Type "1"
 Sleep 300ms
-Type "q"
-Sleep 500ms
+Type "x"
+Sleep 1200ms
