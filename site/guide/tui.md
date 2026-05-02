@@ -6,6 +6,8 @@ Run the TUI with:
 nw
 ```
 
+![Nightward TUI fixture walkthrough](/demo/nightward-tui.gif)
+
 ## Screens
 
 - Dashboard: scan counts and schedule status.
@@ -14,6 +16,8 @@ nw
 - Analysis: offline risk signals and provider warnings.
 - Fix Plan: safe, review-required, and blocked remediation groups.
 - Backup Plan: private-dotfiles dry-run preview.
+
+Nightward uses Bubble Tea with Bubbles table, viewport, help, and text-input components. The current interface is still read-only, but list rendering, filter input, detail panes, footer help, and tab-specific accent colors are now component-backed instead of ad hoc terminal text.
 
 ## Shortcuts
 

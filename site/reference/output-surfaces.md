@@ -13,6 +13,7 @@
 | Badge JSON | `nw policy badge --output badge.json` | explicit badge file or stdout with `-` |
 | Fix plan | `nw fix plan --json` | stdout only |
 | Fix export | `nw fix export --format markdown` | stdout only |
+| MCP server | `nw mcp serve` | stdio JSON-RPC only; no config writes or network listener |
 | Schedule install | `nw schedule install` | explicit user-level schedule files |
 
 Labels used in docs:

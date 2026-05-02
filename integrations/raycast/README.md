@@ -30,6 +30,7 @@ npm ci
 npm test
 npm run lint
 npm run build
+npm run store-check
 ```
 
 Manual smoke testing requires the Raycast CLI:
@@ -37,3 +38,5 @@ Manual smoke testing requires the Raycast CLI:
 ```bash
 npm run dev
 ```
+
+Store submission should use `npm run store-check:strict` only after fixture-only metadata screenshots have been captured into `metadata/`.

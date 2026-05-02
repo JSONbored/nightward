@@ -169,6 +169,7 @@ API_TOKEN = "`+secretValue+`"
 		{"report", "html", "--input", "missing.json", "--output", filepath.Join(home, "report.html")},
 		{"report", "diff", "--from", "missing.json"},
 		{"snapshot", "diff", "--from", "missing.json"},
+		{"mcp"},
 		{"schedule", "install", "--preset", "bogus", "--dry-run"},
 	}
 	for _, args := range failures {

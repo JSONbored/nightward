@@ -26,3 +26,22 @@ The dashboard and menu-bar status include scheduled report counts when `nw docto
 - `Allow Online Providers`: enables selected online-capable providers in Raycast Analysis. Leave it off for local-only behavior.
 
 Provider Doctor can select `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, and `socket` for the Analysis command. Online-capable selections stay blocked until `Allow Online Providers` is enabled; Socket creates a remote scan artifact when it runs.
+
+## Store Readiness
+
+The extension is development-ready, but store submission still requires fixture-only Raycast screenshots captured from `ray develop`.
+
+```sh
+cd integrations/raycast
+npm ci
+npm test
+npm run lint
+npm run build
+npm run store-check
+```
+
+Before opening a draft PR to `raycast/extensions`, sync the fork, copy the self-contained package into `extensions/nightward`, capture at least three metadata screenshots with fixture `Home Override`, then run:
+
+```sh
+npm run store-check:strict
+```

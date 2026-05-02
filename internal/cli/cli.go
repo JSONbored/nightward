@@ -16,6 +16,7 @@ import (
 	"github.com/jsonbored/nightward/internal/backupplan"
 	"github.com/jsonbored/nightward/internal/fixplan"
 	"github.com/jsonbored/nightward/internal/inventory"
+	"github.com/jsonbored/nightward/internal/mcpserver"
 	"github.com/jsonbored/nightward/internal/policy"
 	"github.com/jsonbored/nightward/internal/reportdiff"
 	"github.com/jsonbored/nightward/internal/reporthtml"
@@ -108,12 +109,32 @@ func RunWithName(commandName string, args []string, stdout, stderr io.Writer) in
 		return runReport(home, args[1:], stdout, stderr)
 	case "policy":
 		return runPolicy(home, args[1:], stdout, stderr)
+	case "mcp":
+		return runMCP(home, args[1:], stdout, stderr)
 	case "snapshot":
 		return runSnapshot(home, args[1:], stdout, stderr)
 	case "schedule":
 		return runSchedule(home, args[1:], stdout, stderr)
 	default:
 		return fail(stderr, "unknown command %q\n\nRun `%s --help` for usage.", args[0], commandName)
+	}
+	return 0
+}
+
+func runMCP(home string, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 || args[0] != "serve" {
+		return fail(stderr, "usage: nightward mcp serve")
+	}
+	fs := flag.NewFlagSet("mcp serve", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	if err := fs.Parse(args[1:]); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return fail(stderr, "usage: nightward mcp serve")
+	}
+	if err := mcpserver.Serve(home, currentVersion(), os.Stdin, stdout); err != nil {
+		return fail(stderr, "mcp server failed: %v", err)
 	}
 	return 0
 }
@@ -1213,6 +1234,7 @@ Usage:
   %[1]s policy check [--config .nightward.yml] [--workspace DIR] [--include-analysis] [--strict] [--json]
   %[1]s policy sarif [--config .nightward.yml] [--workspace DIR] [--include-analysis] --output nightward.sarif|-
   %[1]s policy badge [--config .nightward.yml] [--workspace DIR] [--include-analysis] [--sarif-url URL] --output badge.json|-
+  %[1]s mcp serve
   %[1]s snapshot plan --target <dir> [--json]
   %[1]s snapshot diff --from <plan.json> --to <plan.json> [--json]
   %[1]s schedule plan --preset nightly [--json]

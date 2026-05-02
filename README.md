@@ -21,6 +21,7 @@ Nightward does not mutate agent configs. It only writes explicit report/SARIF fi
 | --- | --- | --- |
 | TUI | Dashboard, inventory, findings, analysis, fix plan, backup preview | Read-only except explicit redacted export |
 | CLI | Scriptable scan, doctor, policy, SARIF, snapshot, schedule commands | Read-only unless output/schedule flags are explicit |
+| MCP server | Read-only stdio tools/resources for AI clients | No writes, no network listener, no online providers |
 | Raycast | macOS read-only companion commands | Clipboard/report-folder actions only |
 | GitHub Action | Workspace policy and SARIF checks | Writes only requested CI outputs |
 | Trunk plugin | Local workspace policy/analyze linters | Emits SARIF to stdout |
@@ -33,6 +34,7 @@ The sample below is generated from the committed fixture home at [testdata/homes
 
 - [Scrubbed sample scan JSON](site/public/demo/nightward-sample-scan.json)
 - [Static HTML report](site/public/demo/nightward-sample-report.html)
+- [Fixture TUI GIF](site/public/demo/nightward-tui.gif)
 - Regenerate with `make demo-assets` using Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`
 
 ```mermaid
@@ -63,7 +65,7 @@ Nightward answers the practical questions first:
 
 ## Highlights
 
-- Bubble Tea TUI with dashboard, inventory, findings, analysis, fix plan, and backup preview tabs.
+- Bubble Tea/Bubbles TUI with dashboard, inventory, findings, analysis, fix plan, and backup preview tabs.
 - `nightward` canonical command plus `nw` short alias.
 - Redacted JSON for automation and CI.
 - HOME scanning for local machines and `--workspace` scanning for CI, Trunk, and dotfiles repos.
@@ -79,6 +81,7 @@ Nightward answers the practical questions first:
 - Read-only snapshot plan/diff commands.
 - Reusable GitHub Action for scan, policy, and SARIF modes.
 - Read-only Raycast extension for Dashboard, Findings, Analysis, Provider Doctor, Explain Finding/Signal, Fix Plan/Analysis export, and report-folder access.
+- Read-only stdio MCP server for AI clients that need local scan, finding, rule, provider, policy, and fix-plan context.
 - User-level nightly scan scheduling for macOS launchd, Linux systemd user timers, and cron text fallback.
 - No telemetry, no cloud dashboard, no network calls from Nightward runtime, and no live config mutation.
 - OpenSSF-oriented project hygiene: DCO, governance docs, threat model, coverage gate, pinned CI actions, release snapshot checks, signed release configuration, and security reporting policy.
@@ -214,6 +217,12 @@ nw policy sarif --workspace . --include-analysis --output -
 nw policy badge --workspace . --include-analysis --sarif-url https://example.invalid/nightward.sarif --output nightward-badge.json
 ```
 
+Expose Nightward to MCP-capable AI clients:
+
+```sh
+nw mcp serve
+```
+
 Preview scheduled nightly scans:
 
 ```sh
@@ -297,6 +306,8 @@ The default `nightward` / `nw` command opens the TUI:
 - Fix Plan: safe/review/blocked remediation groups
 - Backup Plan: private-dotfiles dry-run preview
 
+The TUI uses Bubble Tea with Bubbles table, viewport, help, and text input components so lists, filters, and detail panes stay stable at different terminal sizes. Each tab has a distinct accent color that carries into the panel border and selected table row, making dashboard, inventory, findings, analysis, fix-plan, and backup review states easier to distinguish at a glance.
+
 Keyboard shortcuts:
 
 - `1`-`6`: switch tabs
@@ -309,6 +320,27 @@ Keyboard shortcuts:
 - `o`: open remediation docs for the selected finding or fix
 - `?`: help
 - `q` or `esc`: quit
+
+Fixture-only TUI demo:
+
+![Nightward TUI fixture walkthrough](site/public/demo/nightward-tui.gif)
+
+## MCP Server
+
+Nightward can expose local, read-only context to MCP-capable AI clients:
+
+```json
+{
+  "mcpServers": {
+    "nightward": {
+      "command": "nw",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
+```
+
+The server supports scan, doctor, findings, finding explanation, fix-plan, report-change, and policy-check tools plus rules/providers/schedule/latest-report resources. It uses stdio only, does not open a network listener, does not mutate config, and does not enable online-capable providers in v1.
 
 ## GitHub Action
 
@@ -451,6 +483,7 @@ make release-snapshot
 - [Testing](docs/testing.md)
 - [Dependency maintenance](docs/dependency-maintenance.md)
 - [GitHub Action](docs/action.md)
+- [MCP server](docs/mcp-server.md)
 - [Raycast extension](docs/raycast-extension.md)
 - [CI/security notes](docs/ci-security.md)
 - [Release process](docs/release.md)

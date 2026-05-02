@@ -38,6 +38,7 @@ Usage:
   nw policy check [--config .nightward.yml] [--workspace DIR] [--include-analysis] [--strict] [--json]
   nw policy sarif [--config .nightward.yml] [--workspace DIR] [--include-analysis] --output nightward.sarif|-
   nw policy badge [--config .nightward.yml] [--workspace DIR] [--include-analysis] [--sarif-url URL] --output badge.json|-
+  nw mcp serve
   nw snapshot plan --target <dir> [--json]
   nw snapshot diff --from <plan.json> --to <plan.json> [--json]
   nw schedule plan --preset nightly [--json]

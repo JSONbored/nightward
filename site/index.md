@@ -25,7 +25,7 @@ features:
   - title: Built for MCP-heavy machines
     details: Scans Codex, Claude, Cursor, VS Code, Cline/Roo, Goose, OpenCode, Raycast, generic MCP files, and workspace AI config.
   - title: Reviewable output
-    details: Emits redacted JSON, searchable static HTML reports, report diffs, policy badges, SARIF, Trunk output, and Raycast status.
+    details: Emits redacted JSON, searchable static HTML reports, report diffs, policy badges, SARIF, Trunk output, MCP context, and Raycast status.
 ---
 
 <!-- markdownlint-disable MD041 MD033 -->
@@ -50,6 +50,7 @@ Prefer a persistent CLI? Use [npm, GitHub Releases, or `go install`](/guide/inst
 - [Audit an MCP-heavy workstation](/start/audit-mcp-workstation): review command execution, broad filesystem access, local endpoints, and credential exposure.
 - [Run in CI](/start/run-in-ci): fail a workflow on policy violations and upload SARIF to code scanning.
 - [Use Raycast](/integrations/raycast): keep a menu-bar status surface and jump into findings without opening a terminal.
+- [Use MCP](/integrations/mcp-server): expose local Nightward context to AI clients without giving them write tools.
 - [Verify a release](/security/release-verification): check signatures, checksums, npm provenance, and install behavior.
 
 ## Real Fixture Output
@@ -58,7 +59,9 @@ The sample report below is generated from the committed `testdata/homes/policy` 
 
 [![Scrubbed Nightward HTML report showing fixture MCP findings](/demo/nightward-sample-report.png)](/demo/nightward-sample-report.html)
 
-[Sample scan JSON](/demo/nightward-sample-scan.json) · [Static HTML report](/demo/nightward-sample-report.html) · [Provider reference](/reference/providers) · [Output surfaces](/reference/output-surfaces)
+[Sample scan JSON](/demo/nightward-sample-scan.json) · [Static HTML report](/demo/nightward-sample-report.html) · [TUI GIF](/demo/nightward-tui.gif) · [Provider reference](/reference/providers) · [Output surfaces](/reference/output-surfaces)
+
+![Nightward TUI fixture walkthrough](/demo/nightward-tui.gif)
 
 ## What Nightward Checks
 
@@ -69,6 +72,7 @@ The sample report below is generated from the committed `testdata/homes/policy` 
 | Report history | Compare scan JSON files, inspect latest-report status, render filterable diff-aware HTML, and generate a static local report index. |
 | Policy and CI | Reason-required ignores, policy badges, SARIF output, GitHub Action mode, and Trunk plugin support. |
 | Providers | Local `gitleaks`, `trufflehog`, and `semgrep`; online-gated `trivy`, `osv-scanner`, and remote Socket scan creation. |
+| MCP server | Read-only stdio tools/resources for local AI clients; no network listener, no mutation tools, and no online providers in v1. |
 
 ## Trust Posture
 
