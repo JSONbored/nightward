@@ -233,10 +233,11 @@ func TestProviderParsersCoverSupportedFormats(t *testing.T) {
 
 func TestOnlineProviderParsersRedactSecretLikeFields(t *testing.T) {
 	root := "/tmp/workspace"
+	opaqueToken := "providerTokenValue1234567890abcdefABCDEF"
 	cases := map[string]string{
-		"trivy":       `{"Results":[{"Target":"/tmp/workspace/package-lock.json","Vulnerabilities":[{"VulnerabilityID":"CVE-2026-0001","PkgName":"demo","Severity":"CRITICAL","Title":"API_TOKEN=super-secret-value vulnerable dependency"}],"Misconfigurations":[{"ID":"AVD-1","Severity":"MEDIUM","Title":"password=super-secret-value in config"}],"Secrets":[{"RuleID":"aws-access-key","Severity":"HIGH","Target":"/tmp/workspace/.env","Title":"private_key=super-secret-value"}]}]}`,
-		"osv-scanner": `{"results":[{"source":{"path":"/tmp/workspace/package-lock.json","type":"lockfile"},"packages":[{"package":{"name":"demo"},"vulnerabilities":[{"id":"GHSA-123","summary":"api_key=super-secret-value vulnerable package"}]}]},{"path":"/tmp/workspace/go.mod","vulnerabilities":[{"id":"GO-2026-0001","details":"password=super-secret-value detail"}]}]}`,
-		"socket":      `{"issues":[{"type":"malware","severity":"high","message":"API_TOKEN=super-secret-value","package":{"name":"demo"},"file":"package.json"}],"scanId":"scan_123"}`,
+		"trivy":       `{"Results":[{"Target":"/tmp/workspace/package-lock.json","Vulnerabilities":[{"VulnerabilityID":"CVE-2026-0001","PkgName":"demo","Severity":"CRITICAL","Title":"API_TOKEN=super-secret-value ` + opaqueToken + ` vulnerable dependency"}],"Misconfigurations":[{"ID":"AVD-1","Severity":"MEDIUM","Title":"password=super-secret-value in config"}],"Secrets":[{"RuleID":"aws-access-key","Severity":"HIGH","Target":"/tmp/workspace/.env","Title":"private_key=super-secret-value"}]}]}`,
+		"osv-scanner": `{"results":[{"source":{"path":"/tmp/workspace/package-lock.json","type":"lockfile"},"packages":[{"package":{"name":"demo"},"vulnerabilities":[{"id":"GHSA-123","summary":"api_key=super-secret-value vulnerable package"}]}]},{"path":"/tmp/workspace/go.mod","vulnerabilities":[{"id":"GO-2026-0001","details":"password=super-secret-value ` + opaqueToken + ` detail"}]}]}`,
+		"socket":      `{"issues":[{"type":"malware","severity":"high","message":"API_TOKEN=super-secret-value ` + opaqueToken + `","package":{"name":"demo"},"file":"package.json"}],"scanId":"scan_123"}`,
 	}
 	for provider, output := range cases {
 		findings, err := parseProviderOutput(provider, root, output)
@@ -252,6 +253,9 @@ func TestOnlineProviderParsersRedactSecretLikeFields(t *testing.T) {
 		}
 		if strings.Contains(string(data), "super-secret-value") {
 			t.Fatalf("%s parser leaked provider secret material: %s", provider, data)
+		}
+		if strings.Contains(string(data), opaqueToken) {
+			t.Fatalf("%s parser leaked opaque provider token: %s", provider, data)
 		}
 		if !strings.Contains(string(data), "[redacted]") {
 			t.Fatalf("%s parser did not preserve redaction marker: %s", provider, data)

@@ -1,6 +1,6 @@
 {
   "total_items": 1,
-  "total_findings": 8,
+  "total_findings": 5,
   "items_by_classification": {
     "portable": 1
   },
@@ -12,16 +12,16 @@
   },
   "findings_by_severity": {
     "critical": 1,
-    "info": 4,
+    "info": 1,
     "medium": 3
   },
   "findings_by_rule": {
     "mcp_local_endpoint": 1,
     "mcp_secret_header": 2,
-    "mcp_server_review": 4,
+    "mcp_server_review": 1,
     "mcp_unknown_command": 1
   },
   "findings_by_tool": {
-    "Codex": 8
+    "Codex": 5
   }
 }

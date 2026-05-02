@@ -47,10 +47,13 @@ GITHUB_TOKEN = "${GITHUB_TOKEN}"
 	for _, finding := range report.Findings {
 		rules[finding.Rule] = true
 	}
-	for _, rule := range []string{"mcp_server_review", "mcp_unpinned_package", "mcp_secret_env", "mcp_broad_filesystem"} {
+	for _, rule := range []string{"mcp_unpinned_package", "mcp_secret_env", "mcp_broad_filesystem"} {
 		if !rules[rule] {
 			t.Fatalf("expected finding rule %s in %#v", rule, rules)
 		}
+	}
+	if rules["mcp_server_review"] {
+		t.Fatalf("expected redundant server-review findings to collapse when stronger server findings exist: %#v", rules)
 	}
 	var inlineSecret, envReference bool
 	for _, finding := range report.Findings {
@@ -80,6 +83,34 @@ GITHUB_TOKEN = "${GITHUB_TOKEN}"
 	}
 	if strings.Contains(string(data), "super-secret-value") {
 		t.Fatal("scan report leaked an env secret value")
+	}
+}
+
+func TestScannerKeepsReviewOnlyForServersWithoutStrongerFindings(t *testing.T) {
+	home := t.TempDir()
+	writeFile(t, filepath.Join(home, ".mcp.json"), `{
+  "mcpServers": {
+    "review-only": {"command": "node", "args": ["server.js"]},
+    "risky": {"command": "npx", "args": ["mcp-remote"]}
+  }
+}`)
+
+	report := NewScanner(home).Scan()
+	byServerRule := map[string]map[string]bool{}
+	for _, finding := range report.Findings {
+		if byServerRule[finding.Server] == nil {
+			byServerRule[finding.Server] = map[string]bool{}
+		}
+		byServerRule[finding.Server][finding.Rule] = true
+	}
+	if !byServerRule["review-only"]["mcp_server_review"] {
+		t.Fatalf("expected review-only server to keep review finding: %#v", byServerRule)
+	}
+	if byServerRule["risky"]["mcp_server_review"] || !byServerRule["risky"]["mcp_unpinned_package"] {
+		t.Fatalf("expected risky server review finding to collapse under stronger finding: %#v", byServerRule)
+	}
+	if report.Summary.FindingsByRule["mcp_server_review"] != 1 || report.Summary.FindingsByRule["mcp_unpinned_package"] != 1 {
+		t.Fatalf("summary should reflect collapsed findings: %#v", report.Summary.FindingsByRule)
 	}
 }
 
@@ -165,11 +196,12 @@ type = "custom"
 
 func TestScannerRedactsSecretArgumentValues(t *testing.T) {
 	home := t.TempDir()
+	opaqueToken := "providerTokenValue1234567890abcdefABCDEF"
 	writeFile(t, filepath.Join(home, ".mcp.json"), `{
   "mcpServers": {
     "leaky": {
       "command": "bash",
-      "args": ["-c", "node server.js --api-key super-secret-value --token=another-secret"]
+      "args": ["-c", "node server.js --api-key super-secret-value --token=another-secret `+opaqueToken+`"]
     }
   }
 }`)
@@ -180,7 +212,7 @@ func TestScannerRedactsSecretArgumentValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	for _, leaked := range []string{"super-secret-value", "another-secret"} {
+	for _, leaked := range []string{"super-secret-value", "another-secret", opaqueToken} {
 		if strings.Contains(text, leaked) {
 			t.Fatalf("scan report leaked secret argument value %q: %s", leaked, text)
 		}

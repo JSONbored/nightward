@@ -78,6 +78,31 @@ type resource struct {
 	MimeType    string `json:"mimeType,omitempty"`
 }
 
+type compactPolicyReport struct {
+	SchemaVersion    int                 `json:"schema_version"`
+	GeneratedAt      time.Time           `json:"generated_at"`
+	Strict           bool                `json:"strict"`
+	Passed           bool                `json:"passed"`
+	Threshold        inventory.RiskLevel `json:"threshold"`
+	Summary          policy.Summary      `json:"summary"`
+	Violations       []compactViolation  `json:"violations,omitempty"`
+	SignalViolations []compactViolation  `json:"signal_violations,omitempty"`
+	Truncated        bool                `json:"truncated,omitempty"`
+}
+
+type compactViolation struct {
+	ID        string              `json:"id"`
+	Rule      string              `json:"rule"`
+	Severity  inventory.RiskLevel `json:"severity"`
+	Tool      string              `json:"tool,omitempty"`
+	Provider  string              `json:"provider,omitempty"`
+	Path      string              `json:"path,omitempty"`
+	Server    string              `json:"server,omitempty"`
+	Message   string              `json:"message"`
+	Evidence  string              `json:"evidence,omitempty"`
+	Recommend string              `json:"recommended_action,omitempty"`
+}
+
 func Serve(home, version string, stdin io.Reader, stdout io.Writer) error {
 	server := Server{Home: home, Version: version, Now: time.Now}
 	return server.Serve(stdin, stdout)
@@ -222,6 +247,9 @@ func (s Server) callTool(raw json.RawMessage) (callToolResult, error) {
 			IncludeAnalysis: includeAnalysis,
 			Analysis:        analysisReport,
 		})
+		if boolArg(params.Arguments, "compact") {
+			return successToolResult(compactPolicy(policyReport, 25))
+		}
 		return successToolResult(policyReport)
 	default:
 		return callToolResult{}, fmt.Errorf("unknown tool %q", params.Name)
@@ -279,7 +307,7 @@ func mcpTools() []tool {
 		{Name: "nightward_explain_finding", Title: "Explain Finding", Description: "Return a single Nightward finding by full ID or unique prefix.", InputSchema: requiredObjectSchema(map[string]any{"workspace": stringSchema("Optional workspace/repository path."), "finding_id": stringSchema("Finding ID or unique prefix.")}, []string{"finding_id"}), Annotations: readOnly},
 		{Name: "nightward_fix_plan", Title: "Generate Fix Plan", Description: "Generate plan-only remediation output for all findings or a selected finding/rule.", InputSchema: objectSchema(map[string]any{"workspace": stringSchema("Optional workspace/repository path."), "finding_id": stringSchema("Optional finding ID or unique prefix."), "rule": stringSchema("Optional rule ID."), "all": map[string]any{"type": "boolean", "description": "Include all findings."}}), Annotations: readOnly},
 		{Name: "nightward_report_changes", Title: "Compare Latest Reports", Description: "Compare the latest two saved Nightward reports and return added, removed, and changed findings.", InputSchema: objectSchema(map[string]any{"report_dir": stringSchema("Optional report directory. Defaults to Nightward state reports.")}), Annotations: readOnly},
-		{Name: "nightward_policy_check", Title: "Check Policy", Description: "Run the local policy gate with optional offline analysis. Online providers are not enabled through MCP v1.", InputSchema: objectSchema(map[string]any{"workspace": stringSchema("Optional workspace/repository path."), "strict": map[string]any{"type": "boolean", "description": "Fail on medium or higher findings."}, "include_analysis": map[string]any{"type": "boolean", "description": "Include offline analysis signals."}, "providers": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Offline providers to request for analysis."}}), Annotations: readOnly},
+		{Name: "nightward_policy_check", Title: "Check Policy", Description: "Run the local policy gate with optional offline analysis. Online providers are not enabled through MCP v1.", InputSchema: objectSchema(map[string]any{"workspace": stringSchema("Optional workspace/repository path."), "strict": map[string]any{"type": "boolean", "description": "Fail on medium or higher findings."}, "include_analysis": map[string]any{"type": "boolean", "description": "Include offline analysis signals."}, "compact": map[string]any{"type": "boolean", "description": "Return a compact AI-client friendly policy summary instead of full violations."}, "providers": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Offline providers to request for analysis."}}), Annotations: readOnly},
 	}
 }
 
@@ -403,6 +431,57 @@ func bounded(kind string, value any) any {
 			"message":   "Output exceeded the Nightward MCP safety cap.",
 		}
 	}
+}
+
+func compactPolicy(report policy.Report, limit int) compactPolicyReport {
+	if limit <= 0 {
+		limit = 25
+	}
+	out := compactPolicyReport{
+		SchemaVersion: report.SchemaVersion,
+		GeneratedAt:   report.GeneratedAt,
+		Strict:        report.Strict,
+		Passed:        report.Passed,
+		Threshold:     report.Threshold,
+		Summary:       report.Summary,
+	}
+	for _, finding := range report.Violations {
+		if len(out.Violations) >= limit {
+			out.Truncated = true
+			break
+		}
+		out.Violations = append(out.Violations, compactViolation{
+			ID:        finding.ID,
+			Rule:      finding.Rule,
+			Severity:  finding.Severity,
+			Tool:      finding.Tool,
+			Path:      finding.Path,
+			Server:    finding.Server,
+			Message:   finding.Message,
+			Evidence:  finding.Evidence,
+			Recommend: finding.Recommendation,
+		})
+	}
+	for _, signal := range report.SignalViolations {
+		if len(out.SignalViolations) >= limit {
+			out.Truncated = true
+			break
+		}
+		out.SignalViolations = append(out.SignalViolations, compactViolation{
+			ID:        signal.ID,
+			Rule:      signal.Rule,
+			Severity:  signal.Severity,
+			Provider:  signal.Provider,
+			Path:      signal.Path,
+			Message:   signal.Message,
+			Evidence:  signal.Evidence,
+			Recommend: signal.Recommendation,
+		})
+	}
+	if len(report.Violations) > len(out.Violations) || len(report.SignalViolations) > len(out.SignalViolations) {
+		out.Truncated = true
+	}
+	return out
 }
 
 func filterFindings(findings []inventory.Finding, args map[string]any) []inventory.Finding {

@@ -12,7 +12,8 @@ import type {
 
 const secretAssignmentPattern =
   /((?:token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)[^"',\s}]+/gi;
-const longSecretLikePattern = /\bsk-[A-Za-z0-9_-]{12,}\b/g;
+const providerTokenPattern =
+  /\b(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b/g;
 
 const riskRank: Record<RiskLevel, number> = {
   info: 0,
@@ -24,9 +25,13 @@ const riskRank: Record<RiskLevel, number> = {
 
 export function redactText(value: string | undefined): string {
   if (!value) return "";
-  return value
+  const redacted = value
     .replace(secretAssignmentPattern, "$1$2[redacted]")
-    .replace(longSecretLikePattern, "[redacted]");
+    .replace(providerTokenPattern, "[redacted]");
+  return redacted
+    .split(/(\s+)/)
+    .map((part) => (looksOpaqueProviderToken(part) ? "[redacted]" : part))
+    .join("");
 }
 
 export function severityColor(severity: RiskLevel): string {
@@ -315,22 +320,26 @@ export function menuBarStatus(
   const critical = report.summary.findings_by_severity.critical ?? 0;
   const high = report.summary.findings_by_severity.high ?? 0;
   const medium = report.summary.findings_by_severity.medium ?? 0;
+  const low = report.summary.findings_by_severity.low ?? 0;
+  const info = report.summary.findings_by_severity.info ?? 0;
   const findings = report.summary.total_findings;
   const signals = analysis.summary.total_signals;
   const providerWarnings = analysis.summary.provider_warnings;
   const historyDelta = reportHistoryDelta(doctor.schedule.history);
   const issueCount = findings + providerWarnings;
-  const topCount =
-    critical > 0
-      ? critical
-      : high > 0
-        ? high
-        : medium > 0
-          ? medium
-          : issueCount;
-  const title = issueCount === 0 ? "" : String(topCount);
+  const title =
+    issueCount === 0
+      ? ""
+      : critical > 0
+        ? `${critical}C`
+        : high > 0
+          ? `${high}H`
+          : medium > 0
+            ? `${medium}M`
+            : String(issueCount);
   const tooltip = [
-    `${findings} findings`,
+    `${critical} critical / ${high} high / ${findings} total findings`,
+    low > 0 || info > 0 ? `${medium} medium / ${low} low / ${info} info` : "",
     `${signals} analysis signals`,
     `${providerWarnings} provider warnings`,
     `max risk: ${risk}`,
@@ -355,6 +364,17 @@ export function menuBarStatus(
     lastReport: doctor.schedule.last_report,
     historyDelta,
   };
+}
+
+export function policyIgnoreSnippet(
+  finding: Finding,
+  reason = "reviewed locally",
+): string {
+  return [
+    "ignore_findings:",
+    `  - id: ${JSON.stringify(finding.id)}`,
+    `    reason: ${JSON.stringify(reason)}`,
+  ].join("\n");
 }
 
 export function menuBarStatusMarkdown(status: MenuBarStatus): string {
@@ -445,6 +465,21 @@ function maxBacktickRun(value: string): number {
     }
   }
   return max;
+}
+
+function looksOpaqueProviderToken(value: string): boolean {
+  const trimmed = value.replace(/^["'`,]+|["'`,.]+$/g, "");
+  if (
+    trimmed.length < 36 ||
+    trimmed.includes("/") ||
+    trimmed.includes("\\") ||
+    trimmed.includes("@") ||
+    trimmed.includes(".") ||
+    !/^[A-Za-z0-9_-]+$/.test(trimmed)
+  ) {
+    return false;
+  }
+  return /\d/.test(trimmed) && /[A-Za-z]/.test(trimmed);
 }
 
 const markdownSpecialChars = new Set([

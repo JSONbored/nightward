@@ -6,6 +6,10 @@ Formal changelog entries begin with the first tagged release.
 
 ## Unreleased
 
+- Collapsed redundant `mcp_server_review` noise when stronger server-specific findings already exist.
+- Added grouped fix-plan review items for repeated package-pin remediation.
+- Added compact MCP policy output for AI-client status checks.
+- Improved CLI/Raycast provider-token redaction and scoped Raycast fix-plan actions.
 - Replaced pre-1.0 deterministic SHA-1 IDs with SHA-256-backed IDs while preserving the short ID shape.
 - Added OpenSSF Silver-ready governance, threat model, DCO, coverage, and release snapshot hardening.
 - Added a release-gated npm launcher package that downloads GitHub Release binaries on first run without `postinstall`.

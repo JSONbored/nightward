@@ -18,6 +18,10 @@ The server follows the MCP JSON-RPC lifecycle for `initialize`, `tools/list`, `t
 - `nightward_report_changes`
 - `nightward_policy_check`
 
+`nightward_policy_check` accepts `compact: true` for AI-client friendly output.
+Compact mode keeps pass/fail, threshold, summary counts, and bounded violation
+metadata without returning every full finding or policy-ignore detail.
+
 ## Exposed Resources
 
 - `nightward://rules`
@@ -45,4 +49,6 @@ Use an absolute `command` path if the AI client does not inherit the same `PATH`
 - Output is bounded before it is returned to the MCP client.
 - Nightward reports provider or tool execution errors as tool results with `isError: true`.
 - The MCP server can include offline analysis, but it does not enable online providers in v1.
+- Use `compact: true` for casual policy checks in chat clients; request the full
+  policy report only when you need complete local review material.
 - Any future write-capable MCP tool must require a separate design review, confirmation UX, rollback story, and redaction tests.

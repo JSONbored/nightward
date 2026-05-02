@@ -322,6 +322,12 @@ function FixPlanDetail({ plan }: { plan: FixPlan }) {
     "",
     "Nightward exports fix plans only. It does not mutate local configs from Raycast.",
   ];
+  if (plan.groups && plan.groups.length > 0) {
+    lines.push("", "## Grouped Review");
+    for (const group of plan.groups.slice(0, 8)) {
+      lines.push(`- \`${group.label}\` (${group.count}): ${group.summary}`);
+    }
+  }
   return <List.Item.Detail markdown={lines.join("\n")} />;
 }
 

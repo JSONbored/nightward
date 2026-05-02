@@ -30,6 +30,34 @@
     }
   },
   {
+    "id": "mcp_local_endpoint-a1016cb2257c",
+    "tool": "Codex",
+    "path": "/tmp/nightward-golden-home/.codex/config.toml",
+    "server": "local",
+    "severity": "medium",
+    "rule": "mcp_local_endpoint",
+    "message": "MCP server \"local\" points at a local or private endpoint.",
+    "evidence": "transport=remote-url type=unknown url=http://127.0.0.1:8787",
+    "recommended_action": "Keep local endpoint assumptions machine-local unless intentionally templated.",
+    "impact": "Local or private MCP endpoints may not exist on another machine and can reveal local network assumptions.",
+    "why_this_matters": "Portable dotfiles should distinguish remote service configuration from machine-local development endpoints.",
+    "fix_available": true,
+    "fix_kind": "manual-review",
+    "confidence": "medium",
+    "risk": "low",
+    "requires_review": true,
+    "fix_summary": "Move local endpoint assumptions into a machine-local overlay or document them as setup prerequisites.",
+    "fix_steps": [
+      "Confirm whether this MCP endpoint is intentionally machine-local.",
+      "Keep the URL in an ignored local overlay if it is not portable.",
+      "Document the expected local service when the endpoint is required for this machine."
+    ],
+    "patch_hint": {
+      "kind": "manual-review",
+      "replacement": "\u003creviewed-portable-or-local-overlay-url\u003e"
+    }
+  },
+  {
     "id": "mcp_secret_header-5212d7dbf262",
     "tool": "Codex",
     "path": "/tmp/nightward-golden-home/.codex/config.toml",
@@ -59,34 +87,6 @@
     }
   },
   {
-    "id": "mcp_local_endpoint-a1016cb2257c",
-    "tool": "Codex",
-    "path": "/tmp/nightward-golden-home/.codex/config.toml",
-    "server": "local",
-    "severity": "medium",
-    "rule": "mcp_local_endpoint",
-    "message": "MCP server \"local\" points at a local or private endpoint.",
-    "evidence": "transport=remote-url type=unknown url=http://127.0.0.1:8787",
-    "recommended_action": "Keep local endpoint assumptions machine-local unless intentionally templated.",
-    "impact": "Local or private MCP endpoints may not exist on another machine and can reveal local network assumptions.",
-    "why_this_matters": "Portable dotfiles should distinguish remote service configuration from machine-local development endpoints.",
-    "fix_available": true,
-    "fix_kind": "manual-review",
-    "confidence": "medium",
-    "risk": "low",
-    "requires_review": true,
-    "fix_summary": "Move local endpoint assumptions into a machine-local overlay or document them as setup prerequisites.",
-    "fix_steps": [
-      "Confirm whether this MCP endpoint is intentionally machine-local.",
-      "Keep the URL in an ignored local overlay if it is not portable.",
-      "Document the expected local service when the endpoint is required for this machine."
-    ],
-    "patch_hint": {
-      "kind": "manual-review",
-      "replacement": "\u003creviewed-portable-or-local-overlay-url\u003e"
-    }
-  },
-  {
     "id": "mcp_unknown_command-a318c5ca6d87",
     "tool": "Codex",
     "path": "/tmp/nightward-golden-home/.codex/config.toml",
@@ -111,54 +111,6 @@
     ]
   },
   {
-    "id": "mcp_server_review-895197e30eb1",
-    "tool": "Codex",
-    "path": "/tmp/nightward-golden-home/.codex/config.toml",
-    "server": "header",
-    "severity": "info",
-    "rule": "mcp_server_review",
-    "message": "Review MCP server \"header\" before syncing this config.",
-    "evidence": "transport=remote-url type=sse url=https://headers.example.test",
-    "recommended_action": "Confirm the server source, permissions, and local path assumptions.",
-    "impact": "This server may execute local code or expose local files when an AI client invokes it.",
-    "why_this_matters": "MCP configs are executable trust boundaries, so portable backups should preserve intent without hiding local-only risk.",
-    "fix_available": true,
-    "fix_kind": "ignore-with-reason",
-    "confidence": "medium",
-    "risk": "low",
-    "requires_review": true,
-    "fix_summary": "Keep the server only if its source, permissions, and local assumptions are understood.",
-    "fix_steps": [
-      "Identify the server package, binary, or script owner.",
-      "Confirm the command and arguments are expected for this machine.",
-      "Document why this server is safe to keep or exclude it from portable dotfiles."
-    ]
-  },
-  {
-    "id": "mcp_server_review-a1016cb2257c",
-    "tool": "Codex",
-    "path": "/tmp/nightward-golden-home/.codex/config.toml",
-    "server": "local",
-    "severity": "info",
-    "rule": "mcp_server_review",
-    "message": "Review MCP server \"local\" before syncing this config.",
-    "evidence": "transport=remote-url type=unknown url=http://127.0.0.1:8787",
-    "recommended_action": "Confirm the server source, permissions, and local path assumptions.",
-    "impact": "This server may execute local code or expose local files when an AI client invokes it.",
-    "why_this_matters": "MCP configs are executable trust boundaries, so portable backups should preserve intent without hiding local-only risk.",
-    "fix_available": true,
-    "fix_kind": "ignore-with-reason",
-    "confidence": "medium",
-    "risk": "low",
-    "requires_review": true,
-    "fix_summary": "Keep the server only if its source, permissions, and local assumptions are understood.",
-    "fix_steps": [
-      "Identify the server package, binary, or script owner.",
-      "Confirm the command and arguments are expected for this machine.",
-      "Document why this server is safe to keep or exclude it from portable dotfiles."
-    ]
-  },
-  {
     "id": "mcp_server_review-ebc91cff4b17",
     "tool": "Codex",
     "path": "/tmp/nightward-golden-home/.codex/config.toml",
@@ -167,30 +119,6 @@
     "rule": "mcp_server_review",
     "message": "Review MCP server \"remote\" before syncing this config.",
     "evidence": "transport=remote-url type=unknown url=https://mcp.example.test",
-    "recommended_action": "Confirm the server source, permissions, and local path assumptions.",
-    "impact": "This server may execute local code or expose local files when an AI client invokes it.",
-    "why_this_matters": "MCP configs are executable trust boundaries, so portable backups should preserve intent without hiding local-only risk.",
-    "fix_available": true,
-    "fix_kind": "ignore-with-reason",
-    "confidence": "medium",
-    "risk": "low",
-    "requires_review": true,
-    "fix_summary": "Keep the server only if its source, permissions, and local assumptions are understood.",
-    "fix_steps": [
-      "Identify the server package, binary, or script owner.",
-      "Confirm the command and arguments are expected for this machine.",
-      "Document why this server is safe to keep or exclude it from portable dotfiles."
-    ]
-  },
-  {
-    "id": "mcp_server_review-a318c5ca6d87",
-    "tool": "Codex",
-    "path": "/tmp/nightward-golden-home/.codex/config.toml",
-    "server": "unknown",
-    "severity": "info",
-    "rule": "mcp_server_review",
-    "message": "Review MCP server \"unknown\" before syncing this config.",
-    "evidence": "command=unknown",
     "recommended_action": "Confirm the server source, permissions, and local path assumptions.",
     "impact": "This server may execute local code or expose local files when an AI client invokes it.",
     "why_this_matters": "MCP configs are executable trust boundaries, so portable backups should preserve intent without hiding local-only risk.",

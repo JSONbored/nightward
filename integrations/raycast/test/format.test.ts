@@ -6,6 +6,7 @@ import {
   menuBarStatus,
   menuBarStatusMarkdown,
   maxSeverity,
+  policyIgnoreSnippet,
   redactText,
   reportHistoryDelta,
   signalMarkdown,
@@ -23,11 +24,17 @@ import type {
 test("redacts obvious secret assignments and long token-like values", () => {
   const keyName = "API_" + "KEY";
   const token = "sk-" + "1234567890abcdef";
+  const jwt =
+    "eyJhbGciOiJIUzI1" +
+    "NiJ9.eyJzdWIiOiIx" +
+    "MjM0NTY3ODkwIn0." +
+    "signatureValue123";
+  const opaque = "providerTokenValue1234567890abcdefABCDEF";
   const longValue = "abcdefghijklmno" + "pqrstuvwxyz123456";
   const path =
     "/Users/example/Library/Application Support/Claude/claude_desktop_config.json";
   const output = redactText(
-    `${keyName}=${token} secret: ${longValue} path: ${path}`,
+    `${keyName}=${token} secret: ${longValue} jwt: ${jwt} opaque: ${opaque} path: ${path}`,
   );
   assert.match(output, /API_KEY=\[redacted\]/);
   assert.match(output, /secret: \[redacted\]/);
@@ -37,6 +44,8 @@ test("redacts obvious secret assignments and long token-like values", () => {
   );
   assert.doesNotMatch(output, /1234567890abcdef/);
   assert.doesNotMatch(output, /abcdefghijklmnopqrstuvwxyz123456/);
+  assert.doesNotMatch(output, /eyJhbGci/);
+  assert.doesNotMatch(output, /providerTokenValue/);
 });
 
 test("finding markdown keeps guidance while avoiding secret values", () => {
@@ -215,9 +224,9 @@ test("menu bar status summarizes risk and schedule state", () => {
   };
 
   const status = menuBarStatus(report, doctor, analysis);
-  assert.equal(status.title, "1");
+  assert.equal(status.title, "1C");
   assert.equal(status.risk, "critical");
-  assert.match(status.tooltip, /3 findings/);
+  assert.match(status.tooltip, /1 critical \/ 1 high \/ 3 total findings/);
   assert.match(status.tooltip, /1 provider warnings/);
   assert.equal(status.historyDelta, "+2 findings");
   assert.match(menuBarStatusMarkdown(status), /Last scheduled findings: `2`/);
@@ -225,6 +234,13 @@ test("menu bar status summarizes risk and schedule state", () => {
     menuBarStatusMarkdown(status),
     /Change since previous scheduled scan: `\+2 findings`/,
   );
+});
+
+test("policy ignore snippets are explicit and reasoned", () => {
+  const snippet = policyIgnoreSnippet(baseFinding("finding-a", "info", "Codex"));
+  assert.match(snippet, /ignore_findings:/);
+  assert.match(snippet, /"finding-a"/);
+  assert.match(snippet, /"reviewed locally"/);
 });
 
 test("report history delta handles missing and equal histories", () => {
