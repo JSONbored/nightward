@@ -2,13 +2,13 @@
 
 Run Nightward scans, findings, provider checks, and redacted fix-plan exports from Raycast.
 
-This extension is read-only. It runs local `nw`/`nightward` commands, renders redacted JSON output, copies user-requested fix-plan text, and opens the scheduled report folder. It does not install schedules, edit agent configs, restore files, push to Git, or copy secret values.
+This extension is read-only. It runs local `nw`/`nightward` commands, renders redacted JSON output, copies user-requested fix-plan and policy-review text, and opens the scheduled report folder. It does not install schedules, edit agent configs, restore files, push to Git, or copy secret values.
 
 ## Commands
 
 - `Nightward Dashboard`: scan summary, schedule status, adapters, and top findings.
-- `Nightward Status`: menu-bar counter for findings, analysis signals, provider warnings, and scheduled-report state.
-- `Nightward Findings`: searchable findings with severity filters and detail panes.
+- `Nightward Status`: compact menu-bar marker such as `3C`, `18H`, or a total count, with detailed findings, analysis signals, provider warnings, and scheduled-report state in the dropdown.
+- `Nightward Findings`: searchable findings with severity filters, detail panes, scoped fix-plan exports, reviewed-policy-ignore snippets, and redacted evidence copy.
 - `Nightward Analysis`: built-in offline analysis plus any providers explicitly selected in Provider Doctor.
 - `Nightward Provider Doctor`: provider availability, privacy posture, and Raycast Analysis enable/disable controls.
 - `Explain Nightward Finding`: detail view for a specific finding ID.

@@ -59,6 +59,7 @@ func (b *limitedBuffer) String() string {
 }
 
 var providerSecretPattern = regexp.MustCompile(`(?i)((?:token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)[^"',\s}]+`)
+var providerTokenPattern = regexp.MustCompile(`(?i)\b(?:sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9_]{20,}|glpat-[a-z0-9_-]{20,}|npm_[a-z0-9]{20,}|xox[abprs]-[a-z0-9-]{20,}|eyj[a-z0-9_-]{8,}\.[a-z0-9_-]{8,}\.[a-z0-9_-]{8,})\b`)
 
 func appendProviderSignals(out *Report, report inventory.Report, options Options) {
 	selected := selectedProviders(options.With)
@@ -604,8 +605,42 @@ func firstProviderLine(value string) string {
 
 func redactProviderText(value string) string {
 	value = providerSecretPattern.ReplaceAllString(value, "$1$2[redacted]")
+	value = providerTokenPattern.ReplaceAllString(value, "[redacted]")
+	value = strings.Join(redactOpaqueProviderTokens(strings.Fields(value)), " ")
 	if len(value) > 500 {
 		return value[:500] + "..."
 	}
 	return value
+}
+
+func redactOpaqueProviderTokens(parts []string) []string {
+	out := append([]string(nil), parts...)
+	for i, part := range out {
+		trimmed := strings.Trim(part, "\"'`,")
+		if looksOpaqueProviderToken(trimmed) {
+			out[i] = strings.Replace(part, trimmed, "[redacted]", 1)
+		}
+	}
+	return out
+}
+
+func looksOpaqueProviderToken(part string) bool {
+	if len(part) < 36 || strings.ContainsAny(part, `/\`) || strings.Contains(part, "@") || strings.Contains(part, ".") {
+		return false
+	}
+	var hasLower, hasUpper, hasDigit bool
+	for _, r := range part {
+		switch {
+		case r >= 'a' && r <= 'z':
+			hasLower = true
+		case r >= 'A' && r <= 'Z':
+			hasUpper = true
+		case r >= '0' && r <= '9':
+			hasDigit = true
+		case r == '-' || r == '_':
+		default:
+			return false
+		}
+	}
+	return hasDigit && (hasLower || hasUpper)
 }

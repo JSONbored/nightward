@@ -101,32 +101,7 @@ func (s Scanner) Scan() Report {
 		report.Adapters = append(report.Adapters, status)
 	}
 
-	sort.Slice(report.Items, func(i, j int) bool {
-		if report.Items[i].Tool == report.Items[j].Tool {
-			return report.Items[i].Path < report.Items[j].Path
-		}
-		return report.Items[i].Tool < report.Items[j].Tool
-	})
-	sort.Slice(report.Findings, func(i, j int) bool {
-		if report.Findings[i].Severity == report.Findings[j].Severity {
-			return report.Findings[i].Path < report.Findings[j].Path
-		}
-		return severityRank(report.Findings[i].Severity) > severityRank(report.Findings[j].Severity)
-	})
-
-	report.Summary.TotalItems = len(report.Items)
-	report.Summary.TotalFindings = len(report.Findings)
-	for _, item := range report.Items {
-		report.Summary.ItemsByClassification[item.Classification]++
-		report.Summary.ItemsByRisk[item.Risk]++
-		report.Summary.ItemsByTool[item.Tool]++
-	}
-	for _, finding := range report.Findings {
-		report.Summary.FindingsBySeverity[finding.Severity]++
-		report.Summary.FindingsByRule[finding.Rule]++
-		report.Summary.FindingsByTool[finding.Tool]++
-	}
-
+	finalizeReport(&report)
 	return report
 }
 
@@ -200,6 +175,7 @@ func finalizeReport(report *Report) {
 	if report.SchemaVersion == 0 {
 		report.SchemaVersion = ReportSchemaVersion
 	}
+	report.Findings = collapseRedundantReviewFindings(report.Findings)
 	sort.Slice(report.Items, func(i, j int) bool {
 		if report.Items[i].Tool == report.Items[j].Tool {
 			return report.Items[i].Path < report.Items[j].Path
@@ -216,6 +192,14 @@ func finalizeReport(report *Report) {
 		return severityRank(report.Findings[i].Severity) > severityRank(report.Findings[j].Severity)
 	})
 
+	report.Summary = Summary{
+		ItemsByClassification: map[Classification]int{},
+		ItemsByRisk:           map[RiskLevel]int{},
+		ItemsByTool:           map[string]int{},
+		FindingsBySeverity:    map[RiskLevel]int{},
+		FindingsByRule:        map[string]int{},
+		FindingsByTool:        map[string]int{},
+	}
 	report.Summary.TotalItems = len(report.Items)
 	report.Summary.TotalFindings = len(report.Findings)
 	for _, item := range report.Items {
@@ -228,6 +212,33 @@ func finalizeReport(report *Report) {
 		report.Summary.FindingsByRule[finding.Rule]++
 		report.Summary.FindingsByTool[finding.Tool]++
 	}
+}
+
+func collapseRedundantReviewFindings(findings []Finding) []Finding {
+	riskyServers := map[string]bool{}
+	for _, finding := range findings {
+		if finding.Rule == "mcp_server_review" || finding.Server == "" {
+			continue
+		}
+		if severityRank(finding.Severity) > severityRank(RiskInfo) {
+			riskyServers[serverFindingKey(finding)] = true
+		}
+	}
+	if len(riskyServers) == 0 {
+		return findings
+	}
+	out := findings[:0]
+	for _, finding := range findings {
+		if finding.Rule == "mcp_server_review" && riskyServers[serverFindingKey(finding)] {
+			continue
+		}
+		out = append(out, finding)
+	}
+	return out
+}
+
+func serverFindingKey(finding Finding) string {
+	return strings.Join([]string{finding.Tool, finding.Path, finding.Server}, "\x00")
 }
 
 func inspectPath(path string, spec pathSpec) (Item, bool) {

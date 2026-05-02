@@ -222,6 +222,7 @@ func TestFindingExplainReportChangesAndPolicyTool(t *testing.T) {
 		`{"jsonrpc":"2.0","id":"required","method":"tools/call","params":{"name":"nightward_explain_finding","arguments":{}}}`,
 		`{"jsonrpc":"2.0","id":"diff","method":"tools/call","params":{"name":"nightward_report_changes","arguments":{}}}`,
 		`{"jsonrpc":"2.0","id":"policy","method":"tools/call","params":{"name":"nightward_policy_check","arguments":{"strict":true,"include_analysis":true,"providers":"missing-provider"}}}`,
+		`{"jsonrpc":"2.0","id":"policy-compact","method":"tools/call","params":{"name":"nightward_policy_check","arguments":{"strict":true,"include_analysis":true,"compact":true}}}`,
 	}, "\n") + "\n"
 	var out bytes.Buffer
 	if err := server.Serve(strings.NewReader(input), &out); err != nil {
@@ -251,6 +252,13 @@ func TestFindingExplainReportChangesAndPolicyTool(t *testing.T) {
 	policyReport := toolJSON(t, responses[5])
 	if policyReport["schema_version"] == nil {
 		t.Fatalf("expected policy report JSON, got %#v", policyReport)
+	}
+	compactPolicyReport := toolJSON(t, responses[6])
+	if compactPolicyReport["summary"] == nil || compactPolicyReport["threshold"] == nil {
+		t.Fatalf("expected compact policy summary, got %#v", compactPolicyReport)
+	}
+	if _, ok := compactPolicyReport["ignored"]; ok {
+		t.Fatalf("compact policy should omit full ignored policy detail, got %#v", compactPolicyReport)
 	}
 }
 

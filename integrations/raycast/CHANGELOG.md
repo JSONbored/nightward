@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Use compact menu-bar status markers such as `3C` and move detailed counts into the dropdown.
+- Add scoped finding and rule fix-plan copy actions plus reviewed-policy-ignore snippets.
+- Redact additional provider token-shaped values in Raycast-rendered text.
+
 ## 0.1.0
 
 - Add read-only Dashboard, Findings, Explain Finding, Export Fix Plan, and Open Reports commands.

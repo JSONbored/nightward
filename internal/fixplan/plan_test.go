@@ -29,6 +29,7 @@ func TestBuildGroupsFixStatusesAndRedacts(t *testing.T) {
 				RequiresReview: true,
 				FixSummary:     "Pin the package.",
 				FixSteps:       []string{"Change the package arg to an explicit version."},
+				PatchHint:      &inventory.PatchHint{Kind: inventory.FixPinPackage, Package: "mcp-remote"},
 			},
 			{
 				ID:             "mcp_server_review-222222222222",
@@ -58,6 +59,9 @@ func TestBuildGroupsFixStatusesAndRedacts(t *testing.T) {
 	if plan.Summary.Total != 3 || plan.Summary.Safe != 1 || plan.Summary.Review != 1 || plan.Summary.Blocked != 1 {
 		t.Fatalf("unexpected summary: %#v", plan.Summary)
 	}
+	if len(plan.Groups) != 1 || plan.Groups[0].Package != "mcp-remote" || plan.Groups[0].Count != 1 {
+		t.Fatalf("expected package group: %#v", plan.Groups)
+	}
 
 	data, err := json.Marshal(plan)
 	if err != nil {
@@ -68,8 +72,49 @@ func TestBuildGroupsFixStatusesAndRedacts(t *testing.T) {
 	}
 
 	markdown := Markdown(plan)
-	if !strings.Contains(markdown, "Nightward Fix Plan") || !strings.Contains(markdown, "Pin the package.") {
+	if !strings.Contains(markdown, "Nightward Fix Plan") || !strings.Contains(markdown, "Grouped Review") || !strings.Contains(markdown, "Pin mcp-remote") || !strings.Contains(markdown, "Pin the package.") {
 		t.Fatalf("unexpected markdown export:\n%s", markdown)
+	}
+}
+
+func TestBuildGroupsRepeatedPackagePins(t *testing.T) {
+	report := inventory.Report{Findings: []inventory.Finding{
+		{
+			ID:           "pin-a",
+			Tool:         "Cursor",
+			Path:         "/tmp/mcp.json",
+			Server:       "a",
+			Severity:     inventory.RiskHigh,
+			Rule:         "mcp_unpinned_package",
+			FixAvailable: true,
+			FixKind:      inventory.FixPinPackage,
+			PatchHint:    &inventory.PatchHint{Kind: inventory.FixPinPackage, Package: "mcp-remote"},
+			FixSummary:   "Pin mcp-remote.",
+		},
+		{
+			ID:           "pin-b",
+			Tool:         "Cursor",
+			Path:         "/tmp/mcp.json",
+			Server:       "b",
+			Severity:     inventory.RiskHigh,
+			Rule:         "mcp_unpinned_package",
+			FixAvailable: true,
+			FixKind:      inventory.FixPinPackage,
+			PatchHint:    &inventory.PatchHint{Kind: inventory.FixPinPackage, Package: "mcp-remote"},
+			FixSummary:   "Pin mcp-remote.",
+		},
+	}}
+
+	plan := Build(report, Selector{All: true})
+	if len(plan.Groups) != 1 {
+		t.Fatalf("expected one group, got %#v", plan.Groups)
+	}
+	group := plan.Groups[0]
+	if group.Count != 2 || group.Package != "mcp-remote" || len(group.FindingIDs) != 2 || len(group.Servers) != 2 {
+		t.Fatalf("unexpected package group: %#v", group)
+	}
+	if markdown := Markdown(plan); !strings.Contains(markdown, "`Pin mcp-remote` (2 findings)") {
+		t.Fatalf("markdown did not summarize grouped pins:\n%s", markdown)
 	}
 }
 

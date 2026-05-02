@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   analysisReport,
   explainFinding,
+  exportFixPlanMarkdown,
+  fixPlan,
   normalizePreferences,
   providersDoctor,
   reportsDir,
@@ -215,6 +217,50 @@ test("provider doctor reflects selected providers and online preference", async 
     "socket",
     "--online",
     "--json",
+  ]);
+});
+
+test("fix plan helpers pass scoped selectors", async () => {
+  const observed: string[][] = [];
+  const options: RuntimeOptions = {
+    executable: "nightward",
+    allowOnlineProviders: false,
+    timeoutMs: 1000,
+    execFileImpl: (_file, args, _options, callback) => {
+      observed.push(args);
+      if (args.includes("export")) {
+        callback(null, "# Nightward Fix Plan\n", "");
+        return;
+      }
+      callback(
+        null,
+        JSON.stringify({
+          generated_at: "2026-05-01T00:00:00Z",
+          summary: { total: 0, safe: 0, review: 0, blocked: 0 },
+          fixes: [],
+        }),
+        "",
+      );
+    },
+  };
+
+  await fixPlan(options, { rule: "mcp_unpinned_package" });
+  await exportFixPlanMarkdown(options, { findingId: "finding-123" });
+
+  assert.deepEqual(observed[0], [
+    "fix",
+    "plan",
+    "--rule",
+    "mcp_unpinned_package",
+    "--json",
+  ]);
+  assert.deepEqual(observed[1], [
+    "fix",
+    "export",
+    "--finding",
+    "finding-123",
+    "--format",
+    "markdown",
   ]);
 });
 

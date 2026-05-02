@@ -20,6 +20,11 @@ The server exposes Nightward context to AI tools without opening a network liste
 | `nightward_report_changes` | Compare the latest two saved report JSON files. |
 | `nightward_policy_check` | Run the policy gate with optional offline analysis. |
 
+For chat-oriented policy checks, pass `compact: true` to
+`nightward_policy_check`. Compact mode returns pass/fail, threshold, summary
+counts, and bounded violation metadata without flooding the client with every
+full finding.
+
 ## Resources
 
 - `nightward://rules`
@@ -52,5 +57,7 @@ Claude Code and other local AI clients can use the same command/args shape when 
 - No live config mutation or schedule install/remove tools.
 - Tool output is bounded and redacted before it reaches the MCP client.
 - Tool failures are returned as MCP tool results with `isError`, so the client can show the error without treating it as a protocol failure.
+- Compact policy output is available for quick AI-client status checks; full
+  policy output remains available for local review.
 
 Use explicit CLI commands such as `nw analyze --with trivy --online --json` outside MCP when you intentionally want online provider execution.

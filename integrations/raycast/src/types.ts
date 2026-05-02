@@ -205,12 +205,29 @@ export type FixPlan = {
     review: number;
     blocked: number;
   };
+  groups?: Array<{
+    key: string;
+    label: string;
+    rule: string;
+    fix_kind?: FixKind;
+    package?: string;
+    severity: RiskLevel;
+    status: "safe" | "review" | "blocked";
+    count: number;
+    finding_ids: string[];
+    paths?: string[];
+    servers?: string[];
+    summary: string;
+    steps?: string[];
+  }>;
   fixes: Array<{
     finding_id: string;
     tool: string;
     path: string;
+    server?: string;
     severity: RiskLevel;
     rule: string;
+    package?: string;
     fix_available: boolean;
     fix_kind?: FixKind;
     confidence?: string;

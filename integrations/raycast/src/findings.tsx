@@ -1,11 +1,15 @@
 import {
   Action,
   ActionPanel,
+  Clipboard,
   Color,
   Detail,
   Icon,
   List,
   getPreferenceValues,
+  showHUD,
+  showToast,
+  Toast,
 } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
 import { useState } from "react";
@@ -15,10 +19,16 @@ import {
   findingMarkdown,
   findingSubtitle,
   findingTitle,
+  policyIgnoreSnippet,
+  redactText,
   severityColor,
   sortedFindings,
 } from "./format";
-import { findings, normalizePreferences } from "./nightward";
+import {
+  exportFixPlanMarkdown,
+  findings,
+  normalizePreferences,
+} from "./nightward";
 import type { Finding, RiskLevel } from "./types";
 
 const docsUrl =
@@ -162,24 +172,80 @@ function FindingActions({
   finding: Finding;
   onRefresh: () => void;
 }) {
+  const runtime = normalizePreferences(getPreferenceValues());
   const firstStep = finding.fix_steps?.[0] ?? finding.recommended_action;
   return (
     <ActionPanel>
-      <Action.CopyToClipboard title="Copy Finding ID" content={finding.id} />
-      <Action.CopyToClipboard
-        title="Copy Recommended Action"
-        content={firstStep}
-      />
-      <Action.CopyToClipboard title="Copy Path" content={finding.path} />
-      {finding.docs_url ? (
-        <Action.OpenInBrowser
-          title="Open Finding Docs"
-          url={finding.docs_url}
+      <ActionPanel.Section title="Review">
+        <Action.CopyToClipboard title="Copy Finding ID" content={finding.id} />
+        <Action.CopyToClipboard
+          title="Copy Recommended Action"
+          content={redactText(firstStep)}
         />
-      ) : (
-        <Action.OpenInBrowser title="Open Remediation Docs" url={docsUrl} />
-      )}
-      <Action title="Refresh" icon={Icon.ArrowClockwise} onAction={onRefresh} />
+        <Action.CopyToClipboard title="Copy Path" content={finding.path} />
+        <Action.CopyToClipboard
+          title="Copy Reviewed Policy Ignore Snippet"
+          icon={Icon.CheckCircle}
+          content={policyIgnoreSnippet(finding)}
+        />
+      </ActionPanel.Section>
+      <ActionPanel.Section title="Plan-Only Remediation">
+        <Action
+          title="Copy Fix Plan for Finding"
+          icon={Icon.Document}
+          onAction={async () =>
+            copyFixPlan(
+              runtime,
+              { findingId: finding.id },
+              "Copied finding fix plan",
+            )
+          }
+        />
+        <Action
+          title="Copy Fix Plan for Rule"
+          icon={Icon.List}
+          onAction={async () =>
+            copyFixPlan(runtime, { rule: finding.rule }, "Copied rule fix plan")
+          }
+        />
+      </ActionPanel.Section>
+      <ActionPanel.Section title="Open">
+        <Action.CopyToClipboard
+          title="Copy Redacted Evidence"
+          content={redactText(finding.evidence ?? "")}
+        />
+        {finding.docs_url ? (
+          <Action.OpenInBrowser
+            title="Open Finding Docs"
+            url={finding.docs_url}
+          />
+        ) : (
+          <Action.OpenInBrowser title="Open Remediation Docs" url={docsUrl} />
+        )}
+        <Action
+          title="Refresh"
+          icon={Icon.ArrowClockwise}
+          onAction={onRefresh}
+        />
+      </ActionPanel.Section>
     </ActionPanel>
   );
+}
+
+async function copyFixPlan(
+  runtime: ReturnType<typeof normalizePreferences>,
+  selector: { findingId?: string; rule?: string },
+  message: string,
+) {
+  try {
+    await Clipboard.copy(await exportFixPlanMarkdown(runtime, selector));
+    await showHUD(message);
+  } catch (error) {
+    await showToast({
+      style: Toast.Style.Failure,
+      title: "Could not export fix plan",
+      message:
+        error instanceof Error ? error.message : "Unknown Nightward error",
+    });
+  }
 }

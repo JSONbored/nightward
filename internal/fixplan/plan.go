@@ -27,6 +27,7 @@ type Plan struct {
 	SchemaVersion int       `json:"schema_version"`
 	GeneratedAt   time.Time `json:"generated_at"`
 	Summary       Summary   `json:"summary"`
+	Groups        []Group   `json:"groups,omitempty"`
 	Fixes         []Fix     `json:"fixes"`
 }
 
@@ -41,8 +42,10 @@ type Fix struct {
 	FindingID      string              `json:"finding_id"`
 	Tool           string              `json:"tool"`
 	Path           string              `json:"path"`
+	Server         string              `json:"server,omitempty"`
 	Severity       inventory.RiskLevel `json:"severity"`
 	Rule           string              `json:"rule"`
+	Package        string              `json:"package,omitempty"`
 	FixAvailable   bool                `json:"fix_available"`
 	FixKind        inventory.FixKind   `json:"fix_kind,omitempty"`
 	Confidence     string              `json:"confidence,omitempty"`
@@ -54,6 +57,22 @@ type Fix struct {
 	Evidence       string              `json:"evidence,omitempty"`
 	Impact         string              `json:"impact,omitempty"`
 	Why            string              `json:"why_this_matters,omitempty"`
+}
+
+type Group struct {
+	Key        string              `json:"key"`
+	Label      string              `json:"label"`
+	Rule       string              `json:"rule"`
+	FixKind    inventory.FixKind   `json:"fix_kind,omitempty"`
+	Package    string              `json:"package,omitempty"`
+	Severity   inventory.RiskLevel `json:"severity"`
+	Status     Status              `json:"status"`
+	Count      int                 `json:"count"`
+	FindingIDs []string            `json:"finding_ids"`
+	Paths      []string            `json:"paths,omitempty"`
+	Servers    []string            `json:"servers,omitempty"`
+	Summary    string              `json:"summary"`
+	Steps      []string            `json:"steps,omitempty"`
 }
 
 func Build(report inventory.Report, selector Selector) Plan {
@@ -74,6 +93,7 @@ func Build(report inventory.Report, selector Selector) Plan {
 			plan.Summary.Blocked++
 		}
 	}
+	plan.Groups = groupFixes(plan.Fixes)
 	sort.Slice(plan.Fixes, func(i, j int) bool {
 		if plan.Fixes[i].Status == plan.Fixes[j].Status {
 			if plan.Fixes[i].Severity == plan.Fixes[j].Severity {
@@ -113,11 +133,28 @@ func Markdown(plan Plan) string {
 		b.WriteString("No fixes matched the selected findings.\n")
 		return b.String()
 	}
+	if len(plan.Groups) > 0 {
+		b.WriteString("## Grouped Review\n\n")
+		for _, group := range plan.Groups {
+			fmt.Fprintf(&b, "- `%s` (%d finding", group.Label, group.Count)
+			if group.Count != 1 {
+				b.WriteString("s")
+			}
+			fmt.Fprintf(&b, "): %s\n", group.Summary)
+		}
+		b.WriteString("\n")
+	}
 	for _, fix := range plan.Fixes {
 		fmt.Fprintf(&b, "## %s\n\n", fix.FindingID)
 		fmt.Fprintf(&b, "- Tool: `%s`\n", fix.Tool)
 		fmt.Fprintf(&b, "- Path: `%s`\n", fix.Path)
+		if fix.Server != "" {
+			fmt.Fprintf(&b, "- Server: `%s`\n", fix.Server)
+		}
 		fmt.Fprintf(&b, "- Rule: `%s`\n", fix.Rule)
+		if fix.Package != "" {
+			fmt.Fprintf(&b, "- Package: `%s`\n", fix.Package)
+		}
 		fmt.Fprintf(&b, "- Severity: `%s`\n", fix.Severity)
 		fmt.Fprintf(&b, "- Status: `%s`\n", fix.Status)
 		if fix.FixKind != "" {
@@ -172,8 +209,10 @@ func fromFinding(finding inventory.Finding) Fix {
 		FindingID:      finding.ID,
 		Tool:           finding.Tool,
 		Path:           finding.Path,
+		Server:         finding.Server,
 		Severity:       finding.Severity,
 		Rule:           finding.Rule,
+		Package:        patchPackage(finding),
 		FixAvailable:   finding.FixAvailable,
 		FixKind:        finding.FixKind,
 		Confidence:     finding.Confidence,
@@ -186,6 +225,129 @@ func fromFinding(finding inventory.Finding) Fix {
 		Impact:         finding.Impact,
 		Why:            finding.Why,
 	}
+}
+
+func patchPackage(finding inventory.Finding) string {
+	if finding.PatchHint == nil {
+		return ""
+	}
+	return finding.PatchHint.Package
+}
+
+func groupFixes(fixes []Fix) []Group {
+	byKey := map[string]*Group{}
+	for _, fix := range fixes {
+		key := fixGroupKey(fix)
+		if key == "" {
+			continue
+		}
+		group, ok := byKey[key]
+		if !ok {
+			group = &Group{
+				Key:      key,
+				Label:    fixGroupLabel(fix),
+				Rule:     fix.Rule,
+				FixKind:  fix.FixKind,
+				Package:  fix.Package,
+				Severity: fix.Severity,
+				Status:   fix.Status,
+				Summary:  fixGroupSummary(fix),
+				Steps:    fixGroupSteps(fix),
+			}
+			byKey[key] = group
+		}
+		group.Count++
+		group.FindingIDs = appendUnique(group.FindingIDs, fix.FindingID)
+		group.Paths = appendUnique(group.Paths, fix.Path)
+		group.Servers = appendUnique(group.Servers, fix.Server)
+		if riskRank(fix.Severity) > riskRank(group.Severity) {
+			group.Severity = fix.Severity
+		}
+		if statusRank(fix.Status) > statusRank(group.Status) {
+			group.Status = fix.Status
+		}
+	}
+	groups := make([]Group, 0, len(byKey))
+	for _, group := range byKey {
+		sort.Strings(group.FindingIDs)
+		sort.Strings(group.Paths)
+		sort.Strings(group.Servers)
+		groups = append(groups, *group)
+	}
+	sort.Slice(groups, func(i, j int) bool {
+		if groups[i].Count == groups[j].Count {
+			return groups[i].Key < groups[j].Key
+		}
+		return groups[i].Count > groups[j].Count
+	})
+	return groups
+}
+
+func fixGroupKey(fix Fix) string {
+	switch {
+	case fix.Rule == "mcp_unpinned_package" && fix.Package != "":
+		return "package:" + fix.Package
+	case fix.Rule == "mcp_local_endpoint":
+		return "local-endpoint:" + fix.Tool
+	case fix.Rule == "mcp_broad_filesystem":
+		return "filesystem-scope:" + fix.Tool
+	default:
+		return ""
+	}
+}
+
+func fixGroupLabel(fix Fix) string {
+	switch {
+	case fix.Rule == "mcp_unpinned_package" && fix.Package != "":
+		return "Pin " + fix.Package
+	case fix.Rule == "mcp_local_endpoint":
+		return fix.Tool + " local endpoints"
+	case fix.Rule == "mcp_broad_filesystem":
+		return fix.Tool + " filesystem scope"
+	default:
+		return fix.Rule
+	}
+}
+
+func fixGroupSummary(fix Fix) string {
+	switch {
+	case fix.Rule == "mcp_unpinned_package" && fix.Package != "":
+		return "Choose one reviewed version and apply it consistently anywhere this package executor is used."
+	case fix.Rule == "mcp_local_endpoint":
+		return "Move machine-local service assumptions into an ignored local overlay or document them as prerequisites."
+	case fix.Rule == "mcp_broad_filesystem":
+		return "Replace broad filesystem arguments with explicit reviewed paths."
+	default:
+		return fix.Summary
+	}
+}
+
+func fixGroupSteps(fix Fix) []string {
+	switch {
+	case fix.Rule == "mcp_unpinned_package" && fix.Package != "":
+		return []string{
+			"Pick a reviewed package version once.",
+			"Replace each matching package token with the same pinned version.",
+			"Rerun `nw findings list --json` and confirm the grouped unpinned-package findings are gone.",
+		}
+	case len(fix.Steps) > 0:
+		return append([]string(nil), fix.Steps...)
+	default:
+		return nil
+	}
+}
+
+func appendUnique(values []string, value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return values
+	}
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
+	}
+	return append(values, value)
 }
 
 func statusRank(status Status) int {
