@@ -11,21 +11,22 @@ COVERAGE_THRESHOLD ?= 83.0
 RAYCAST_DIR ?= integrations/raycast
 NPM_PACKAGE_DIR ?= packages/npm
 SITE_DIR ?= site
+OPENTUI_DIR ?= packages/tui
 GO_PACKAGES ?= $(shell go list ./cmd/... ./internal/... ./tools/...)
 COVERAGE_PACKAGES ?= ./internal/...
 
-.PHONY: test test-fast test-security test-ux test-release test-local test-prepush test-release-install test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke fuzz-test coverage coverage-check go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-store-check raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify docs-reference docs-reference-check docs-freshness docs-qa site-install site-audit site-build site-verify tui-demo demo-assets tool-syft release-snapshot verify build install-local clean-reports
+.PHONY: test test-fast test-security test-ux test-release test-local test-prepush test-release-install test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke fuzz-test coverage coverage-check go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-store-check raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify opentui-install opentui-test opentui-build opentui-sidecars opentui-verify opentui-demo docs-reference docs-reference-check docs-freshness docs-qa site-install site-audit site-build site-verify demo-assets tool-syft release-snapshot verify build install-local clean-reports
 
 test:
 	go test $(GO_PACKAGES)
 
-test-fast: test npm-package-test raycast-test
+test-fast: test npm-package-test raycast-test opentui-test
 
 test-security: vet staticcheck gosec gitleaks govulncheck npm-package-audit raycast-audit site-audit
 
-test-ux: raycast-verify site-verify
+test-ux: raycast-verify opentui-verify site-verify
 
-test-release: ci-scripts-test npm-package-verify raycast-build site-build release-snapshot
+test-release: ci-scripts-test npm-package-verify raycast-build opentui-sidecars site-build release-snapshot
 
 test-local: verify
 
@@ -128,6 +129,24 @@ npm-package-pack:
 
 npm-package-verify: npm-package-install npm-package-test npm-package-audit npm-package-pack
 
+opentui-install:
+	cd $(OPENTUI_DIR) && bun install --frozen-lockfile
+
+opentui-test: opentui-install
+	cd $(OPENTUI_DIR) && bun test
+
+opentui-build: opentui-install
+	cd $(OPENTUI_DIR) && bun run build && bun run compile
+
+opentui-sidecars: opentui-install
+	cd $(OPENTUI_DIR) && bun run sidecars
+
+opentui-verify: opentui-test opentui-build
+
+opentui-demo:
+	PATH="$(HOME)/go/bin:$(PATH)" vhs docs/demo/nightward-opentui.tape
+	ffmpeg -y -ss 00:00:01.05 -i site/public/demo/nightward-opentui.gif -frames:v 1 -update 1 site/public/demo/nightward-opentui.png
+
 site-install:
 	cd $(SITE_DIR) && npm ci --ignore-scripts --no-audit
 
@@ -150,28 +169,26 @@ docs-qa: docs-reference-check docs-freshness
 
 site-verify: docs-qa site-install site-audit site-build
 
-tui-demo:
-	PATH="$(HOME)/go/bin:$(PATH)" vhs docs/demo/nightward-tui.tape
-
 demo-assets:
 	node scripts/generate-demo-assets.mjs
 
 tool-syft:
 	go install github.com/anchore/syft/cmd/syft@$(SYFT_VERSION)
 
-release-snapshot: tool-syft
+release-snapshot: tool-syft opentui-sidecars
 	PATH="$$(go env GOPATH)/bin:$$PATH" go run github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION) release --snapshot --clean --skip=publish,sign
 
-verify: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage-check test-junit trunk-flaky-validate trunk-check ci-scripts-test raycast-audit raycast-lint raycast-build npm-package-verify site-verify
+verify: test test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke coverage-check test-junit trunk-flaky-validate trunk-check ci-scripts-test raycast-audit raycast-lint raycast-build npm-package-verify opentui-verify site-verify
 
-build:
+build: opentui-build
 	go build -o bin/nightward ./cmd/nightward
 	go build -o bin/nw ./cmd/nw
 
-install-local:
+install-local: build
 	mkdir -p $(PREFIX)/bin
-	go build -o $(PREFIX)/bin/nightward ./cmd/nightward
-	go build -o $(PREFIX)/bin/nw ./cmd/nw
+	install -m 0755 bin/nightward $(PREFIX)/bin/nightward
+	install -m 0755 bin/nw $(PREFIX)/bin/nw
+	install -m 0755 bin/nightward-tui $(PREFIX)/bin/nightward-tui
 
 clean-reports:
 	rm -rf $(REPORTS_DIR)

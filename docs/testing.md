@@ -66,8 +66,8 @@ make verify
 - Golden-style tests should stay stable for JSON/SARIF shape, not timestamps or host-specific paths. Scan-summary goldens must keep item buckets separate from finding buckets.
 - MCP fixture tests should cover command servers, URL-shaped servers, sensitive headers, local endpoints, and unsupported shapes.
 - Scheduler tests verify generated launchd, systemd user timer, and cron text without installing schedules.
-- TUI action tests cover clipboard/open command construction and private redacted fix-plan exports.
-- TUI model tests cover tab switching, search, filters, help, cursor clamping, dashboard report history, what-next guidance, wide detail panes, compact terminal rendering, and redaction.
+- TUI launcher tests cover the Go-to-OpenTUI handoff, private review-bundle generation, and missing-sidecar errors.
+- OpenTUI tests live under `packages/tui`, run with `bun test`, and are part of `make verify` through `make opentui-verify`.
 - Scheduler tests cover report history ordering, finding counts, non-report filtering, and symlink skipping without installing timers.
 - Raycast extension tests cover pure redaction/formatting helpers and safe command execution wrappers.
 - `go vet`, `staticcheck`, `gosec`, `gitleaks`, `govulncheck`, and fuzz tests are part of the local verification bar. `#nosec` comments must include a narrow reason tied to an intentional local CLI behavior.
@@ -144,7 +144,7 @@ The launcher must remain dependency-light, avoid `postinstall`, and verify downl
 Most repository checks are centralized behind `make verify` and the suite aliases above. The remaining loose commands are intentionally not part of the default gate because they require a browser, a published release, or manual UI evidence:
 
 - `make demo-assets` regenerates fixture-only sample JSON, HTML, report screenshot, and social preview assets. It requires Chrome, Chromium, Brave, or `NIGHTWARD_CHROME`.
-- `vhs docs/demo/nightward-tui.tape` regenerates the fixture-only TUI GIF after copying `testdata/homes/policy` into `/tmp/nightward-fixture-home`. It requires VHS and `ttyd`.
+- `make opentui-demo` regenerates the fixture-only OpenTUI GIF and PNG still. It requires Bun, VHS, `ttyd`, and `ffmpeg`.
 - `make test-release-install VERSION=<version>` verifies a published GitHub/npm release after artifacts exist.
 - `npm run dev` under `integrations/raycast` is the local Raycast UI smoke path and should be paired with fixture-only evidence in `docs/screenshots.md`.
 

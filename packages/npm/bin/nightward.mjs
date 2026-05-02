@@ -25,6 +25,9 @@ export function targetFor(platform = osPlatform(), arch = process.arch) {
   if (!os || !cpu) {
     throw new Error(`unsupported platform: ${platform}/${arch}`);
   }
+  if (os === "windows" && cpu === "arm64") {
+    throw new Error(`unsupported platform: ${platform}/${arch}`);
+  }
   return { os, arch: cpu, extension: os === "windows" ? ".zip" : ".tar.gz" };
 }
 

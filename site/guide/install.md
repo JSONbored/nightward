@@ -22,13 +22,14 @@ Nightward uses signed [GitHub Releases](https://github.com/JSONbored/nightward/r
 | npm launcher | Fast trial, `npx`, Raycast users, JavaScript-heavy machines | `npx @jsonbored/nightward scan` |
 | npm global | Everyday CLI/TUI use | `npm install -g @jsonbored/nightward` |
 | GitHub Releases | Manual verification and pinned binary installs | Download from [Releases](https://github.com/JSONbored/nightward/releases) |
-| Go install | Go users who want to build from module source | `go install github.com/jsonbored/nightward/cmd/nw@latest` |
+| Go install | Go users who want non-interactive CLI commands from module source | `go install github.com/jsonbored/nightward/cmd/nw@latest` |
 | Source checkout | Nightward development | `make install-local` |
 
 The installed commands are:
 
 - `nightward`: canonical project command.
 - `nw`: short alias for frequent terminal/TUI use.
+- `nightward-tui`: OpenTUI renderer sidecar used by the default interactive app.
 
 ## npm Launcher
 
@@ -41,6 +42,8 @@ nw scan --json
 ```
 
 The launcher has no `postinstall` script. On first run it downloads the matching GitHub Release archive, verifies its SHA-256 from `checksums.txt`, caches the extracted binaries, and executes `nightward` or `nw`.
+
+Published release archives currently cover macOS arm64/amd64, Linux arm64/amd64, and Windows amd64. Windows ARM64 is deferred until the OpenTUI sidecar has a supported compile target.
 
 ## GitHub Releases
 
@@ -62,7 +65,7 @@ cd nightward
 make install-local
 ```
 
-This installs `nightward` and `nw` into `~/.local/bin` by default.
+This installs `nightward`, `nw`, and `nightward-tui` into `~/.local/bin` by default.
 
 ## Channels
 
@@ -70,7 +73,7 @@ This installs `nightward` and `nw` into `~/.local/bin` by default.
 | --- | --- | --- |
 | GitHub Releases | Shipped | Canonical signed release artifacts. |
 | npm launcher | Shipped | No `postinstall`; verifies GitHub Release checksums. |
-| `go install` | Shipped | Useful for Go-native workflows. |
+| `go install` | Shipped | Useful for Go-native workflows. Non-interactive commands work from source builds; the OpenTUI app needs `nightward-tui` from a release archive or `NIGHTWARD_TUI_BIN`. |
 | Trunk plugin import | Shipped | Pin to a Nightward release tag or SHA. |
 | GitHub Action tags | Shipped | Use for policy/SARIF checks in CI. |
 | Homebrew tap | Planned next | Best next macOS distribution channel. |

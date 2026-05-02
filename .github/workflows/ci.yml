@@ -228,6 +228,24 @@ jobs:
         run: npm run pack:dry-run
         working-directory: packages/npm
 
+  opentui:
+    name: OpenTUI sidecar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 24
+
+      - name: Install Bun
+        run: npm install --global bun@1.2.21
+
+      - name: Test OpenTUI package
+        run: make opentui-verify
+
   site:
     name: Documentation site
     runs-on: ubuntu-latest
@@ -337,6 +355,14 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 24
+
+      - name: Install Bun
+        run: npm install --global bun@1.2.21
 
       - name: Run GoReleaser snapshot
         run: make release-snapshot

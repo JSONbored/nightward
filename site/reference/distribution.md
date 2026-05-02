@@ -8,7 +8,7 @@ Nightward v0.1.4 is distributed through signed GitHub Releases and the npm launc
 | --- | --- | --- |
 | [GitHub Releases](https://github.com/JSONbored/nightward/releases) | Shipped | Canonical signed artifacts, checksums, and release notes. |
 | [npm launcher](https://www.npmjs.com/package/@jsonbored/nightward) | Shipped | No `postinstall`; verifies GitHub Release checksums before caching binaries. |
-| `go install` | Shipped | Useful for Go users who already trust `github.com/jsonbored/nightward`. |
+| `go install` | Shipped | Useful for Go users who already trust `github.com/jsonbored/nightward`. Non-interactive commands work from source builds; the OpenTUI app needs `nightward-tui` from a release archive or `NIGHTWARD_TUI_BIN`. |
 | [GitHub Action](/integrations/github-action) | Shipped | Uses release tags for CI policy/SARIF workflows. |
 | [Trunk plugin import](/integrations/trunk) | Shipped | Imports the in-repo plugin from release tags. |
 | [Raycast extension](/integrations/raycast) | Development-ready | Local Raycast extension commands and menu-bar status; store PR still pending. |

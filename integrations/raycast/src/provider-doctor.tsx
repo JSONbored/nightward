@@ -1,10 +1,12 @@
 import {
   Action,
   ActionPanel,
+  Alert,
   Clipboard,
   Color,
   Icon,
   List,
+  confirmAlert,
   getPreferenceValues,
   openExtensionPreferences,
   open,
@@ -13,6 +15,7 @@ import {
   Toast,
 } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
+import { execFile } from "node:child_process";
 import { useEffect, useMemo, useState } from "react";
 import { normalizePreferences, providersDoctor } from "./nightward";
 import { installInfoForProvider, isOnlineProvider } from "./provider-options";
@@ -205,13 +208,28 @@ function ProviderItem({
           {installInfo ? (
             <ActionPanel.Section title="Install">
               {installCommand ? (
-                <Action
-                  title="Copy Install Command"
-                  icon={Icon.Terminal}
-                  onAction={() =>
-                    void copyInstallCommand(provider.name, installCommand)
-                  }
-                />
+                <>
+                  {!provider.available ? (
+                    <Action
+                      title="Install Provider"
+                      icon={Icon.Download}
+                      onAction={() =>
+                        void installProvider(
+                          provider.name,
+                          installCommand,
+                          onRefresh,
+                        )
+                      }
+                    />
+                  ) : null}
+                  <Action
+                    title="Copy Install Command"
+                    icon={Icon.Terminal}
+                    onAction={() =>
+                      void copyInstallCommand(provider.name, installCommand)
+                    }
+                  />
+                </>
               ) : null}
               <Action
                 title="Open Install Docs"
@@ -302,6 +320,43 @@ function providerMarkdown(
 async function copyInstallCommand(provider: string, command: string) {
   await Clipboard.copy(command);
   await showHUD(`Copied ${provider} install command`);
+}
+
+async function installProvider(
+  provider: string,
+  command: string,
+  onRefresh: () => void,
+) {
+  const confirmed = await confirmAlert({
+    title: `Install ${provider}?`,
+    message: `Raycast will run: ${command}`,
+    primaryAction: {
+      title: "Install",
+      style: Alert.ActionStyle.Default,
+    },
+  });
+  if (!confirmed) return;
+
+  const toast = await showToast({
+    style: Toast.Style.Animated,
+    title: `Installing ${provider}`,
+    message: command,
+  });
+  execFile("/bin/zsh", ["-lc", command], (error, stdout, stderr) => {
+    if (error) {
+      void showToast({
+        style: Toast.Style.Failure,
+        title: `Could not install ${provider}`,
+        message: (stderr || error.message).trim().slice(0, 180),
+      });
+      return;
+    }
+    toast.style = Toast.Style.Success;
+    toast.title = `${provider} installed`;
+    toast.message =
+      stdout.trim().slice(0, 180) || "Provider is ready to refresh.";
+    onRefresh();
+  });
 }
 
 async function toggleProvider(

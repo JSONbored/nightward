@@ -34,7 +34,7 @@ The sample below is generated from the committed fixture home at [testdata/homes
 
 - [Scrubbed sample scan JSON](site/public/demo/nightward-sample-scan.json)
 - [Static HTML report](site/public/demo/nightward-sample-report.html)
-- [Fixture TUI GIF](site/public/demo/nightward-tui.gif)
+- [OpenTUI walkthrough GIF](site/public/demo/nightward-opentui.gif)
 - Regenerate with `make demo-assets` using Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`
 
 ```mermaid
@@ -65,13 +65,13 @@ Nightward answers the practical questions first:
 
 ## Highlights
 
-- Bubble Tea/Bubbles TUI with dashboard, inventory, findings, analysis, fix plan, and backup preview tabs.
+- OpenTUI interactive app with dashboard, findings, analysis, fix plan, inventory, backup preview, and help sections.
 - `nightward` canonical command plus `nw` short alias.
 - Redacted JSON for automation and CI.
 - HOME scanning for local machines and `--workspace` scanning for CI, Trunk, and dotfiles repos.
 - MCP findings for unpinned package execution, shell wrappers, sensitive env keys, sensitive headers, local endpoints, broad filesystem access, token paths, parse failures, and unknown server shapes.
 - Offline analysis signals for supply-chain, secret exposure, filesystem scope, network exposure, execution risk, machine-local, and app-owned state review.
-- Optional provider framework for local and online-capable tools; providers never auto-install and online-capable providers stay blocked unless explicitly enabled.
+- Optional provider framework for local and online-capable tools; CLI providers never auto-install and online-capable providers stay blocked unless explicitly enabled.
 - Scan summaries separate inventory buckets from finding buckets: item classification/risk/tool counts are distinct from finding severity/rule/tool counts.
 - Plan-only remediation metadata: fix kind, confidence, risk, review requirement, impact, and steps.
 - SARIF output for GitHub code scanning.
@@ -83,7 +83,7 @@ Nightward answers the practical questions first:
 - Read-only Raycast extension for Dashboard, Findings, Analysis, Provider Doctor, Explain Finding/Signal, Fix Plan/Analysis export, and report-folder access.
 - Read-only stdio MCP server for AI clients that need local scan, finding, rule, provider, policy, and fix-plan context.
 - User-level nightly scan scheduling for macOS launchd, Linux systemd user timers, and cron text fallback.
-- No telemetry, no cloud dashboard, no network calls from Nightward runtime, and no live config mutation.
+- No telemetry, no cloud dashboard, no default network calls from Nightward runtime, and no live config mutation.
 - OpenSSF-oriented project hygiene: DCO, governance docs, threat model, coverage gate, pinned CI actions, release snapshot checks, signed release configuration, and security reporting policy.
 
 > [!TIP]
@@ -99,6 +99,7 @@ This installs:
 
 - `nightward`: canonical project command
 - `nw`: short alias for frequent terminal/TUI use
+- `nightward-tui`: OpenTUI renderer sidecar used by the default interactive app
 
 Install the release-gated npm launcher:
 
@@ -306,24 +307,20 @@ The default `nightward` / `nw` command opens the TUI:
 - Fix Plan: safe/review/blocked remediation groups
 - Backup Plan: private-dotfiles dry-run preview
 
-The TUI uses Bubble Tea with Bubbles table, viewport, help, and text input components so lists, filters, and detail panes stay stable at different terminal sizes. Each tab has a distinct accent color that carries into the panel border and selected table row, making dashboard, inventory, findings, analysis, fix-plan, and backup review states easier to distinguish at a glance.
+The TUI is an OpenTUI sidecar backed by the Go scanner engine. The Go binary writes a private, redacted review bundle, then launches `nightward-tui` so the interface can use richer panels, color, and navigation without reimplementing scanner logic.
 
 Keyboard shortcuts:
 
-- `1`-`6`: switch tabs
+- `1`-`7`: switch sections
 - arrow keys or `h`/`j`/`k`/`l`: navigate
 - `/`: search findings
-- `s`, `t`, `r`: cycle finding severity, tool, and rule filters
-- `x`: clear finding filters
-- `c`: copy the selected path, recommendation, or fix step to the clipboard
-- `e`: export a redacted fix plan to `~/.local/state/nightward/exports`
-- `o`: open remediation docs for the selected finding or fix
-- `?`: help
+- `s`: cycle severity
+- `x`: clear filters
 - `q` or `esc`: quit
 
 Fixture-only TUI demo:
 
-![Nightward TUI fixture walkthrough](site/public/demo/nightward-tui.gif)
+![Nightward OpenTUI fixture walkthrough](site/public/demo/nightward-opentui.gif)
 
 ## MCP Server
 
@@ -402,7 +399,7 @@ Commands:
 - `Export Nightward Analysis`
 - `Open Nightward Reports`
 
-The extension shells out to `nw` or `nightward`, renders redacted output, copies explicitly requested exports, and opens the local reports folder. Provider Doctor can enable/disable provider selection for Raycast Analysis and show install commands/docs for missing local tools, but it does not run package managers, mutate agent configs, or install schedules.
+The extension shells out to `nw` or `nightward`, renders redacted output, copies explicitly requested exports, and opens the local reports folder. Provider Doctor can enable/disable provider selection for Raycast Analysis and, after confirmation, install known provider CLIs with the displayed Homebrew/npm command. It does not mutate agent configs or install schedules.
 
 See [docs/raycast-extension.md](docs/raycast-extension.md) for preferences, validation, and read-only boundaries.
 

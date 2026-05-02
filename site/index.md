@@ -59,9 +59,9 @@ The sample report below is generated from the committed `testdata/homes/policy` 
 
 [![Scrubbed Nightward HTML report showing fixture MCP findings](/demo/nightward-sample-report.png)](/demo/nightward-sample-report.html)
 
-[Sample scan JSON](/demo/nightward-sample-scan.json) · [Static HTML report](/demo/nightward-sample-report.html) · [TUI GIF](/demo/nightward-tui.gif) · [Provider reference](/reference/providers) · [Output surfaces](/reference/output-surfaces)
+[Sample scan JSON](/demo/nightward-sample-scan.json) · [Static HTML report](/demo/nightward-sample-report.html) · [OpenTUI GIF](/demo/nightward-opentui.gif) · [Provider reference](/reference/providers) · [Output surfaces](/reference/output-surfaces)
 
-![Nightward TUI fixture walkthrough](/demo/nightward-tui.gif)
+![Nightward OpenTUI walkthrough](/demo/nightward-opentui.gif)
 
 ## What Nightward Checks
 

@@ -12,7 +12,7 @@ Nightward’s roadmap is intentionally conservative. The next releases should ma
 - Explicit provider execution for local providers and online-gated provider runs.
 - Static HTML reports with local finding filters, report diffs, report history, and sample fixture assets.
 - Read-only stdio MCP server for local AI-client integration.
-- Bubbles-backed TUI tables, detail panes, footer help, and search input.
+- OpenTUI sidecar with colored dashboard, findings, analysis, fix plan, inventory, backup preview, and help sections.
 - OpenSSF-oriented governance, coverage, DCO, threat model, and release hardening.
 - Generated CLI, provider, rule, and config reference pages.
 

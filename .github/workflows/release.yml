@@ -32,6 +32,14 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Set up Node
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 24
+
+      - name: Install Bun
+        run: npm install --global bun@1.2.21
+
       - name: Validate release tag
         env:
           REF_NAME: ${{ github.ref_name }}

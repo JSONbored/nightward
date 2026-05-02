@@ -11,11 +11,14 @@ npm install -g @jsonbored/nightward
 nw scan --json
 ```
 
-This package is intentionally a thin launcher for the Go release binaries from
+This package is intentionally a thin launcher for the release binaries from
 <https://github.com/JSONbored/nightward>. It does not use a `postinstall`
 script. On first run, it downloads the matching GitHub Release archive, verifies
-the archive SHA-256 against `checksums.txt`, caches the extracted binaries, and
-then executes `nightward` or `nw`.
+the archive SHA-256 against `checksums.txt`, caches the extracted `nightward`,
+`nw`, and `nightward-tui` binaries, and then executes `nightward` or `nw`.
+
+Supported launcher platforms are macOS arm64/amd64, Linux arm64/amd64, and
+Windows amd64.
 
 Release notes are published with GitHub Releases:
 

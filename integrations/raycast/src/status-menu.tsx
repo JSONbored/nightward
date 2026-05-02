@@ -106,40 +106,37 @@ function StatusItems({
   lastReport?: string;
   onRefresh: () => void;
 }) {
-  const severitySummary = [
-    status.critical > 0 ? `${status.critical} critical` : "",
-    status.high > 0 ? `${status.high} high` : "",
-    status.medium > 0 ? `${status.medium} medium` : "",
-  ]
-    .filter(Boolean)
-    .join(", ");
+  const scheduleTitle = status.scheduled ? "Schedule on" : "Schedule off";
+  const scheduleSubtitle =
+    status.lastFindings !== undefined
+      ? `${status.lastFindings} findings in latest scheduled report`
+      : "No scheduled report yet";
 
   return (
     <>
       <MenuBarExtra.Section title="Findings">
-        <MenuBarExtra.Item
-          title={`${status.findings} findings`}
-          subtitle={severitySummary || `Max severity: ${status.risk}`}
-          icon={{ source: Icon.Warning, tintColor: severityColor(status.risk) }}
-        />
         {status.critical > 0 ? (
           <MenuBarExtra.Item
-            title={`Critical: ${status.critical}`}
+            title={`${status.critical} Critical`}
             icon={{ source: Icon.ExclamationMark, tintColor: Color.Red }}
           />
         ) : null}
         {status.high > 0 ? (
           <MenuBarExtra.Item
-            title={`High: ${status.high}`}
+            title={`${status.high} High`}
             icon={{ source: Icon.Warning, tintColor: severityColor("high") }}
           />
         ) : null}
         {status.medium > 0 ? (
           <MenuBarExtra.Item
-            title={`Medium: ${status.medium}`}
+            title={`${status.medium} Medium`}
             icon={{ source: Icon.Circle, tintColor: Color.Yellow }}
           />
         ) : null}
+        <MenuBarExtra.Item
+          title={`${status.findings} Total`}
+          icon={{ source: Icon.List, tintColor: severityColor(status.risk) }}
+        />
       </MenuBarExtra.Section>
 
       <MenuBarExtra.Section title="Analysis">
@@ -154,30 +151,24 @@ function StatusItems({
             icon={{ source: Icon.ExclamationMark, tintColor: Color.Yellow }}
           />
         ) : null}
+        {status.historyDelta ? (
+          <MenuBarExtra.Item
+            title={status.historyDelta}
+            subtitle="Since previous scheduled scan"
+            icon={Icon.ArrowClockwise}
+          />
+        ) : null}
       </MenuBarExtra.Section>
 
       <MenuBarExtra.Section title="Schedule">
         <MenuBarExtra.Item
-          title={
-            status.scheduled ? "Scheduled Scan Installed" : "No Scheduled Scan"
-          }
-          subtitle={
-            status.lastFindings !== undefined
-              ? `${status.lastFindings} findings in last report`
-              : "no scheduled report yet"
-          }
+          title={scheduleTitle}
+          subtitle={scheduleSubtitle}
           icon={{
             source: Icon.Clock,
             tintColor: status.scheduled ? Color.Green : Color.Yellow,
           }}
         />
-        {status.historyDelta ? (
-          <MenuBarExtra.Item
-            title="Latest Change"
-            subtitle={status.historyDelta}
-            icon={Icon.ArrowClockwise}
-          />
-        ) : null}
       </MenuBarExtra.Section>
 
       <MenuBarExtra.Section title="Open">
@@ -198,14 +189,13 @@ function StatusItems({
         />
         <MenuBarExtra.Item
           title="Reports Folder"
-          subtitle={reportDir}
           icon={Icon.Folder}
           onAction={() => void open(reportDir)}
         />
         {lastReport ? (
           <MenuBarExtra.Item
             title="Latest Report"
-            subtitle={lastReport}
+            subtitle={shortPath(lastReport)}
             icon={Icon.Document}
             onAction={() => void open(lastReport)}
           />
@@ -240,4 +230,9 @@ async function openCommand(name: string) {
 async function copyStatus(status: MenuBarStatus) {
   await Clipboard.copy(menuBarStatusMarkdown(status));
   await showHUD("Copied Nightward status");
+}
+
+function shortPath(value: string): string {
+  const parts = value.split("/");
+  return parts.slice(-2).join("/");
 }

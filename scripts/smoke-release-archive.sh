@@ -32,5 +32,6 @@ tar -xzf "${asset}"
 
 ./nightward --version | grep -Fx "${version}"
 ./nw --version | grep -Fx "${version}"
+test -x ./nightward-tui
 
 echo "release archive smoke passed for ${repo}@${tag}"

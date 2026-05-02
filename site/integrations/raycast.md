@@ -25,7 +25,7 @@ The menu-bar title stays intentionally small: icon plus the highest-risk count. 
 | `Home Override` | Typed `NIGHTWARD_HOME` path for fixture homes, QA profiles, or demos. |
 | `Allow Online Providers` | Allows selected online-capable providers in Raycast Analysis. Leave off for local-only behavior. |
 
-Provider selection is separate from installation. If a provider is missing, Provider Doctor offers the install command and upstream install docs, but it does not run package managers for you.
+Provider selection is separate from execution. If a provider is missing, Provider Doctor offers the install command, upstream install docs, and a confirmation-gated install action for known Homebrew/npm provider CLIs.
 
 ## Providers
 
