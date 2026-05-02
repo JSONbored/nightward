@@ -86,6 +86,7 @@ export default defineConfig({
         items: [
           { text: "GitHub Action", link: "/integrations/github-action" },
           { text: "Trunk", link: "/integrations/trunk" },
+          { text: "MCP server", link: "/integrations/mcp-server" },
           { text: "Raycast", link: "/integrations/raycast" },
         ],
       },

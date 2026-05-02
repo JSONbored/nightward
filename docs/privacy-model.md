@@ -13,6 +13,7 @@ Nightward is designed around local custody. The scanner inspects local file meta
 - No agent config mutation in scan, doctor, findings, fix, policy, or backup-plan commands.
 - The TUI can copy text, export redacted fix-plan Markdown, and open docs only after explicit keypresses.
 - The Raycast extension calls only read-only Nightward commands and explicit clipboard/report-folder actions.
+- The MCP server is stdio-only and exposes read-only tools/resources. It has no network listener, no schedule tools, no live mutation tools, and no online-provider execution in v1.
 
 ## Write Paths
 
@@ -27,6 +28,8 @@ Nightward writes only when explicitly asked:
 - `schedule remove`
 
 Schedule install/remove writes only user-level scheduler files. It does not copy configs, secrets, dotfiles, or reports into Git.
+
+`nw mcp serve` is not a write path. It can run read-only scan, policy, finding, rule, report, and fix-plan preview operations for an MCP client, but it cannot install schedules, mutate agent config, or enable online providers.
 
 The TUI docs action opens an http(s) documentation URL through the OS default opener after the user presses `o`; Nightward itself does not fetch docs content.
 

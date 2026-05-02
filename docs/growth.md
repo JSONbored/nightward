@@ -11,6 +11,7 @@ Nightward's growth should come from practical trust and low-friction adoption, n
 - Contributor fixture templates for adapters and rules.
 - Richer Nightward badge examples for CI users.
 - Polished sample reports and before-syncing-dotfiles walkthroughs.
+- Read-only MCP resources/tools for AI-client assisted local audits.
 - Read-only local report browser after static reports are mature.
 - Public JSON schemas and generated docs contracts for scan, analysis, policy badge, report diff/history, provider status, rules, and adapters.
 
@@ -28,6 +29,6 @@ Nightward's growth should come from practical trust and low-friction adoption, n
 - Adapter request issue template.
 - Good-first-rule and good-first-adapter labels.
 - Redacted fixture contribution guide.
-- TUI GIF and sample SARIF screenshot.
+- Additional TUI screenshots and sample SARIF screenshot.
 - Blog post: "What your AI tools leave in dotfiles."
 - Raycast store screenshots, privacy copy, command metadata, and development-mode smoke evidence.

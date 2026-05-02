@@ -30,7 +30,7 @@ Use this skill when a task asks to inspect local AI agent configs, MCP servers, 
 4. Generate a dry-run backup plan:
 
    ```sh
-   nightward plan backup --target ~/dotfiles --json
+   nightward plan backup --json
    ```
 
 5. Preview scheduling before installing anything:

@@ -103,7 +103,8 @@
   margin-top: 0;
 }
 
-.vp-doc img[alt^="Scrubbed Nightward HTML report"] {
+.vp-doc img[alt^="Scrubbed Nightward HTML report"],
+.vp-doc img[alt^="Nightward TUI fixture"] {
   width: 100%;
   border: 1px solid var(--vp-c-divider);
   border-radius: 8px;

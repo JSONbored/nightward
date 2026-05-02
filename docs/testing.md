@@ -144,6 +144,7 @@ The launcher must remain dependency-light, avoid `postinstall`, and verify downl
 Most repository checks are centralized behind `make verify` and the suite aliases above. The remaining loose commands are intentionally not part of the default gate because they require a browser, a published release, or manual UI evidence:
 
 - `make demo-assets` regenerates fixture-only sample JSON, HTML, report screenshot, and social preview assets. It requires Chrome, Chromium, Brave, or `NIGHTWARD_CHROME`.
+- `vhs docs/demo/nightward-tui.tape` regenerates the fixture-only TUI GIF after copying `testdata/homes/policy` into `/tmp/nightward-fixture-home`. It requires VHS and `ttyd`.
 - `make test-release-install VERSION=<version>` verifies a published GitHub/npm release after artifacts exist.
 - `npm run dev` under `integrations/raycast` is the local Raycast UI smoke path and should be paired with fixture-only evidence in `docs/screenshots.md`.
 

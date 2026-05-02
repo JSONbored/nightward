@@ -14,7 +14,7 @@ Nightward remediation is plan-only in v1.
 ## Commands
 
 ```sh
-nw fix plan --all --json
+nw fix plan --json
 nw fix plan --rule mcp_secret_env
 nw fix preview --rule mcp_unpinned_package --format diff
 nw fix export --format markdown

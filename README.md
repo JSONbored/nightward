@@ -6,7 +6,7 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12713/badge)](https://www.bestpractices.dev/projects/12713)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-Nightward shows what your AI tools would leak if you synced your dotfiles: MCP risk, local-only state, secret exposure, and reviewable fix plans, all locally.
+Nightward finds AI-tool risks before you sync: MCP risk, local-only state, secret exposure, and reviewable fix plans, all locally.
 
 It scans common Codex, Claude, Cursor, Windsurf, VS Code, Raycast, JetBrains, Zed, Continue, Cline/Roo, Aider, OpenCode, Goose, LM Studio, Ollama/Open WebUI, Neovim, MCP config locations, and repo/workspace AI config; classifies what is portable versus local-only or secret; highlights MCP security findings; and produces redacted analysis signals, fix plans, fix previews, SARIF policy output, snapshot plans, and dry-run backup plans.
 
@@ -21,6 +21,7 @@ Nightward does not mutate agent configs. It only writes explicit report/SARIF fi
 | --- | --- | --- |
 | TUI | Dashboard, inventory, findings, analysis, fix plan, backup preview | Read-only except explicit redacted export |
 | CLI | Scriptable scan, doctor, policy, SARIF, snapshot, schedule commands | Read-only unless output/schedule flags are explicit |
+| MCP server | Read-only stdio tools/resources for AI clients | No writes, no network listener, no online providers |
 | Raycast | macOS read-only companion commands | Clipboard/report-folder actions only |
 | GitHub Action | Workspace policy and SARIF checks | Writes only requested CI outputs |
 | Trunk plugin | Local workspace policy/analyze linters | Emits SARIF to stdout |
@@ -33,6 +34,7 @@ The sample below is generated from the committed fixture home at [testdata/homes
 
 - [Scrubbed sample scan JSON](site/public/demo/nightward-sample-scan.json)
 - [Static HTML report](site/public/demo/nightward-sample-report.html)
+- [Fixture TUI GIF](site/public/demo/nightward-tui.gif)
 - Regenerate with `make demo-assets` using Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`
 
 ```mermaid
@@ -63,7 +65,7 @@ Nightward answers the practical questions first:
 
 ## Highlights
 
-- Bubble Tea TUI with dashboard, inventory, findings, analysis, fix plan, and backup preview tabs.
+- Bubble Tea/Bubbles TUI with dashboard, inventory, findings, analysis, fix plan, and backup preview tabs.
 - `nightward` canonical command plus `nw` short alias.
 - Redacted JSON for automation and CI.
 - HOME scanning for local machines and `--workspace` scanning for CI, Trunk, and dotfiles repos.
@@ -79,12 +81,13 @@ Nightward answers the practical questions first:
 - Read-only snapshot plan/diff commands.
 - Reusable GitHub Action for scan, policy, and SARIF modes.
 - Read-only Raycast extension for Dashboard, Findings, Analysis, Provider Doctor, Explain Finding/Signal, Fix Plan/Analysis export, and report-folder access.
+- Read-only stdio MCP server for AI clients that need local scan, finding, rule, provider, policy, and fix-plan context.
 - User-level nightly scan scheduling for macOS launchd, Linux systemd user timers, and cron text fallback.
 - No telemetry, no cloud dashboard, no network calls from Nightward runtime, and no live config mutation.
 - OpenSSF-oriented project hygiene: DCO, governance docs, threat model, coverage gate, pinned CI actions, release snapshot checks, signed release configuration, and security reporting policy.
 
 > [!TIP]
-> A practical first pass is `nw doctor --json`, then `nw scan --json`, then `nw fix plan --all --json`.
+> A practical first pass is `nw`, then `nw scan`, then `nw doctor fix-hints`.
 
 ## Install
 
@@ -131,6 +134,7 @@ Check local assumptions:
 
 ```sh
 nw doctor --json
+nw doctor fix-hints
 ```
 
 List and explain findings:
@@ -143,7 +147,7 @@ nw findings explain mcp_unpinned_package-abc123
 Generate a plan-only fix report:
 
 ```sh
-nw fix plan --all --json
+nw fix plan --json
 nw fix plan --rule mcp_secret_env
 nw fix preview --rule mcp_secret_env --format diff
 nw fix preview --all --format markdown
@@ -153,8 +157,8 @@ nw fix export --format markdown
 Run offline analysis and provider checks:
 
 ```sh
-nw analyze --all --json
-nw analyze --all --workspace . --json
+nw analyze --json
+nw analyze --workspace . --json
 nw analyze package npm:@modelcontextprotocol/server-filesystem --json
 nw trust explain mcp_unpinned_package-abc123
 nw providers list --json
@@ -167,13 +171,13 @@ Online-capable providers remain blocked until explicitly allowed:
 
 ```sh
 nw providers doctor --with socket --online --json
-nw analyze --all --workspace . --with trivy,osv-scanner,socket --online --json
+nw analyze --workspace . --with trivy,osv-scanner,socket --online --json
 ```
 
 Create or explain policy config:
 
 ```sh
-nw policy init --dry-run
+nw policy init
 nw policy explain
 nw policy check --config .nightward.yml --strict --json
 ```
@@ -181,7 +185,7 @@ nw policy check --config .nightward.yml --strict --json
 Generate a dry-run backup plan:
 
 ```sh
-nw plan backup --target ~/dotfiles
+nw plan backup
 ```
 
 Generate read-only snapshot plans and compare them:
@@ -197,6 +201,8 @@ Render a local static HTML report from redacted scan JSON:
 nw scan --json --output /tmp/nightward-scan.json
 nw report html --input /tmp/nightward-scan.json --output /tmp/nightward-report.html
 nw report diff --from /tmp/previous-scan.json --to /tmp/nightward-scan.json
+nw report html
+nw report changes
 nw report history
 nw report latest
 ```
@@ -209,6 +215,12 @@ nw policy sarif --output nightward.sarif
 nw policy check --workspace . --include-analysis --strict --json
 nw policy sarif --workspace . --include-analysis --output -
 nw policy badge --workspace . --include-analysis --sarif-url https://example.invalid/nightward.sarif --output nightward-badge.json
+```
+
+Expose Nightward to MCP-capable AI clients:
+
+```sh
+nw mcp serve
 ```
 
 Preview scheduled nightly scans:
@@ -275,9 +287,9 @@ sequenceDiagram
   participant User
   participant Nightward
   participant LocalTool as Optional local provider
-  User->>Nightward: nw analyze --all
+  User->>Nightward: nw analyze
   Nightward-->>User: offline built-in signals
-  User->>Nightward: nw analyze --all --workspace . --with gitleaks
+  User->>Nightward: nw analyze --workspace . --with gitleaks
   Nightward->>LocalTool: run only after explicit provider selection
   LocalTool-->>Nightward: provider signals
   Nightward-->>User: redacted analysis report
@@ -294,6 +306,8 @@ The default `nightward` / `nw` command opens the TUI:
 - Fix Plan: safe/review/blocked remediation groups
 - Backup Plan: private-dotfiles dry-run preview
 
+The TUI uses Bubble Tea with Bubbles table, viewport, help, and text input components so lists, filters, and detail panes stay stable at different terminal sizes. Each tab has a distinct accent color that carries into the panel border and selected table row, making dashboard, inventory, findings, analysis, fix-plan, and backup review states easier to distinguish at a glance.
+
 Keyboard shortcuts:
 
 - `1`-`6`: switch tabs
@@ -306,6 +320,27 @@ Keyboard shortcuts:
 - `o`: open remediation docs for the selected finding or fix
 - `?`: help
 - `q` or `esc`: quit
+
+Fixture-only TUI demo:
+
+![Nightward TUI fixture walkthrough](site/public/demo/nightward-tui.gif)
+
+## MCP Server
+
+Nightward can expose local, read-only context to MCP-capable AI clients:
+
+```json
+{
+  "mcpServers": {
+    "nightward": {
+      "command": "nw",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
+```
+
+The server supports scan, doctor, findings, finding explanation, fix-plan, report-change, and policy-check tools plus rules/providers/schedule/latest-report resources. It uses stdio only, does not open a network listener, does not mutate config, and does not enable online-capable providers in v1.
 
 ## GitHub Action
 
@@ -407,10 +442,10 @@ go run ./cmd/nw scan --workspace . --json
 go run ./cmd/nw scan --json | jq '.summary'
 go run ./cmd/nw findings list --json
 go run ./cmd/nw findings list --json | jq '[.[] | select(.rule=="mcp_unknown_command")]'
-go run ./cmd/nw analyze --all --json
+go run ./cmd/nw analyze --json
 go run ./cmd/nw providers doctor --json
 go run ./cmd/nw rules list --json
-go run ./cmd/nw fix plan --all --json
+go run ./cmd/nw fix plan --json
 go run ./cmd/nw fix preview --all --format markdown
 go run ./cmd/nw policy sarif --output /tmp/nightward.sarif
 go run ./cmd/nw policy sarif --workspace . --include-analysis --output -
@@ -448,6 +483,7 @@ make release-snapshot
 - [Testing](docs/testing.md)
 - [Dependency maintenance](docs/dependency-maintenance.md)
 - [GitHub Action](docs/action.md)
+- [MCP server](docs/mcp-server.md)
 - [Raycast extension](docs/raycast-extension.md)
 - [CI/security notes](docs/ci-security.md)
 - [Release process](docs/release.md)
