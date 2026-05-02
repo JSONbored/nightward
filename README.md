@@ -118,6 +118,12 @@ Open the TUI:
 nw
 ```
 
+Review a saved scan in the same TUI:
+
+```sh
+nw tui --input scan.json
+```
+
 Scan local HOME state and emit redacted JSON:
 
 ```sh

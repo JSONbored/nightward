@@ -8,7 +8,13 @@ RUST_PATH ?= $(HOME)/.cargo/bin:/opt/homebrew/bin:$(PATH)
 CARGO ?= env PATH="$(RUST_PATH)" cargo
 RUST_BINS ?= nightward nw
 
-.PHONY: test test-fast test-security test-ux test-release test-local test-prepush test-release-install fmt clippy cargo-test cargo-nextest cargo-doc cargo-audit cargo-deny cargo-llvm-cov coverage-check test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test gitleaks raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-store-check raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify docs-reference docs-reference-check docs-freshness docs-qa site-install site-audit site-build site-verify demo-assets release-snapshot verify build install-local clean-reports
+.PHONY: doctor install-dev-tools test test-fast test-security test-ux test-release test-local test-prepush test-release-install fmt clippy cargo-test cargo-nextest cargo-doc cargo-audit cargo-deny cargo-llvm-cov coverage-check test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test gitleaks raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-store-check raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify docs-reference docs-reference-check docs-freshness docs-qa site-install site-audit site-build site-verify demo-assets release-snapshot verify build install-local clean-reports
+
+doctor:
+	bash scripts/dev-doctor.sh
+
+install-dev-tools:
+	$(CARGO) install cargo-audit cargo-deny cargo-llvm-cov --locked
 
 test: cargo-test
 
@@ -44,13 +50,13 @@ cargo-doc:
 	$(CARGO) test --doc --workspace
 
 cargo-audit:
-	@if command -v cargo-audit >/dev/null 2>&1; then $(CARGO) audit; else echo "cargo-audit not installed; skipping local audit"; fi
+	@PATH="$(RUST_PATH)"; if command -v cargo-audit >/dev/null 2>&1; then $(CARGO) audit; else echo "cargo-audit not installed; skipping local audit"; fi
 
 cargo-deny:
-	@if command -v cargo-deny >/dev/null 2>&1; then $(CARGO) deny check; else echo "cargo-deny not installed; skipping local deny check"; fi
+	@PATH="$(RUST_PATH)"; if command -v cargo-deny >/dev/null 2>&1; then $(CARGO) deny check; else echo "cargo-deny not installed; skipping local deny check"; fi
 
 cargo-llvm-cov:
-	@if command -v cargo-llvm-cov >/dev/null 2>&1; then mkdir -p $(REPORTS_DIR) && $(CARGO) llvm-cov --workspace --lcov --output-path $(REPORTS_DIR)/coverage.lcov --summary-only | tee $(REPORTS_DIR)/coverage.txt; else $(CARGO) test --workspace; fi
+	@PATH="$(RUST_PATH)"; if command -v cargo-llvm-cov >/dev/null 2>&1; then mkdir -p $(REPORTS_DIR) && $(CARGO) llvm-cov --workspace --lcov --output-path $(REPORTS_DIR)/coverage.lcov --summary-only | tee $(REPORTS_DIR)/coverage.txt; else $(CARGO) test --workspace; fi
 
 coverage-check: cargo-llvm-cov
 	@if [ -f "$(REPORTS_DIR)/coverage.txt" ]; then python3 -c 'import pathlib,re,sys; text=pathlib.Path("$(REPORTS_DIR)/coverage.txt").read_text(); nums=[float(x) for x in re.findall(r"([0-9]+(?:\.[0-9]+)?)%", text)]; pct=nums[-1] if nums else 100.0; threshold=float("$(COVERAGE_THRESHOLD)"); print(f"coverage {pct:.1f}% / threshold {threshold:.1f}%"); sys.exit(0 if pct >= threshold else 1)'; fi
@@ -74,7 +80,7 @@ ci-scripts-test:
 	bash scripts/test-release-scripts.sh
 
 gitleaks:
-	@if command -v gitleaks >/dev/null 2>&1; then gitleaks detect --source . --redact --no-banner; else echo "gitleaks not installed; skipping local secret scan"; fi
+	@PATH="$(RUST_PATH)"; if command -v gitleaks >/dev/null 2>&1; then gitleaks detect --source . --redact --no-banner; else echo "gitleaks not installed; skipping local secret scan"; fi
 
 raycast-install:
 	cd $(RAYCAST_DIR) && npm ci --ignore-scripts --no-audit
@@ -141,7 +147,7 @@ demo-assets:
 release-snapshot: build
 	bash scripts/release-snapshot-rust.sh
 
-verify: fmt clippy cargo-nextest cargo-doc coverage-check test-junit trunk-flaky-validate trunk-check ci-scripts-test raycast-audit raycast-lint raycast-build npm-package-verify site-verify
+verify: doctor fmt clippy cargo-nextest cargo-doc coverage-check test-junit trunk-flaky-validate trunk-check ci-scripts-test raycast-audit raycast-lint raycast-build npm-package-verify site-verify
 
 build:
 	$(CARGO) build --release --bins

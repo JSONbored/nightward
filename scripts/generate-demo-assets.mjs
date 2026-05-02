@@ -18,12 +18,13 @@ const ogImageOutput = join(repoRoot, "site", "public", "og-image.png");
 const faviconPath = join(repoRoot, "site", "public", "favicon.svg");
 const tempDir = mkdtempSync(join(tmpdir(), "nightward-demo-"));
 const rawScan = join(tempDir, "raw-scan.json");
+const toolPath = `${process.env.HOME}/.cargo/bin:/opt/homebrew/bin:${process.env.PATH || ""}`;
 let sourceHost = "";
 
 function run(command, args, options = {}) {
   execFileSync(command, args, {
     cwd: repoRoot,
-    env: { ...process.env, ...options.env },
+    env: { ...process.env, PATH: toolPath, ...options.env },
     stdio: options.stdio ?? "pipe",
   });
 }

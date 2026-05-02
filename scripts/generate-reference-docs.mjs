@@ -6,11 +6,12 @@ import { join } from "node:path";
 
 const check = process.argv.includes("--check");
 const outDir = check ? mkdtempSync(join(tmpdir(), "nightward-docs-")) : "site/reference";
+const toolPath = `${process.env.HOME}/.cargo/bin:/opt/homebrew/bin:${process.env.PATH || ""}`;
 
 function runNightward(args) {
   return execFileSync("cargo", ["run", "--quiet", "--bin", "nw", "--", ...args], {
     encoding: "utf8",
-    env: { ...process.env, NIGHTWARD_HOME: join(tmpdir(), "nightward-docs-home") },
+    env: { ...process.env, PATH: toolPath, NIGHTWARD_HOME: join(tmpdir(), "nightward-docs-home") },
     stdio: ["ignore", "pipe", "pipe"],
   }).trimEnd();
 }

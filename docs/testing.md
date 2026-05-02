@@ -4,6 +4,24 @@ Nightward treats read-only behavior, redaction, and policy stability as release 
 
 ## Local Checks
 
+Start with the developer toolchain doctor:
+
+```sh
+make doctor
+```
+
+If `cargo` is installed but your shell cannot find it, load the repo-local path helper:
+
+```sh
+. scripts/dev-env.sh
+```
+
+Optional Cargo security/coverage tools can be installed with:
+
+```sh
+make install-dev-tools
+```
+
 Use the suite aliases first. They are intentionally shaped around the same surfaces CI and release workflows gate, so local failures are caught before a branch is pushed.
 
 ```sh
@@ -19,6 +37,7 @@ make test-prepush
 - `make test-ux` runs the Raycast and VitePress site validation paths.
 - `make test-release` runs release helper tests, npm package verification, Raycast/site builds, and a Rust archive snapshot.
 - `make test-prepush` is the full local gate and is equivalent to `make verify`.
+- `make doctor` verifies required local tools and checks common optional tools used by release, UX, and security evidence paths.
 
 After a package is published, verify the install path explicitly:
 
@@ -140,7 +159,7 @@ The launcher must remain dependency-light, avoid `postinstall`, and verify downl
 Most repository checks are centralized behind `make verify` and the suite aliases above. The remaining loose commands are intentionally not part of the default gate because they require a browser, a published release, or manual UI evidence:
 
 - `make demo-assets` regenerates fixture-only sample JSON, HTML, report screenshot, and social preview assets. It requires Chrome, Chromium, Brave, or `NIGHTWARD_CHROME`.
-- Fixture-only TUI media should be regenerated from the embedded Rust TUI after visual gates pass. Use fixture data only.
+- Fixture-only TUI media should be regenerated from the embedded Rust TUI after visual gates pass. Use `nw tui --input site/public/demo/nightward-sample-scan.json` so screenshots render from scrubbed report JSON instead of live HOME data.
 - `make test-release-install VERSION=<version>` verifies a published GitHub/npm release after artifacts exist.
 - `npm run dev` under `integrations/raycast` is the local Raycast UI smoke path and should be paired with fixture-only evidence in `docs/screenshots.md`.
 

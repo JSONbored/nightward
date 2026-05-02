@@ -25,6 +25,7 @@ pub fn run() -> Result<()> {
     let command = args.remove(0);
     match command.as_str() {
         "scan" => cmd_scan(&args),
+        "tui" => cmd_tui(&args),
         "doctor" => cmd_doctor(&args),
         "plan" => cmd_plan(&args),
         "adapters" => cmd_adapters(&args),
@@ -44,6 +45,19 @@ pub fn run() -> Result<()> {
         }
         unknown => Err(anyhow!("unknown command {unknown}; run nightward help")),
     }
+}
+
+fn cmd_tui(args: &[String]) -> Result<()> {
+    let input = value_after(args, "--input");
+    let workspace = value_after(args, "--workspace").or_else(|| value_after(args, "-w"));
+    let report = if let Some(input) = input {
+        load_report(input)?
+    } else if let Some(workspace) = workspace {
+        scan_workspace(workspace)?
+    } else {
+        scan_home(home_dir_from_env())?
+    };
+    tui::run(&report)
 }
 
 fn cmd_scan(args: &[String]) -> Result<()> {
@@ -427,6 +441,6 @@ fn version() -> &'static str {
 
 fn print_help() {
     println!(
-        "Nightward audits AI agent state, MCP config, and dotfiles sync risk.\n\nUSAGE:\n  nightward                 Open the TUI\n  nightward scan --json     Scan HOME\n  nightward scan --workspace . --json\n  nightward analyze --all --with gitleaks --json\n  nightward providers doctor --with trivy --online --json\n  nightward fix plan --all --json\n  nightward report html --input scan.json --output report.html\n  nightward policy check --json\n  nightward mcp serve\n\nNightward is local-first, read-only by default, and never enables online providers without --online."
+        "Nightward audits AI agent state, MCP config, and dotfiles sync risk.\n\nUSAGE:\n  nightward                         Open the TUI\n  nightward tui --input scan.json   Review a saved report in the TUI\n  nightward scan --json             Scan HOME\n  nightward scan --workspace . --json\n  nightward analyze --all --with gitleaks --json\n  nightward providers doctor --with trivy --online --json\n  nightward fix plan --all --json\n  nightward report html --input scan.json --output report.html\n  nightward policy check --json\n  nightward mcp serve\n\nNightward is local-first, read-only by default, and never enables online providers without --online."
     );
 }

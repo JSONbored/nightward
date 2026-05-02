@@ -6,6 +6,12 @@ Run Nightward without arguments to open the interactive terminal app:
 nw
 ```
 
+Review a saved report without scanning again:
+
+```sh
+nw tui --input scan.json
+```
+
 ![Nightward TUI fixture dashboard](/demo/nightward-tui.png)
 
 [Open the fixture walkthrough GIF](/demo/nightward-tui.gif)
@@ -40,6 +46,7 @@ The Rust CLI is the source of truth. The TUI uses embedded `opentui_rust` render
 
 ```sh
 cargo run --bin nw
+cargo run --bin nw -- tui --input site/public/demo/nightward-sample-scan.json
 make demo-assets
 ```
 

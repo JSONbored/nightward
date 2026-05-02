@@ -4,6 +4,24 @@ Nightward should stay useful to AI power users without becoming a tool that copi
 
 ## Development
 
+Run the developer doctor first. It adds the common Rust/Homebrew paths for the check and fails if required tools are missing:
+
+```sh
+make doctor
+```
+
+If a non-login shell cannot find `cargo`, source the repo helper before running direct Cargo commands:
+
+```sh
+. scripts/dev-env.sh
+```
+
+Install optional Cargo security/coverage helpers when you want the strongest local gate:
+
+```sh
+make install-dev-tools
+```
+
 ```sh
 make test-fast
 make test-security

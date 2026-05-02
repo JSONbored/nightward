@@ -24,7 +24,7 @@ Nightward should have visual proof before broader promotion.
 ## Suggested Fixture Run
 
 ```sh
-NIGHTWARD_HOME="$PWD/testdata/homes/policy" cargo run --bin nw
+target/debug/nw tui --input site/public/demo/nightward-sample-scan.json
 ```
 
 For Raycast, set the extension `Home Override` preference to the same fixture home before `npm run dev`.

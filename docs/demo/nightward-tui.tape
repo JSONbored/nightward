@@ -12,7 +12,7 @@ Set PlaybackSpeed 1.0
 Set Framerate 20
 Set Theme "TokyoNight"
 
-Type "NIGHTWARD_HOME=$PWD/testdata/homes/policy target/debug/nw"
+Type "target/debug/nw tui --input site/public/demo/nightward-sample-scan.json"
 Enter
 Sleep 1800ms
 
