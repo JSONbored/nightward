@@ -261,7 +261,7 @@ impl<'a> TuiState<'a> {
             (
                 "active",
                 VIEWS[self.active_view].to_string(),
-                self.palette.green,
+                self.palette.cyan,
             ),
         ];
         for (idx, (label, value, color)) in cards.iter().enumerate() {
@@ -313,7 +313,7 @@ impl<'a> TuiState<'a> {
             x,
             row,
             "NIGHTWARD",
-            Style::fg(self.palette.green).with_bold(),
+            Style::fg(self.palette.cyan).with_bold(),
         );
         row += 1;
         draw_text(
@@ -363,7 +363,7 @@ impl<'a> TuiState<'a> {
         for (idx, view) in VIEWS.iter().enumerate() {
             let active = idx == self.active_view;
             let color = if active {
-                self.palette.green
+                self.palette.cyan
             } else {
                 self.palette.line
             };
@@ -523,7 +523,7 @@ impl<'a> TuiState<'a> {
             area.x + 2,
             row,
             "next action",
-            Style::fg(self.palette.green).with_bold(),
+            Style::fg(self.palette.cyan).with_bold(),
         );
         row += 1;
         for line in wrap(&next_action(self.report), area.w.saturating_sub(4) as usize)
@@ -545,7 +545,7 @@ impl<'a> TuiState<'a> {
             area.x + 2,
             row,
             "safe defaults",
-            Style::fg(self.palette.green).with_bold(),
+            Style::fg(self.palette.cyan).with_bold(),
         );
         row += 1;
         for line in [
@@ -559,7 +559,7 @@ impl<'a> TuiState<'a> {
     }
 
     fn render_recent_findings(&self, buffer: &mut OptimizedBuffer, area: Area) {
-        plain_box(buffer, area, self.palette.blue, self.palette.panel);
+        plain_box(buffer, area, self.palette.blue, self.palette.surface);
         let mut row = area.y + 2;
         draw_text(
             buffer,
@@ -606,7 +606,7 @@ impl<'a> TuiState<'a> {
             area.x + 2,
             flow_y,
             "review flow",
-            Style::fg(self.palette.green).with_bold(),
+            Style::fg(self.palette.cyan).with_bold(),
         );
         for (idx, line) in [
             "inspect finding evidence",
@@ -868,6 +868,7 @@ struct Palette {
     muted: Rgba,
     cyan: Rgba,
     green: Rgba,
+    lime: Rgba,
     amber: Rgba,
     red: Rgba,
     orange: Rgba,
@@ -878,21 +879,22 @@ struct Palette {
 impl Palette {
     fn new() -> Self {
         Self {
-            bg: color("#000000"),
-            sidebar: color("#151817"),
-            panel: color("#1A1C19"),
-            surface: color("#20262C"),
+            bg: color("#080808"),
+            sidebar: color("#1C1C1C"),
+            panel: color("#1C1C1C"),
+            surface: color("#1C1C1C"),
             code_bg: color("#111827"),
             line: color("#26324A"),
             white: color("#E8EEF8"),
-            muted: color("#8E9097"),
+            muted: color("#7D8799"),
             cyan: color("#2DD4BF"),
             green: color("#34D399"),
+            lime: color("#A3E635"),
             amber: color("#FFD166"),
             red: color("#FF4D6D"),
             orange: color("#FF8A3D"),
             magenta: color("#A78BFA"),
-            blue: color("#60a5fa"),
+            blue: color("#60A5FA"),
         }
     }
 }
@@ -1020,7 +1022,7 @@ fn severity_color(palette: &Palette, risk: RiskLevel) -> Rgba {
         RiskLevel::High => palette.orange,
         RiskLevel::Medium => palette.amber,
         RiskLevel::Low => palette.blue,
-        RiskLevel::Info => palette.green,
+        RiskLevel::Info => palette.lime,
     }
 }
 
