@@ -34,8 +34,8 @@ For Raycast, set the extension `Home Override` preference to the same fixture ho
 | Surface | Fixture-only source | Required evidence | Status |
 | --- | --- | --- | --- |
 | Static HTML report | `testdata/homes/policy` | Scrubbed scan JSON, filterable static HTML report, and PNG screenshot generated from fixture output | captured in `site/public/demo/` with `node scripts/generate-demo-assets.mjs`; no local paths or secret values found |
-| TUI dashboard | `testdata/homes/policy` or another committed fixture home | Screenshot shows counts, schedule status, report history, and what-next text | pending manual capture |
-| TUI findings/fix plan | committed MCP/security fixtures only | GIF or screenshots show filters, detail pane, redacted evidence, and fix plan | pending manual capture |
+| TUI dashboard | `/tmp/nightward-fixture-home` copied from `testdata/homes/policy` | Screenshot/GIF shows counts, schedule status, report history, and what-next text | fixture GIF captured with `vhs docs/demo/nightward-tui.tape`; no `/Users`, username, or secret fixture values found |
+| TUI findings/fix plan | `/tmp/nightward-fixture-home` copied from `testdata/homes/policy` | GIF or screenshots show filters, detail pane, redacted evidence, and fix plan | fixture GIF captured in `site/public/demo/nightward-tui.gif` from commit-local tape |
 | Raycast Dashboard | fixture `Home Override` | Screenshot shows counts and top findings from synthetic data | pending `ray develop` smoke |
 | Raycast Findings/Analysis | fixture `Home Override` | Screenshots show redacted evidence and no config mutation actions | pending `ray develop` smoke |
 | Raycast Provider Doctor | fixture/default local environment | Screenshot shows provider status without implying online scans | pending `ray develop` smoke |

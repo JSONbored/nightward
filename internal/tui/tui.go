@@ -12,6 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/help"
+	bubblekey "github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jsonbored/nightward/internal/analysis"
@@ -22,19 +27,23 @@ import (
 )
 
 type model struct {
-	report    inventory.Report
-	schedule  schedule.Plan
-	tab       int
-	cursor    int
-	width     int
-	height    int
-	severity  string
-	tool      string
-	rule      string
-	search    string
-	status    string
-	searching bool
-	showHelp  bool
+	report        inventory.Report
+	schedule      schedule.Plan
+	tab           int
+	cursor        int
+	width         int
+	height        int
+	severity      string
+	tool          string
+	rule          string
+	search        string
+	status        string
+	searching     bool
+	showHelp      bool
+	palette       bool
+	paletteCursor int
+	helpModel     help.Model
+	searchInput   textinput.Model
 }
 
 type actionMsg struct {
@@ -50,6 +59,7 @@ var (
 	amber     = lipgloss.Color("#e0af68")
 	red       = lipgloss.Color("#f7768e")
 	green     = lipgloss.Color("#9ece6a")
+	purple    = lipgloss.Color("#bb9af7")
 	panelLine = lipgloss.Color("#26314a")
 
 	baseStyle  = lipgloss.NewStyle().Foreground(ink).Background(bg)
@@ -77,6 +87,48 @@ var (
 var tabs = []string{"Dashboard", "Inventory", "Findings", "Analysis", "Fix Plan", "Backup Plan"}
 var compactTabs = []string{"Dash", "Inv", "Find", "Analysis", "Fix", "Backup"}
 var tinyTabs = []string{"D", "I", "F", "A", "X", "B"}
+var tabAccents = []lipgloss.Color{cyan, blue, red, purple, amber, green}
+
+type tuiKeyMap struct {
+	Tabs    bubblekey.Binding
+	Palette bubblekey.Binding
+	Search  bubblekey.Binding
+	Filters bubblekey.Binding
+	Copy    bubblekey.Binding
+	Export  bubblekey.Binding
+	Docs    bubblekey.Binding
+	Help    bubblekey.Binding
+	Quit    bubblekey.Binding
+}
+
+func (k tuiKeyMap) ShortHelp() []bubblekey.Binding {
+	return []bubblekey.Binding{k.Tabs, k.Palette, k.Search, k.Filters, k.Copy, k.Export, k.Help, k.Quit}
+}
+
+func (k tuiKeyMap) FullHelp() [][]bubblekey.Binding {
+	return [][]bubblekey.Binding{
+		{k.Tabs, k.Palette, k.Search, k.Filters},
+		{k.Copy, k.Export, k.Docs, k.Help, k.Quit},
+	}
+}
+
+var tuiKeys = tuiKeyMap{
+	Tabs:    bubblekey.NewBinding(bubblekey.WithKeys("tab", "1-6"), bubblekey.WithHelp("tab/1-6", "tabs")),
+	Palette: bubblekey.NewBinding(bubblekey.WithKeys("p"), bubblekey.WithHelp("p", "palette")),
+	Search:  bubblekey.NewBinding(bubblekey.WithKeys("/"), bubblekey.WithHelp("/", "search")),
+	Filters: bubblekey.NewBinding(bubblekey.WithKeys("s", "t", "r", "x"), bubblekey.WithHelp("s/t/r/x", "filters")),
+	Copy:    bubblekey.NewBinding(bubblekey.WithKeys("c"), bubblekey.WithHelp("c", "copy")),
+	Export:  bubblekey.NewBinding(bubblekey.WithKeys("e"), bubblekey.WithHelp("e", "export")),
+	Docs:    bubblekey.NewBinding(bubblekey.WithKeys("o"), bubblekey.WithHelp("o", "docs")),
+	Help:    bubblekey.NewBinding(bubblekey.WithKeys("?"), bubblekey.WithHelp("?", "help")),
+	Quit:    bubblekey.NewBinding(bubblekey.WithKeys("q", "esc"), bubblekey.WithHelp("q/esc", "quit")),
+}
+
+type paletteCommand struct {
+	Title  string
+	Detail string
+	Action string
+}
 
 const remediationDocsURL = "https://github.com/JSONbored/nightward/blob/main/docs/remediation.md"
 const analysisDocsURL = "https://github.com/JSONbored/nightward/blob/main/docs/analysis.md"
@@ -85,8 +137,17 @@ var tuiSecretAssignmentPattern = regexp.MustCompile(`(?i)((?:token|secret|passwo
 var tuiLongSecretPattern = regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{12,}\b`)
 
 func Run(report inventory.Report, scheduleStatus schedule.Plan) error {
-	_, err := tea.NewProgram(model{report: report, schedule: scheduleStatus}, tea.WithAltScreen()).Run()
+	_, err := tea.NewProgram(newModel(report, scheduleStatus), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
 	return err
+}
+
+func newModel(report inventory.Report, scheduleStatus schedule.Plan) model {
+	return model{
+		report:      report,
+		schedule:    scheduleStatus,
+		helpModel:   newHelpModel(),
+		searchInput: newSearchInput(""),
+	}
 }
 
 func (m model) Init() tea.Cmd {
@@ -104,22 +165,56 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.searching {
 			switch msg.String() {
 			case "enter":
+				m.search = m.searchInputValue()
 				m.searching = false
 				m.status = "search: " + filterLabel(m.search)
 			case "esc":
 				m.searching = false
+				m.searchInput = newSearchInput(m.search)
 			case "backspace":
-				if len(m.search) > 0 {
-					m.search = m.search[:len(m.search)-1]
-					m.cursor = 0
-				}
+				var cmd tea.Cmd
+				m.searchInput, cmd = m.searchInputModel().Update(msg)
+				m.search = m.searchInput.Value()
+				m.cursor = 0
+				return m, cmd
 			case "ctrl+u":
 				m.search = ""
+				m.searchInput = newSearchInput("")
 				m.cursor = 0
 			default:
-				if len(msg.Runes) > 0 {
-					m.search += string(msg.Runes)
+				if len(msg.Runes) > 0 || msg.Type == tea.KeySpace {
+					var cmd tea.Cmd
+					m.searchInput, cmd = m.searchInputModel().Update(msg)
+					m.search = m.searchInput.Value()
 					m.cursor = 0
+					return m, cmd
+				}
+			}
+			return m, nil
+		}
+		if m.palette {
+			switch msg.String() {
+			case "esc", "p":
+				m.palette = false
+			case "enter":
+				commands := m.paletteCommands()
+				if len(commands) == 0 {
+					m.palette = false
+					return m, nil
+				}
+				if m.paletteCursor >= len(commands) {
+					m.paletteCursor = len(commands) - 1
+				}
+				selected := commands[m.paletteCursor]
+				m.palette = false
+				return m.applyPaletteCommand(selected)
+			case "up", "k":
+				if m.paletteCursor > 0 {
+					m.paletteCursor--
+				}
+			case "down", "j":
+				if m.paletteCursor < len(m.paletteCommands())-1 {
+					m.paletteCursor++
 				}
 			}
 			return m, nil
@@ -129,6 +224,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "?":
 			m.showHelp = !m.showHelp
+		case "p":
+			m.palette = true
+			m.paletteCursor = 0
+			m.showHelp = false
+			m.status = "command palette"
 		case "tab", "right", "l":
 			m.tab = (m.tab + 1) % len(tabs)
 			m.cursor = 0
@@ -168,11 +268,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "/":
 			if m.tab == 2 {
 				m.searching = true
+				m.searchInput = newSearchInput(m.search)
+				m.searchInput.Focus()
 				m.status = "type search, enter to keep, esc to cancel"
 			}
 		case "x":
 			if m.tab == 2 {
 				m.search = ""
+				m.searchInput = newSearchInput("")
 				m.severity = ""
 				m.tool = ""
 				m.rule = ""
@@ -223,10 +326,17 @@ func (m model) View() string {
 	if m.showHelp {
 		bodyText = m.help(bodyWidth - 6)
 	}
-	body := panelStyle.Width(bodyWidth).Height(bodyHeight).Render(bodyText)
-	footerText := "1-6 tabs  arrows/hjkl navigate  / search  s/t/r filters  x clear  c copy  e export  o docs  ? help  q quit"
+	if m.palette {
+		bodyText = m.commandPalette(bodyWidth-6, bodyHeight-2)
+	}
+	body := panelStyle.BorderForeground(tabAccent(m.tab)).Width(bodyWidth).Height(bodyHeight).Render(bodyText)
+	footerText := m.footerHelp(bodyWidth - 2)
 	if m.searching {
-		footerText = "search: " + m.search
+		input := m.searchInputModel()
+		footerText = "search: " + input.View()
+	}
+	if m.palette {
+		footerText = "palette: enter run  arrows navigate  esc close"
 	}
 	if m.status != "" {
 		footerText += "  " + m.status
@@ -245,10 +355,11 @@ func (m model) renderTabs(width int) string {
 	rendered := make([]string, 0, len(tabs))
 	for i, tab := range labels {
 		label := fmt.Sprintf("%d %s", i+1, tab)
+		accent := tabAccent(i)
 		if i == m.tab {
-			rendered = append(rendered, activeTabStyle.Render(label))
+			rendered = append(rendered, activeTabStyle.Background(accent).Render(label))
 		} else {
-			rendered = append(rendered, tabStyle.Render(label))
+			rendered = append(rendered, tabStyle.Foreground(accent).Render(label))
 		}
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
@@ -315,6 +426,9 @@ func (m model) dashboard(width int) string {
 		}
 		if delta := reportDelta(m.schedule.History); delta != "" {
 			lines = append(lines, "Latest delta: "+delta)
+			if severity := reportSeverityDelta(m.schedule.History); severity != "" {
+				lines = append(lines, "Severity delta: "+severity)
+			}
 		}
 	}
 	lines = append(lines, "", section("What Next"))
@@ -323,23 +437,25 @@ func (m model) dashboard(width int) string {
 }
 
 func (m model) inventory(width, height int) string {
-	lines := []string{section("Inventory"), ""}
 	items := m.report.Items
 	if len(items) == 0 {
 		return "No known AI agent/devtool config paths found yet."
 	}
-	visible := max(1, height-4)
-	start := clampCursor(m.cursor, len(items), visible)
-	for i := start; i < len(items) && len(lines) < visible+2; i++ {
-		item := items[i]
-		prefix := "  "
-		if i == m.cursor {
-			prefix = "> "
-		}
-		line := fmt.Sprintf("%s%-10s %-14s %-12s %s", prefix, item.Tool, item.Classification, item.Risk, item.Path)
-		lines = append(lines, line)
+	rows := make([]table.Row, 0, len(items))
+	for _, item := range items {
+		rows = append(rows, table.Row{item.Tool, string(item.Classification), string(item.Risk), item.Path})
 	}
-	return fitLines(lines, width)
+	return lipgloss.JoinVertical(lipgloss.Left,
+		section("Inventory"),
+		renderTable(
+			[]table.Column{{Title: "Tool", Width: 12}, {Title: "Class", Width: 16}, {Title: "Risk", Width: 10}, {Title: "Path", Width: max(12, width-46)}},
+			rows,
+			m.cursor,
+			width,
+			max(3, height-2),
+			tabAccent(m.tab),
+		),
+	)
 }
 
 func (m model) findings(width, height int) string {
@@ -358,20 +474,21 @@ func (m model) findings(width, height int) string {
 		fmt.Sprintf("severity=%s  tool=%s  rule=%s  search=%s", filterLabel(m.severity), filterLabel(m.tool), filterLabel(m.rule), filterLabel(m.search)),
 		"",
 	}
-	visible := max(1, height-5)
 	if m.cursor >= len(findings) {
 		m.cursor = len(findings) - 1
 	}
-	start := clampCursor(m.cursor, len(findings), visible)
-	for i := start; i < len(findings) && len(lines) < visible+2; i++ {
-		finding := findings[i]
-		prefix := "  "
-		if i == m.cursor {
-			prefix = "> "
-		}
-		line := fmt.Sprintf("%s%-8s %-22s %s", prefix, finding.Severity, finding.Rule, finding.Message)
-		lines = append(lines, line)
+	rows := make([]table.Row, 0, len(findings))
+	for _, finding := range findings {
+		rows = append(rows, table.Row{string(finding.Severity), finding.Rule, finding.Message})
 	}
+	lines = append(lines, renderTable(
+		[]table.Column{{Title: "Risk", Width: 9}, {Title: "Rule", Width: 24}, {Title: "Message", Width: max(12, listWidth-39)}},
+		rows,
+		m.cursor,
+		listWidth,
+		max(3, height-4),
+		tabAccent(m.tab),
+	))
 	left := fitLines(lines, listWidth)
 	if detailWidth <= 0 {
 		return left
@@ -396,20 +513,22 @@ func (m model) fixPlan(width, height int) string {
 	if len(plan.Fixes) == 0 {
 		return "No fix plans available."
 	}
-	visible := max(1, height-5)
 	if m.cursor >= len(plan.Fixes) {
 		m.cursor = len(plan.Fixes) - 1
 	}
-	start := clampCursor(m.cursor, len(plan.Fixes), visible)
-	for i := start; i < len(plan.Fixes) && len(lines) < visible+3; i++ {
-		fix := plan.Fixes[i]
-		prefix := "  "
-		if i == m.cursor {
-			prefix = "> "
-		}
-		lines = append(lines, fmt.Sprintf("%s%-7s %-20s %-22s %s", prefix, fix.Status, fix.FixKind, fix.Rule, fix.Summary))
+	rows := make([]table.Row, 0, len(plan.Fixes))
+	for _, fix := range plan.Fixes {
+		rows = append(rows, table.Row{string(fix.Status), string(fix.FixKind), fix.Rule, fix.Summary})
 	}
-	lines = append(lines, "", "Use `nw fix plan --all --json` or `nw fix export --format markdown` for full steps.")
+	lines = append(lines, renderTable(
+		[]table.Column{{Title: "Status", Width: 9}, {Title: "Kind", Width: 20}, {Title: "Rule", Width: 22}, {Title: "Summary", Width: max(12, listWidth-57)}},
+		rows,
+		m.cursor,
+		listWidth,
+		max(3, height-6),
+		tabAccent(m.tab),
+	))
+	lines = append(lines, "", "Use `nw fix plan --json` or `nw fix export --format markdown` for full steps.")
 	left := fitLines(lines, listWidth)
 	if detailWidth <= 0 {
 		return left
@@ -435,20 +554,22 @@ func (m model) analysis(width, height int) string {
 		lines = append(lines, "No known risky signals from enabled providers.")
 		return fitLines(lines, width)
 	}
-	visible := max(1, height-5)
 	if m.cursor >= len(report.Signals) {
 		m.cursor = len(report.Signals) - 1
 	}
-	start := clampCursor(m.cursor, len(report.Signals), visible)
-	for i := start; i < len(report.Signals) && len(lines) < visible+3; i++ {
-		signal := report.Signals[i]
-		prefix := "  "
-		if i == m.cursor {
-			prefix = "> "
-		}
-		lines = append(lines, fmt.Sprintf("%s%-8s %-30s %s", prefix, signal.Severity, signal.Rule, signal.Message))
+	rows := make([]table.Row, 0, len(report.Signals))
+	for _, signal := range report.Signals {
+		rows = append(rows, table.Row{string(signal.Severity), signal.Rule, signal.Message})
 	}
-	lines = append(lines, "", "Use `nw analyze --all --json` or `nw providers doctor --json` for full details.")
+	lines = append(lines, renderTable(
+		[]table.Column{{Title: "Risk", Width: 9}, {Title: "Rule", Width: 30}, {Title: "Message", Width: max(12, listWidth-43)}},
+		rows,
+		m.cursor,
+		listWidth,
+		max(3, height-6),
+		tabAccent(m.tab),
+	))
+	lines = append(lines, "", "Use `nw analyze --json` or `nw providers doctor --json` for full details.")
 	left := fitLines(lines, listWidth)
 	if detailWidth <= 0 {
 		return left
@@ -466,17 +587,19 @@ func (m model) backupPlan(width, height int) string {
 		fmt.Sprintf("Include: %d  Review: %d  Exclude: %d", plan.Summary.Included, plan.Summary.Review, plan.Summary.Excluded),
 		"",
 	}
-	visible := max(1, height-6)
-	start := clampCursor(m.cursor, len(plan.Entries), visible)
-	for i := start; i < len(plan.Entries) && len(lines) < visible+4; i++ {
-		entry := plan.Entries[i]
-		prefix := "  "
-		if i == m.cursor {
-			prefix = "> "
-		}
-		lines = append(lines, fmt.Sprintf("%s%-7s %-12s %s", prefix, entry.Action, entry.Tool, entry.Source))
+	rows := make([]table.Row, 0, len(plan.Entries))
+	for _, entry := range plan.Entries {
+		rows = append(rows, table.Row{string(entry.Action), entry.Tool, entry.Source})
 	}
-	lines = append(lines, "", "Use `nightward plan backup --target <repo>` for exact JSON or shell output.")
+	lines = append(lines, renderTable(
+		[]table.Column{{Title: "Action", Width: 9}, {Title: "Tool", Width: 14}, {Title: "Source", Width: max(12, width-27)}},
+		rows,
+		m.cursor,
+		width,
+		max(3, height-8),
+		tabAccent(m.tab),
+	))
+	lines = append(lines, "", "Use `nw plan backup --json` for exact JSON output, or add `--target` for a custom repo.")
 	return fitLines(lines, width)
 }
 
@@ -520,6 +643,7 @@ func (m model) help(width int) string {
 	lines := []string{
 		section("Help"),
 		"1-6 or tab: switch tabs",
+		"p: open command palette",
 		"arrows or h/j/k/l: navigate rows",
 		"s/t/r: cycle severity, tool, and rule filters in Findings",
 		"/: search findings",
@@ -533,6 +657,156 @@ func (m model) help(width int) string {
 		"Nightward TUI actions do not mutate agent configs.",
 	}
 	return fitLines(lines, width)
+}
+
+func (m model) footerHelp(width int) string {
+	helpModel := m.helpModel
+	if helpModel.Width == 0 {
+		helpModel = newHelpModel()
+	}
+	helpModel.Width = width
+	return helpModel.View(tuiKeys)
+}
+
+func (m model) searchInputModel() textinput.Model {
+	input := m.searchInput
+	if input.Width == 0 && input.Placeholder == "" {
+		input = newSearchInput(m.search)
+	}
+	input.Focus()
+	return input
+}
+
+func (m model) searchInputValue() string {
+	return strings.TrimSpace(m.searchInputModel().Value())
+}
+
+func newHelpModel() help.Model {
+	h := help.New()
+	h.ShortSeparator = "  "
+	return h
+}
+
+func newSearchInput(value string) textinput.Model {
+	input := textinput.New()
+	input.Placeholder = "rule, path, tool, server, or ID"
+	input.Prompt = ""
+	input.CharLimit = 160
+	input.Width = 42
+	input.TextStyle = lipgloss.NewStyle().Foreground(ink)
+	input.PlaceholderStyle = lipgloss.NewStyle().Foreground(muted)
+	input.SetValue(value)
+	return input
+}
+
+func (m model) commandPalette(width, height int) string {
+	commands := m.paletteCommands()
+	lines := []string{
+		section("Command Palette"),
+		"Choose an action. Nothing here mutates agent config.",
+		"",
+	}
+	visible := max(1, height-4)
+	if m.paletteCursor >= len(commands) {
+		m.paletteCursor = len(commands) - 1
+	}
+	if m.paletteCursor < 0 {
+		m.paletteCursor = 0
+	}
+	start := clampCursor(m.paletteCursor, len(commands), visible)
+	for i := start; i < len(commands) && len(lines) < visible+3; i++ {
+		command := commands[i]
+		prefix := "  "
+		if i == m.paletteCursor {
+			prefix = "> "
+		}
+		line := fmt.Sprintf("%s%-24s %s", prefix, command.Title, command.Detail)
+		lines = append(lines, line)
+	}
+	return fitLines(lines, width)
+}
+
+func (m model) paletteCommands() []paletteCommand {
+	commands := []paletteCommand{
+		{Title: "Dashboard", Detail: "show scan summary and next actions", Action: "tab:0"},
+		{Title: "Inventory", Detail: "review discovered config paths", Action: "tab:1"},
+		{Title: "Findings", Detail: "filter and inspect MCP/config risks", Action: "tab:2"},
+		{Title: "Analysis", Detail: "review normalized signals", Action: "tab:3"},
+		{Title: "Fix Plan", Detail: "review plan-only remediation", Action: "tab:4"},
+		{Title: "Backup Plan", Detail: "preview dotfiles backup choices", Action: "tab:5"},
+		{Title: "Copy Selection", Detail: "copy selected redacted action or path", Action: "copy"},
+		{Title: "Export Fix Plan", Detail: "write redacted markdown review material", Action: "export"},
+	}
+	if _, ok := m.currentDocsURL(); ok {
+		commands = append(commands, paletteCommand{Title: "Open Docs", Detail: "open docs for selected row", Action: "docs"})
+	}
+	if m.tab == 2 {
+		commands = append(commands,
+			paletteCommand{Title: "Search Findings", Detail: "filter by rule, path, server, or evidence", Action: "search"},
+			paletteCommand{Title: "Cycle Severity", Detail: "advance severity filter", Action: "filter:severity"},
+			paletteCommand{Title: "Cycle Tool", Detail: "advance tool filter", Action: "filter:tool"},
+			paletteCommand{Title: "Cycle Rule", Detail: "advance rule filter", Action: "filter:rule"},
+		)
+		if m.search != "" || m.severity != "" || m.tool != "" || m.rule != "" {
+			commands = append(commands, paletteCommand{Title: "Clear Filters", Detail: "reset finding filters and search", Action: "filters:clear"})
+		}
+	}
+	return commands
+}
+
+func (m model) applyPaletteCommand(command paletteCommand) (model, tea.Cmd) {
+	switch command.Action {
+	case "tab:0", "tab:1", "tab:2", "tab:3", "tab:4", "tab:5":
+		tab := int(command.Action[len(command.Action)-1] - '0')
+		if tab >= 0 && tab < len(tabs) {
+			m.tab = tab
+			m.cursor = 0
+			m.status = "opened " + tabs[tab]
+		}
+	case "copy":
+		value, label, ok := m.copySelection()
+		if !ok {
+			m.status = "copy: nothing selected"
+			return m, nil
+		}
+		m.status = "copying " + label + "..."
+		return m, copyToClipboardCmd(value, label)
+	case "export":
+		m.status = "exporting fix plan..."
+		return m, exportFixPlanCmd(m.report)
+	case "docs":
+		docsURL, ok := m.currentDocsURL()
+		if !ok {
+			m.status = "open docs: no docs URL for selected row"
+			return m, nil
+		}
+		m.status = "opening docs..."
+		return m, openURLCmd(docsURL)
+	case "search":
+		m.searching = true
+		m.status = "type search, enter to keep, esc to cancel"
+	case "filter:severity":
+		m.severity = cycle(m.severity, riskOptions(m.report.Findings))
+		m.cursor = 0
+		m.status = "severity: " + filterLabel(m.severity)
+	case "filter:tool":
+		m.tool = cycle(m.tool, toolOptions(m.report.Findings))
+		m.cursor = 0
+		m.status = "tool: " + filterLabel(m.tool)
+	case "filter:rule":
+		m.rule = cycle(m.rule, ruleOptions(m.report.Findings))
+		m.cursor = 0
+		m.status = "rule: " + filterLabel(m.rule)
+	case "filters:clear":
+		m.search = ""
+		m.searchInput = newSearchInput("")
+		m.severity = ""
+		m.tool = ""
+		m.rule = ""
+		m.cursor = 0
+		m.status = "filters cleared"
+	}
+	return m, nil
 }
 
 func (m model) currentSignal() (analysis.Signal, bool) {
@@ -646,7 +920,7 @@ func (m model) nextActions() []string {
 	if len(m.schedule.History) > 1 {
 		return []string{"Compare recent reports before publishing screenshots or store metadata."}
 	}
-	return []string{"Run explicit local providers with `nw analyze --all --with gitleaks,trufflehog,semgrep --json`."}
+	return []string{"Run explicit local providers with `nw analyze --with gitleaks,trufflehog,semgrep --json`."}
 }
 
 func reportDelta(history []schedule.ReportRecord) string {
@@ -662,6 +936,21 @@ func reportDelta(history []schedule.ReportRecord) string {
 	default:
 		return "no finding change since previous report"
 	}
+}
+
+func reportSeverityDelta(history []schedule.ReportRecord) string {
+	if len(history) < 2 {
+		return ""
+	}
+	var parts []string
+	for _, severity := range []inventory.RiskLevel{inventory.RiskCritical, inventory.RiskHigh, inventory.RiskMedium, inventory.RiskLow, inventory.RiskInfo} {
+		delta := history[0].FindingsBySeverity[severity] - history[1].FindingsBySeverity[severity]
+		if delta == 0 {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s %+d", severity, delta))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func (m model) currentDocsURL() (string, bool) {
@@ -736,10 +1025,7 @@ func findingDetail(finding inventory.Finding, width, height int) string {
 	if finding.Why != "" {
 		lines = append(lines, "", section("Why"), redactTUIText(finding.Why))
 	}
-	if len(lines) > height {
-		lines = lines[:height]
-	}
-	return fitLines(lines, width)
+	return renderViewport(lines, width, height)
 }
 
 func signalDetail(signal analysis.Signal, width, height int) string {
@@ -758,10 +1044,7 @@ func signalDetail(signal analysis.Signal, width, height int) string {
 	if signal.Why != "" {
 		lines = append(lines, "", section("Why"), redactTUIText(signal.Why))
 	}
-	if len(lines) > height {
-		lines = lines[:height]
-	}
-	return fitLines(lines, width)
+	return renderViewport(lines, width, height)
 }
 
 func fixDetail(fix fixplan.Fix, width, height int) string {
@@ -788,10 +1071,7 @@ func fixDetail(fix fixplan.Fix, width, height int) string {
 	if fix.Why != "" {
 		lines = append(lines, "", section("Why"), redactTUIText(fix.Why))
 	}
-	if len(lines) > height {
-		lines = lines[:height]
-	}
-	return fitLines(lines, width)
+	return renderViewport(lines, width, height)
 }
 
 func copyToClipboardCmd(value, label string) tea.Cmd {
@@ -981,6 +1261,48 @@ func metricLine(label string, value int, color lipgloss.Color) string {
 	return lipgloss.NewStyle().Foreground(color).Bold(true).Render(fmt.Sprintf("%-10s %d", label, value))
 }
 
+func renderTable(cols []table.Column, rows []table.Row, cursor, width, height int, accent lipgloss.Color) string {
+	if len(rows) == 0 {
+		return "No rows."
+	}
+	if accent == "" {
+		accent = cyan
+	}
+	styles := table.DefaultStyles()
+	styles.Header = lipgloss.NewStyle().
+		Foreground(accent).
+		Bold(true).
+		Padding(0, 1).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).
+		BorderForeground(panelLine)
+	styles.Cell = lipgloss.NewStyle().Foreground(ink).Padding(0, 1)
+	styles.Selected = lipgloss.NewStyle().Foreground(bg).Background(accent).Bold(true).Padding(0, 1)
+	t := table.New(
+		table.WithColumns(cols),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		table.WithWidth(width),
+		table.WithHeight(max(3, height)),
+		table.WithStyles(styles),
+	)
+	t.SetCursor(cursor)
+	return t.View()
+}
+
+func tabAccent(index int) lipgloss.Color {
+	if index < 0 || index >= len(tabAccents) {
+		return cyan
+	}
+	return tabAccents[index]
+}
+
+func renderViewport(lines []string, width, height int) string {
+	view := viewport.New(max(1, width), max(1, height))
+	view.SetContent(fitLines(lines, width))
+	return view.View()
+}
+
 func byteSize(size int64) string {
 	if size < 1024 {
 		return fmt.Sprintf("%dB", size)
@@ -1032,7 +1354,9 @@ func rank(risk inventory.RiskLevel) int {
 func fitLines(lines []string, width int) string {
 	out := make([]string, 0, len(lines))
 	for _, line := range lines {
-		out = append(out, truncate(line, width))
+		for _, segment := range strings.Split(line, "\n") {
+			out = append(out, truncate(segment, width))
+		}
 	}
 	return strings.Join(out, "\n")
 }

@@ -39,6 +39,7 @@ Policy output includes pass/fail status, threshold, violations, ignored findings
 ## Report Diff
 
 ```sh
+nw report changes --json
 nw report diff --from previous.json --to current.json --json
 nw report history --json
 nw report latest --json

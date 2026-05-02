@@ -30,7 +30,7 @@ Use this skill when a task asks to inspect local AI agent configs, MCP servers, 
 4. Generate a dry-run backup plan:
 
    ```sh
-   nightward plan backup --target ~/dotfiles --json
+   nightward plan backup --json
    ```
 
 5. Preview scheduling before installing anything:
@@ -49,3 +49,7 @@ Use this skill when a task asks to inspect local AI agent configs, MCP servers, 
 ## Notes
 
 Nightward v1 is local-only and read-mostly. Scan and plan commands do not mutate user config. The only write paths are explicit schedule install/remove commands.
+
+## Repository Commits
+
+Nightward requires DCO on every non-merge commit. Use `git commit -s` or `git commit --signoff` for all Nightward commits, while preserving the normal local signing setup.

@@ -14,7 +14,7 @@ SITE_DIR ?= site
 GO_PACKAGES ?= $(shell go list ./cmd/... ./internal/... ./tools/...)
 COVERAGE_PACKAGES ?= ./internal/...
 
-.PHONY: test test-fast test-security test-ux test-release test-local test-prepush test-release-install test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke fuzz-test coverage coverage-check go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify docs-reference docs-reference-check docs-freshness docs-qa site-install site-audit site-build site-verify demo-assets tool-syft release-snapshot verify build install-local clean-reports
+.PHONY: test test-fast test-security test-ux test-release test-local test-prepush test-release-install test-race vet staticcheck gosec gitleaks govulncheck fuzz-smoke fuzz-test coverage coverage-check go-test-junit test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-store-check raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify docs-reference docs-reference-check docs-freshness docs-qa site-install site-audit site-build site-verify tui-demo demo-assets tool-syft release-snapshot verify build install-local clean-reports
 
 test:
 	go test $(GO_PACKAGES)
@@ -109,7 +109,10 @@ raycast-lint:
 raycast-build:
 	cd $(RAYCAST_DIR) && npm run build
 
-raycast-verify: raycast-install raycast-test raycast-audit raycast-lint raycast-build
+raycast-store-check:
+	cd $(RAYCAST_DIR) && npm run store-check
+
+raycast-verify: raycast-install raycast-test raycast-audit raycast-lint raycast-build raycast-store-check
 
 npm-package-install:
 	cd $(NPM_PACKAGE_DIR) && npm ci --ignore-scripts --no-audit
@@ -146,6 +149,9 @@ docs-freshness:
 docs-qa: docs-reference-check docs-freshness
 
 site-verify: docs-qa site-install site-audit site-build
+
+tui-demo:
+	PATH="$(HOME)/go/bin:$(PATH)" vhs docs/demo/nightward-tui.tape
 
 demo-assets:
 	node scripts/generate-demo-assets.mjs

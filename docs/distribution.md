@@ -16,6 +16,10 @@ Nightward distribution should optimize for trust first, then convenience.
 
 Docker is deferred until Nightward has a useful local report browser. A container is not a good default for safely scanning a user's HOME directory.
 
+## Homebrew Tap Plan
+
+Homebrew is straightforward once the release archive layout stays stable. Add a dedicated tap repository, then let GoReleaser publish a formula from the signed GitHub Release archive and checksum data. The formula should install both `nightward` and `nw`, include a lightweight `nightward --version` test, and avoid becoming a separate packaging implementation.
+
 ## NPM Posture
 
 The npm package is `@jsonbored/nightward`. It is published through npm trusted publishing and must remain a launcher:

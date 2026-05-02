@@ -7,8 +7,8 @@ Use this path before copying AI-tool config into a private dotfiles repo.
 ```sh
 nw doctor --json
 nw scan --json --output nightward-scan.json
-nw fix plan --all --json
-nw plan backup --target ~/dotfiles
+nw fix plan --json
+nw plan backup
 nw report html --input nightward-scan.json --output nightward-report.html
 ```
 

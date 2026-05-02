@@ -35,9 +35,9 @@ The extension uses `execFile`, not a shell, for local Nightward commands. It cal
 - `doctor --json`
 - `findings list --json`
 - `findings explain <id> --json`
-- `fix plan --all --json`
+- `fix plan --json`
 - `fix export --all --format markdown`
-- `analyze --all [--with providers] [--online] --json`
+- `analyze [--with providers] [--online] --json`
 - `analyze finding <id> --json`
 - `providers doctor [--with providers] [--online] --json`
 
@@ -53,6 +53,7 @@ npm ci
 npm test
 npm run lint
 npm run build
+npm run store-check
 ```
 
 Manual smoke:
@@ -74,3 +75,33 @@ Manual smoke must use a fixture `Home Override`, not a real local home, before s
 Record the fixture path, commit SHA, command result, and reviewer in `docs/screenshots.md` or adjacent release notes when screenshots/GIFs are captured.
 
 Do not run `npm run publish` unless publishing is explicitly in scope.
+
+## Store Submission Readiness
+
+`npm run store-check` verifies the self-contained package shape, required manifest fields, matching command source files, 512x512 manifest icon, README, CHANGELOG, and metadata screenshot count. It reports missing screenshots as warnings so regular local validation can pass before manual Raycast capture is complete.
+
+Use the strict gate immediately before preparing a draft PR to `raycast/extensions`:
+
+```sh
+npm run store-check:strict
+```
+
+Current expected blocker: store metadata screenshots are not committed yet. Capture them from `ray develop` with fixture `Home Override` and Raycast Window Capture before opening the draft submission PR.
+
+Draft submission prep:
+
+```sh
+# In a local fork of raycast/extensions after syncing upstream:
+mkdir -p extensions/nightward
+rsync -a --delete \
+  --exclude node_modules \
+  --exclude dist \
+  /path/to/nightward/integrations/raycast/ \
+  extensions/nightward/
+cd extensions/nightward
+npm ci
+npm test
+npm run lint
+npm run build
+npm run store-check:strict
+```

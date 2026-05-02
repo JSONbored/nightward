@@ -27,7 +27,7 @@ nw policy badge --workspace . --include-analysis --sarif-url ./nightward.sarif -
 Run this once to inspect the default shape:
 
 ```sh
-nw policy init --dry-run
+nw policy init
 ```
 
 Ignore entries must include reasons. Online-capable providers stay blocked unless policy explicitly sets `allow_online_providers: true` and selected providers are configured.
