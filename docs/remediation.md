@@ -22,10 +22,9 @@ root cause. For example, repeated `mcp-remote` unpinned-package findings are
 summarized as one grouped review item so the same reviewed version can be
 applied consistently instead of triaging dozens of identical hints.
 
-Advisory `mcp_server_review` findings are collapsed when the same server already
-has a higher-severity finding. The stronger finding remains the review anchor,
-which keeps Raycast, HTML reports, MCP output, and policy results focused on the
-actionable risk.
+Advisory `mcp_server_review` findings stay visible alongside stronger findings
+so review surfaces can show both the concrete issue and the final server-level
+approval step.
 
 ## Rule Guidance
 
@@ -64,8 +63,9 @@ Replace broad filesystem mounts with explicit project or data paths after confir
 ### mcp_server_review
 
 Confirm advisory MCP servers are intentional, documented, and safe to sync before
-moving them into portable dotfiles. Nightward collapses this advisory when the
-same server already has a stronger finding.
+moving them into portable dotfiles. Nightward keeps this advisory visible so
+review flows can distinguish concrete findings from the final server-level
+approval step.
 
 ### mcp_unknown_command
 

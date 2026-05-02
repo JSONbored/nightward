@@ -1,5 +1,5 @@
 use anyhow::Result;
-use nightward_core::{max_risk, Report, RiskLevel};
+use nightward_core::{max_risk, Finding, Report, RiskLevel};
 use opentui::buffer::{BoxOptions, BoxStyle, ClipRect, TitleAlign};
 use opentui::input::{Event, InputParser, KeyCode};
 use opentui::terminal::{enable_raw_mode, terminal_size};
@@ -158,15 +158,25 @@ impl<'a> TuiState<'a> {
         let main_x = sidebar_w + 2;
         let main_w = width.saturating_sub(main_x + 2);
         self.render_sidebar(buffer, Area::new(0, 0, sidebar_w, height));
-        self.render_header(buffer, Area::new(main_x, 1, main_w, 7));
+        self.render_header(buffer, Area::new(main_x, 1, main_w, 6));
         self.render_content(
             buffer,
-            Area::new(main_x, 9, main_w, height.saturating_sub(12)),
+            Area::new(main_x, 8, main_w, height.saturating_sub(11)),
         );
-        self.render_footer(
-            buffer,
-            Area::new(main_x, height.saturating_sub(3), main_w, 2),
-        );
+        if self.active_view == 0 {
+            draw_hline(
+                buffer,
+                main_x,
+                height.saturating_sub(3),
+                main_w,
+                self.palette.line,
+            );
+        } else {
+            self.render_footer(
+                buffer,
+                Area::new(main_x, height.saturating_sub(3), main_w, 2),
+            );
+        }
     }
 
     fn render_tiny(&self, buffer: &mut OptimizedBuffer, width: u32, height: u32) {
@@ -258,7 +268,7 @@ impl<'a> TuiState<'a> {
             let x = area.x + u32::try_from(idx).unwrap_or(0) * (card_w + 1);
             old_stat_card(
                 buffer,
-                Area::new(x, area.y + 3, card_w, 4),
+                Area::new(x, area.y + 2, card_w, 4),
                 label,
                 value,
                 *color,
@@ -313,12 +323,12 @@ impl<'a> TuiState<'a> {
             "AI config risk console",
             Style::fg(self.palette.muted),
         );
-        row += 3;
+        row += 2;
 
         let risk = max_risk(&self.report.findings);
         plain_box(
             buffer,
-            Area::new(x, row, area.w.saturating_sub(5), 3),
+            Area::new(x, row, area.w.saturating_sub(6), 3),
             severity_color(&self.palette, risk),
             self.palette.sidebar,
         );
@@ -329,7 +339,7 @@ impl<'a> TuiState<'a> {
             &format!("RISK {}", risk_label(risk)),
             Style::fg(severity_color(&self.palette, risk)).with_bold(),
         );
-        row += 4;
+        row += 3;
         draw_text(
             buffer,
             x,
@@ -349,7 +359,7 @@ impl<'a> TuiState<'a> {
             ),
             Style::fg(self.palette.muted),
         );
-        row += 3;
+        row += 2;
         for (idx, view) in VIEWS.iter().enumerate() {
             let active = idx == self.active_view;
             let color = if active {
@@ -560,7 +570,11 @@ impl<'a> TuiState<'a> {
         );
         row += 3;
         let max_rows = area.h.saturating_sub(13) as usize / 3;
-        for finding in self.report.findings.iter().take(max_rows.clamp(3, 5)) {
+        for finding in self
+            .display_findings()
+            .into_iter()
+            .take(max_rows.clamp(3, 5))
+        {
             let color = severity_color(&self.palette, finding.severity);
             draw_text(
                 buffer,
@@ -581,7 +595,7 @@ impl<'a> TuiState<'a> {
                 buffer,
                 area.x + 3,
                 row,
-                &truncate(&finding.message, area.w.saturating_sub(6) as usize),
+                &truncate(&recent_message(finding), area.w.saturating_sub(6) as usize),
                 Style::fg(self.palette.muted),
             );
             row += 2;
@@ -650,7 +664,8 @@ impl<'a> TuiState<'a> {
         );
 
         let max_rows = area.h.saturating_sub(5) as usize;
-        for (idx, finding) in self.report.findings.iter().take(max_rows).enumerate() {
+        let display_findings = self.display_findings();
+        for (idx, finding) in display_findings.into_iter().take(max_rows).enumerate() {
             let row = area.y + 4 + u32::try_from(idx).unwrap_or(0);
             let selected = idx == self.selected_finding;
             let color = severity_color(&self.palette, finding.severity);
@@ -797,6 +812,19 @@ impl<'a> TuiState<'a> {
         }
     }
 
+    fn display_findings(&self) -> Vec<&Finding> {
+        let mut findings = self.report.findings.iter().collect::<Vec<_>>();
+        findings.sort_by(|a, b| {
+            b.severity
+                .rank()
+                .cmp(&a.severity.rank())
+                .then_with(|| rule_display_rank(&a.rule).cmp(&rule_display_rank(&b.rule)))
+                .then_with(|| a.server.cmp(&b.server))
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        findings
+    }
+
     fn render_placeholder(&self, buffer: &mut OptimizedBuffer, area: Area, title: &str) {
         plain_box(
             buffer,
@@ -850,9 +878,9 @@ struct Palette {
 impl Palette {
     fn new() -> Self {
         Self {
-            bg: color("#070A12"),
+            bg: color("#000000"),
             sidebar: color("#151817"),
-            panel: color("#171A19"),
+            panel: color("#1A1C19"),
             surface: color("#20262C"),
             code_bg: color("#111827"),
             line: color("#26324A"),
@@ -888,7 +916,7 @@ fn draw_panel(buffer: &mut OptimizedBuffer, area: Area, title: &str, border: Rgb
         return;
     }
     let mut options = BoxOptions::new(BoxStyle::rounded(Style::fg(border)));
-    options.fill = Some(fill.with_alpha(0.92));
+    options.fill = Some(fill);
     options.title = Some(format!(" {title} "));
     options.title_align = TitleAlign::Left;
     buffer.draw_box_with_options(area.x, area.y, area.w, area.h, options);
@@ -899,7 +927,7 @@ fn plain_box(buffer: &mut OptimizedBuffer, area: Area, border: Rgba, fill: Rgba)
         return;
     }
     let mut options = BoxOptions::new(BoxStyle::rounded(Style::fg(border)));
-    options.fill = Some(fill.with_alpha(0.94));
+    options.fill = Some(fill);
     buffer.draw_box_with_options(area.x, area.y, area.w, area.h, options);
 }
 
@@ -992,7 +1020,41 @@ fn severity_color(palette: &Palette, risk: RiskLevel) -> Rgba {
         RiskLevel::High => palette.orange,
         RiskLevel::Medium => palette.amber,
         RiskLevel::Low => palette.blue,
-        RiskLevel::Info => palette.muted,
+        RiskLevel::Info => palette.green,
+    }
+}
+
+fn rule_display_rank(rule: &str) -> usize {
+    match rule {
+        "mcp_unpinned_package" => 0,
+        "mcp_secret_env" | "mcp_secret_header" => 1,
+        "mcp_broad_filesystem" => 2,
+        "mcp_server_review" => 3,
+        _ => 10,
+    }
+}
+
+fn recent_message(finding: &Finding) -> String {
+    match finding.rule.as_str() {
+        "mcp_unpinned_package" => {
+            format!("MCP server \"{}\" runs a package executor", finding.server)
+        }
+        "mcp_secret_env" | "mcp_secret_header" => {
+            format!("MCP server \"{}\" references a sensitive", finding.server)
+        }
+        "mcp_broad_filesystem" => {
+            format!(
+                "MCP server \"{}\" appears to reference broad",
+                finding.server
+            )
+        }
+        "mcp_server_review" => {
+            format!(
+                "Review MCP server \"{}\" before syncing this",
+                finding.server
+            )
+        }
+        _ => finding.message.clone(),
     }
 }
 

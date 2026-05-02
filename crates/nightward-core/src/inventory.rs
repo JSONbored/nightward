@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -395,7 +395,6 @@ fn mcp_server_entries(value: &Value) -> Vec<(String, &Value)> {
 }
 
 fn inspect_server(report: &mut Report, tool: &str, path: &Path, server: &str, config: &Value) {
-    let finding_start = report.findings.len();
     let command = str_field(config, &["command", "cmd"]);
     let args = array_field(config, &["args", "arguments"]);
     let url = str_field(config, &["url", "endpoint"]);
@@ -587,24 +586,22 @@ fn inspect_server(report: &mut Report, tool: &str, path: &Path, server: &str, co
             None,
         );
     }
-    if report.findings.len() == finding_start {
-        push_finding(
-            report,
-            tool,
-            path,
-            server,
-            "mcp_server_review",
-            RiskLevel::Info,
-            &format!(
-                "Review MCP server \"{}\" before syncing this config.",
-                server
-            ),
-            &redact_text(&combined),
-            "Confirm this server is intentional and safe for the target machine before syncing.",
-            FixKind::ManualReview,
-            None,
-        );
-    }
+    push_finding(
+        report,
+        tool,
+        path,
+        server,
+        "mcp_server_review",
+        RiskLevel::Info,
+        &format!(
+            "Review MCP server \"{}\" before syncing this config.",
+            server
+        ),
+        &redact_text(&combined),
+        "Confirm this server is intentional and safe for the target machine before syncing.",
+        FixKind::ManualReview,
+        None,
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -653,40 +650,27 @@ fn push_finding(
 }
 
 fn finalize_report(report: &mut Report) {
-    collapse_review_duplicates(report);
     report.items.sort_by(|a, b| a.path.cmp(&b.path));
     report.findings.sort_by(|a, b| {
         b.severity
             .rank()
             .cmp(&a.severity.rank())
             .then_with(|| a.tool.cmp(&b.tool))
-            .then_with(|| a.rule.cmp(&b.rule))
+            .then_with(|| rule_sort_rank(&a.rule).cmp(&rule_sort_rank(&b.rule)))
             .then_with(|| a.id.cmp(&b.id))
     });
     report.recompute_summary();
 }
 
-fn collapse_review_duplicates(report: &mut Report) {
-    let higher: BTreeSet<(String, String, String)> = report
-        .findings
-        .iter()
-        .filter(|finding| finding.severity.rank() >= RiskLevel::Medium.rank())
-        .map(|finding| {
-            (
-                finding.tool.clone(),
-                finding.path.clone(),
-                finding.server.clone(),
-            )
-        })
-        .collect();
-    report.findings.retain(|finding| {
-        !(finding.rule == "mcp_server_review"
-            && higher.contains(&(
-                finding.tool.clone(),
-                finding.path.clone(),
-                finding.server.clone(),
-            )))
-    });
+fn rule_sort_rank(rule: &str) -> usize {
+    match rule {
+        "mcp_unpinned_package" => 0,
+        "mcp_secret_env" | "mcp_secret_header" => 1,
+        "mcp_broad_filesystem" => 2,
+        "mcp_local_endpoint" => 3,
+        "mcp_server_review" => 4,
+        _ => 10,
+    }
 }
 
 fn str_field(config: &Value, keys: &[&str]) -> String {
@@ -852,6 +836,7 @@ pub fn stable_id(parts: &[&str]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
     use std::fs;
 
     #[test]
