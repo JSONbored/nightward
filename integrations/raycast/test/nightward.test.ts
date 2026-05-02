@@ -12,6 +12,7 @@ import {
   type RuntimeOptions,
 } from "../src/nightward";
 import {
+  installInfoForProvider,
   normalizeProviderSelection,
   selectedAnalysisProviders,
   selectedOnlineProviders,
@@ -147,6 +148,15 @@ test("normalizes and gates provider selections", () => {
   assert.deepEqual(selectedAnalysisProviders(selected, false), ["gitleaks"]);
   assert.deepEqual(selectedAnalysisProviders(selected, true), selected);
   assert.deepEqual(selectedOnlineProviders(selected), ["trivy", "socket"]);
+});
+
+test("provider install metadata exposes safe user-run commands", () => {
+  assert.equal(
+    installInfoForProvider("gitleaks")?.command,
+    "brew install gitleaks",
+  );
+  assert.equal(installInfoForProvider("SOCKET")?.command, "npm install -g socket");
+  assert.equal(installInfoForProvider("unknown"), undefined);
 });
 
 test("analysis command passes selected local providers without online gate", async () => {

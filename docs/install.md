@@ -16,7 +16,7 @@ GitHub Releases are the canonical binary distribution channel.
 
 Release artifacts include:
 
-- `nightward` and `nw` binaries for macOS, Linux, and Windows.
+- `nightward`, `nw`, and `nightward-tui` binaries for macOS, Linux, and Windows x64.
 - `checksums.txt`.
 - `checksums.txt.sigstore.json` from Cosign keyless signing.
 - SBOM files for release archives.
@@ -33,12 +33,14 @@ The package is a thin launcher:
 - no bundled Node implementation of Nightward
 - downloads the matching GitHub Release archive on first run
 - verifies the archive SHA-256 from `checksums.txt`
-- caches extracted `nightward` and `nw` binaries locally
+- caches extracted `nightward`, `nw`, and `nightward-tui` binaries locally
+
+Windows ARM64 is not published yet because the OpenTUI sidecar does not currently have a Bun compile target for that platform.
 
 Example:
 
 ```sh
-npx @jsonbored/nightward --help
+npx @jsonbored/nightward scan
 npm install -g @jsonbored/nightward
 nw scan --json
 ```

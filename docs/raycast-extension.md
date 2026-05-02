@@ -11,10 +11,10 @@ integrations/raycast
 ## Commands
 
 - `Nightward Dashboard`: scan counts, schedule status, adapter summary, and top findings.
-- `Nightward Status`: compact menu-bar severity marker such as `3C`, `18H`, or `59`, with full critical/high/total counts, analysis signals, provider warnings, scheduled-report state, and latest-report access in the dropdown.
+- `Nightward Status`: compact menu-bar severity marker with just the highest-risk count, plus full critical/high/total counts, analysis signals, provider warnings, scheduled-report state, and latest-report access in the dropdown.
 - `Nightward Findings`: searchable findings with a severity filter, detail pane, scoped fix-plan exports, reviewed-policy-ignore snippets, redacted evidence copy, and open-doc actions.
 - `Nightward Analysis`: built-in offline signals plus explicitly selected providers.
-- `Nightward Provider Doctor`: optional provider availability, privacy posture, and Raycast Analysis enable/disable controls.
+- `Nightward Provider Doctor`: optional provider availability, privacy posture, install guidance for missing tools, and Raycast Analysis enable/disable controls.
 - `Explain Nightward Finding`: detail view for a known finding ID.
 - `Explain Nightward Signal`: analysis signal view for a known finding ID.
 - `Export Nightward Fix Plan`: copies `nw fix export --all --format markdown`.
@@ -43,7 +43,7 @@ The extension uses `execFile`, not a shell, for local Nightward commands. It cal
 - `analyze finding <id> --json`
 - `providers doctor [--with providers] [--online] --json`
 
-It does not call schedule install/remove, backup writes, snapshot writes, restore, Git, or any config mutation command.
+It does not call schedule install/remove, backup writes, snapshot writes, restore, Git, or any config mutation command. Provider Doctor can run a displayed Homebrew/npm install command only after explicit confirmation.
 
 The menu-bar command runs the same read-only scan, doctor, and built-in offline analysis commands. Provider selections affect the Analysis and Export Analysis commands only. Online-capable selections remain blocked unless the user enables `Allow Online Providers`; the extension never enables background mutation.
 
@@ -70,7 +70,7 @@ Manual smoke must use a fixture `Home Override`, not a real local home, before s
 - Menu-bar status shows finding, analysis, provider-warning, and schedule counters; its actions open existing read-only commands, open the latest report when present, and copy a redacted summary.
 - Findings search/filter/detail panes render redacted evidence, docs actions, scoped fix-plan exports, and reviewed-policy-ignore snippets.
 - Analysis renders built-in signals, selected provider output, provider warnings, and blocked-online-provider state.
-- Provider Doctor shows provider status and lets users enable or disable providers for Raycast Analysis without running online-capable providers unless explicit opt-in is enabled.
+- Provider Doctor shows provider status, install guidance, confirmation-gated provider CLI installation, and enable/disable controls for Raycast Analysis without running online-capable providers unless explicit opt-in is enabled.
 - Export commands copy redacted Markdown and do not mutate local config.
 - Open Reports opens only an existing reports folder.
 

@@ -7,9 +7,13 @@ import {
   getPreferenceValues,
   launchCommand,
   open,
+  showToast,
   showHUD,
+  Toast,
 } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { menuBarStatus, menuBarStatusMarkdown, severityColor } from "./format";
 import {
   analysisReport,
@@ -63,7 +67,12 @@ export default function Command() {
           <MenuBarExtra.Item
             title="Open Reports Folder"
             icon={Icon.Folder}
-            onAction={() => void open(reportsDir(runtime.homeOverride))}
+            onAction={() =>
+              void openLocalPath(
+                reportsDir(runtime.homeOverride),
+                "Reports folder is not available yet",
+              )
+            }
           />
         </MenuBarExtra.Section>
       </MenuBarExtra>
@@ -106,33 +115,71 @@ function StatusItems({
   lastReport?: string;
   onRefresh: () => void;
 }) {
+  const scheduleTitle = status.scheduled ? "Enabled" : "Off";
+
   return (
     <>
-      <MenuBarExtra.Section title="Status">
+      <MenuBarExtra.Section title="Findings">
+        {status.critical > 0 ? (
+          <MenuBarExtra.Item
+            title={`${status.critical} Critical`}
+            icon={{ source: Icon.ExclamationMark, tintColor: Color.Red }}
+          />
+        ) : null}
+        {status.high > 0 ? (
+          <MenuBarExtra.Item
+            title={`${status.high} High`}
+            icon={{ source: Icon.Warning, tintColor: severityColor("high") }}
+          />
+        ) : null}
+        {status.medium > 0 ? (
+          <MenuBarExtra.Item
+            title={`${status.medium} Medium`}
+            icon={{ source: Icon.Circle, tintColor: Color.Yellow }}
+          />
+        ) : null}
         <MenuBarExtra.Item
-          title={`${status.findings} findings`}
-          subtitle={`critical ${status.critical} - high ${status.high} - medium ${status.medium}`}
-          icon={{ source: Icon.Warning, tintColor: severityColor(status.risk) }}
+          title={`${status.findings} Total`}
+          icon={{ source: Icon.List, tintColor: severityColor(status.risk) }}
         />
+      </MenuBarExtra.Section>
+
+      <MenuBarExtra.Section title="Analysis">
         <MenuBarExtra.Item
-          title={`${status.signals} analysis signals`}
-          subtitle={`${status.providerWarnings} provider warnings`}
+          title={`${status.signals} Signals`}
           icon={Icon.MagnifyingGlass}
         />
+        {status.providerWarnings > 0 ? (
+          <MenuBarExtra.Item
+            title={`${status.providerWarnings} Provider Warnings`}
+            icon={{ source: Icon.ExclamationMark, tintColor: Color.Yellow }}
+          />
+        ) : null}
+        {status.historyDelta ? (
+          <MenuBarExtra.Item
+            title={status.historyDelta}
+            subtitle="Since previous scheduled scan"
+            icon={Icon.ArrowClockwise}
+          />
+        ) : null}
+      </MenuBarExtra.Section>
+
+      <MenuBarExtra.Section title="Schedule">
         <MenuBarExtra.Item
-          title={
-            status.scheduled ? "Scheduled scan installed" : "No scheduled scan"
-          }
-          subtitle={
-            status.lastFindings !== undefined
-              ? `${status.lastFindings} findings in last report`
-              : "no scheduled report yet"
-          }
+          title={scheduleTitle}
           icon={{
             source: Icon.Clock,
             tintColor: status.scheduled ? Color.Green : Color.Yellow,
           }}
         />
+        {status.lastFindings !== undefined ? (
+          <MenuBarExtra.Item
+            title={`${status.lastFindings} Findings in Latest Report`}
+            icon={Icon.Document}
+          />
+        ) : (
+          <MenuBarExtra.Item title="No Scheduled Report" icon={Icon.Document} />
+        )}
       </MenuBarExtra.Section>
 
       <MenuBarExtra.Section title="Open">
@@ -153,16 +200,18 @@ function StatusItems({
         />
         <MenuBarExtra.Item
           title="Reports Folder"
-          subtitle={reportDir}
           icon={Icon.Folder}
-          onAction={() => void open(reportDir)}
+          onAction={() =>
+            void openLocalPath(reportDir, "Reports folder is not available yet")
+          }
         />
         {lastReport ? (
           <MenuBarExtra.Item
             title="Latest Report"
-            subtitle={lastReport}
             icon={Icon.Document}
-            onAction={() => void open(lastReport)}
+            onAction={() =>
+              void openLocalPath(lastReport, "Latest report is not available")
+            }
           />
         ) : null}
       </MenuBarExtra.Section>
@@ -181,7 +230,7 @@ function StatusItems({
         <MenuBarExtra.Item
           title="Open Nightward Docs"
           icon={Icon.Book}
-          onAction={() => void open(docsUrl)}
+          onAction={() => void openDocs()}
         />
       </MenuBarExtra.Section>
     </>
@@ -189,10 +238,51 @@ function StatusItems({
 }
 
 async function openCommand(name: string) {
-  await launchCommand({ name, type: LaunchType.UserInitiated });
+  try {
+    await launchCommand({ name, type: LaunchType.UserInitiated });
+  } catch (error) {
+    await showToast({
+      style: Toast.Style.Failure,
+      title: `Could not open ${name}`,
+      message: error instanceof Error ? error.message : "Unknown Raycast error",
+    });
+  }
 }
 
 async function copyStatus(status: MenuBarStatus) {
   await Clipboard.copy(menuBarStatusMarkdown(status));
   await showHUD("Copied Nightward status");
+}
+
+async function openDocs() {
+  try {
+    await open(docsUrl);
+  } catch (error) {
+    await showToast({
+      style: Toast.Style.Failure,
+      title: "Could not open Nightward docs",
+      message: error instanceof Error ? error.message : "Unknown Raycast error",
+    });
+  }
+}
+
+async function openLocalPath(path: string, missingTitle: string) {
+  if (!existsSync(path)) {
+    await showToast({
+      style: Toast.Style.Failure,
+      title: missingTitle,
+      message: path,
+    });
+    return;
+  }
+
+  execFile("/usr/bin/open", [path], (error) => {
+    if (error) {
+      void showToast({
+        style: Toast.Style.Failure,
+        title: "Could not open path",
+        message: error.message,
+      });
+    }
+  });
 }

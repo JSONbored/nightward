@@ -5,6 +5,8 @@ project_name: nightward
 before:
   hooks:
     - go mod tidy
+    - sh -c "cd packages/tui && bun install --frozen-lockfile"
+    - sh -c "cd packages/tui && bun run sidecars"
 
 builds:
   - id: nightward
@@ -21,6 +23,9 @@ builds:
     goarch:
       - amd64
       - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
   - id: nw
     main: ./cmd/nw
     binary: nw
@@ -35,6 +40,9 @@ builds:
     goarch:
       - amd64
       - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
 
 archives:
   - id: default
@@ -53,6 +61,8 @@ archives:
       - README.md
       - LICENSE
       - SECURITY.md
+      - src: build/opentui/{{ .Os }}_{{ .Arch }}/nightward-tui*
+        strip_parent: true
 
 checksum:
   name_template: checksums.txt

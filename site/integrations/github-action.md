@@ -1,6 +1,6 @@
 # GitHub Action
 
-Nightward ships a composite GitHub Action for repository policy checks.
+Nightward ships a composite [GitHub Action](https://docs.github.com/en/actions) for repository policy checks.
 
 ```yaml
 - uses: JSONbored/nightward@v0.1.4
@@ -19,3 +19,5 @@ Nightward ships a composite GitHub Action for repository policy checks.
 ## Trust boundary
 
 The action validates relative output/config paths and keeps writes inside `GITHUB_WORKSPACE`. It treats repository content as untrusted input.
+
+Use the Action when you want the same local policy gate to run on pull requests, release branches, or dotfiles repositories before sync.

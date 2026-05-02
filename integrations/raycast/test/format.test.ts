@@ -224,9 +224,9 @@ test("menu bar status summarizes risk and schedule state", () => {
   };
 
   const status = menuBarStatus(report, doctor, analysis);
-  assert.equal(status.title, "1C");
+  assert.equal(status.title, "1");
   assert.equal(status.risk, "critical");
-  assert.match(status.tooltip, /1 critical \/ 1 high \/ 3 total findings/);
+  assert.match(status.tooltip, /Nightward: 1 critical, 1 high, 3 total/);
   assert.match(status.tooltip, /1 provider warnings/);
   assert.equal(status.historyDelta, "+2 findings");
   assert.match(menuBarStatusMarkdown(status), /Last scheduled findings: `2`/);

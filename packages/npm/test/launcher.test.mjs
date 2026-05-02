@@ -25,6 +25,7 @@ test("maps supported platforms to GoReleaser asset names", () => {
 test("rejects unsupported npm launcher platforms", () => {
   assert.throws(() => targetFor("freebsd", "x64"), /unsupported platform/);
   assert.throws(() => targetFor("linux", "ia32"), /unsupported platform/);
+  assert.throws(() => targetFor("win32", "arm64"), /unsupported platform/);
 });
 
 test("parses checksums by archive basename", () => {

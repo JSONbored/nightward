@@ -103,6 +103,71 @@
   margin-top: 0;
 }
 
+.nw-client-tabs {
+  overflow: hidden;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+}
+
+.nw-client-tabs__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 1px solid var(--vp-c-divider);
+  padding: 10px;
+}
+
+.nw-client-tabs__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 7px 11px;
+  background: transparent;
+  color: var(--vp-c-text-2);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.nw-client-tabs__button:hover,
+.nw-client-tabs__button--active {
+  border-color: rgba(94, 234, 212, 0.36);
+  background: rgba(45, 212, 191, 0.12);
+  color: var(--vp-c-text-1);
+}
+
+.nw-client-tabs__icon,
+.nw-client-tabs__badge {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.nw-client-tabs__badge {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.nw-client-tabs__panel {
+  padding: 16px;
+}
+
+.nw-client-tabs__file {
+  margin-top: 0;
+}
+
+.nw-client-tabs pre {
+  margin-bottom: 0;
+}
+
 .vp-doc img[alt^="Scrubbed Nightward HTML report"],
 .vp-doc img[alt^="Nightward TUI fixture"] {
   width: 100%;

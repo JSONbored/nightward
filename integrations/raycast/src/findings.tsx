@@ -43,6 +43,17 @@ export default function Command() {
   const allFindings = sortedFindings(data ?? []).filter(
     (finding) => !severity || finding.severity === severity,
   );
+  const sections = severity
+    ? [[severity, allFindings] as const]
+    : (["critical", "high", "medium", "low", "info"] as const)
+        .map(
+          (level) =>
+            [
+              level,
+              allFindings.filter((finding) => finding.severity === level),
+            ] as const,
+        )
+        .filter(([, findings]) => findings.length > 0);
 
   if (error) {
     return <Detail markdown={`# Nightward Findings\n\n${error.message}`} />;
@@ -58,15 +69,21 @@ export default function Command() {
       }
       filtering
     >
-      <List.Section title="Findings" subtitle={`${allFindings.length}`}>
-        {allFindings.map((finding) => (
-          <FindingItem
-            key={finding.id}
-            finding={finding}
-            onRefresh={revalidate}
-          />
-        ))}
-      </List.Section>
+      {sections.map(([level, findings]) => (
+        <List.Section
+          key={level}
+          title={level.charAt(0).toUpperCase() + level.slice(1)}
+          subtitle={`${findings.length}`}
+        >
+          {findings.map((finding) => (
+            <FindingItem
+              key={finding.id}
+              finding={finding}
+              onRefresh={revalidate}
+            />
+          ))}
+        </List.Section>
+      ))}
     </List>
   );
 }
@@ -111,12 +128,6 @@ function FindingItem({
         tintColor: severityColor(finding.severity as RiskLevel),
       }}
       accessories={[
-        {
-          tag: {
-            value: finding.severity,
-            color: severityColor(finding.severity),
-          },
-        },
         finding.fix_available
           ? {
               tag: {

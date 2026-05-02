@@ -1,18 +1,24 @@
 import {
   Action,
   ActionPanel,
+  Alert,
+  Clipboard,
   Color,
   Icon,
   List,
+  confirmAlert,
   getPreferenceValues,
   openExtensionPreferences,
+  open,
+  showHUD,
   showToast,
   Toast,
 } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
+import { execFile } from "node:child_process";
 import { useEffect, useMemo, useState } from "react";
 import { normalizePreferences, providersDoctor } from "./nightward";
-import { isOnlineProvider } from "./provider-options";
+import { installInfoForProvider, isOnlineProvider } from "./provider-options";
 import {
   clearSelectedProviders,
   readSelectedProviders,
@@ -104,6 +110,8 @@ function ProviderItem({
 }) {
   const blockedByPreference =
     selected && isOnlineProvider(provider.name) && !onlineAllowed;
+  const installInfo = installInfoForProvider(provider.name);
+  const installCommand = installInfo?.command;
   const selectionLabel = provider.default
     ? "built-in"
     : blockedByPreference
@@ -165,53 +173,92 @@ function ProviderItem({
       }
       actions={
         <ActionPanel>
-          {provider.default ? (
+          <ActionPanel.Section title="Provider">
+            {provider.default ? null : (
+              <Action
+                title={
+                  selected
+                    ? "Disable for Raycast Analysis"
+                    : "Enable for Raycast Analysis"
+                }
+                icon={selected ? Icon.XMarkCircle : Icon.PlusCircle}
+                onAction={() =>
+                  void toggleProvider(
+                    provider.name,
+                    !selected,
+                    onSelectedChange,
+                  )
+                }
+              />
+            )}
+            {provider.online && !onlineAllowed ? (
+              <Action
+                title="Allow Online Providers in Preferences"
+                icon={Icon.Gear}
+                onAction={() => void openExtensionPreferences()}
+              />
+            ) : null}
+            <Action
+              title="Clear Selected Providers"
+              icon={Icon.Trash}
+              onAction={() => void clearProviders(onSelectedChange)}
+            />
+          </ActionPanel.Section>
+
+          {installInfo ? (
+            <ActionPanel.Section title="Install">
+              {installCommand ? (
+                <>
+                  {!provider.available ? (
+                    <Action
+                      title="Install Provider"
+                      icon={Icon.Download}
+                      onAction={() =>
+                        void installProvider(
+                          provider.name,
+                          installCommand,
+                          onRefresh,
+                        )
+                      }
+                    />
+                  ) : null}
+                  <Action
+                    title="Copy Install Command"
+                    icon={Icon.Terminal}
+                    onAction={() =>
+                      void copyInstallCommand(provider.name, installCommand)
+                    }
+                  />
+                </>
+              ) : null}
+              <Action
+                title="Open Install Docs"
+                icon={Icon.Book}
+                onAction={() => void open(installInfo.url)}
+              />
+            </ActionPanel.Section>
+          ) : null}
+
+          <ActionPanel.Section title="Copy">
             <Action.CopyToClipboard
               title="Copy Provider Name"
               content={provider.name}
             />
-          ) : (
+            {provider.command ? (
+              <Action.CopyToClipboard
+                title="Copy Command Name"
+                content={provider.command}
+              />
+            ) : null}
+          </ActionPanel.Section>
+
+          <ActionPanel.Section title="Refresh">
             <Action
-              title={
-                selected
-                  ? "Disable for Raycast Analysis"
-                  : "Enable for Raycast Analysis"
-              }
-              icon={selected ? Icon.XMarkCircle : Icon.PlusCircle}
-              onAction={() =>
-                void toggleProvider(provider.name, !selected, onSelectedChange)
-              }
+              title="Refresh"
+              icon={Icon.ArrowClockwise}
+              onAction={onRefresh}
             />
-          )}
-          {provider.online && !onlineAllowed ? (
-            <Action
-              title="Allow Online Providers in Preferences"
-              icon={Icon.Gear}
-              onAction={() => void openExtensionPreferences()}
-            />
-          ) : null}
-          <Action
-            title="Clear Selected Providers"
-            icon={Icon.Trash}
-            onAction={() => void clearProviders(onSelectedChange)}
-          />
-          {provider.default ? null : (
-            <Action.CopyToClipboard
-              title="Copy Provider Name"
-              content={provider.name}
-            />
-          )}
-          {provider.command ? (
-            <Action.CopyToClipboard
-              title="Copy Command Name"
-              content={provider.command}
-            />
-          ) : null}
-          <Action
-            title="Refresh"
-            icon={Icon.ArrowClockwise}
-            onAction={onRefresh}
-          />
+          </ActionPanel.Section>
         </ActionPanel>
       }
     />
@@ -240,6 +287,7 @@ function providerMarkdown(
   onlineAllowed: boolean,
 ): string {
   const onlineBlocked = selected && provider.online && !onlineAllowed;
+  const installInfo = installInfoForProvider(provider.name);
   return [
     `# ${provider.name}`,
     "",
@@ -257,12 +305,58 @@ function providerMarkdown(
     "",
     "## Capability",
     provider.capabilities,
+    installInfo ? "" : "",
+    installInfo ? "## Install" : "",
+    installInfo?.command ? `Command: \`${installInfo.command}\`` : "",
+    installInfo?.note ?? "",
     provider.detail ? "" : "",
     provider.detail ? "## Detail" : "",
     provider.detail ? provider.detail : "",
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+async function copyInstallCommand(provider: string, command: string) {
+  await Clipboard.copy(command);
+  await showHUD(`Copied ${provider} install command`);
+}
+
+async function installProvider(
+  provider: string,
+  command: string,
+  onRefresh: () => void,
+) {
+  const confirmed = await confirmAlert({
+    title: `Install ${provider}?`,
+    message: `Raycast will run: ${command}`,
+    primaryAction: {
+      title: "Install",
+      style: Alert.ActionStyle.Default,
+    },
+  });
+  if (!confirmed) return;
+
+  const toast = await showToast({
+    style: Toast.Style.Animated,
+    title: `Installing ${provider}`,
+    message: command,
+  });
+  execFile("/bin/zsh", ["-lc", command], (error, stdout, stderr) => {
+    if (error) {
+      void showToast({
+        style: Toast.Style.Failure,
+        title: `Could not install ${provider}`,
+        message: (stderr || error.message).trim().slice(0, 180),
+      });
+      return;
+    }
+    toast.style = Toast.Style.Success;
+    toast.title = `${provider} installed`;
+    toast.message =
+      stdout.trim().slice(0, 180) || "Provider is ready to refresh.";
+    onRefresh();
+  });
 }
 
 async function toggleProvider(

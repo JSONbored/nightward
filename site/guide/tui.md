@@ -1,41 +1,46 @@
 # TUI
 
-Run the TUI with:
+Run Nightward without arguments to open the interactive OpenTUI app:
 
 ```sh
 nw
 ```
 
-![Nightward TUI fixture walkthrough](/demo/nightward-tui.gif)
+![Nightward OpenTUI fixture dashboard](/demo/nightward-opentui.png)
 
-## Screens
+[Open the fixture walkthrough GIF](/demo/nightward-opentui.gif)
 
-- Dashboard: scan counts and schedule status.
-- Inventory: discovered paths by tool, classification, and risk.
-- Findings: severity/tool/rule filters plus detail pane.
-- Analysis: offline risk signals and provider warnings.
-- Fix Plan: safe, review-required, and blocked remediation groups.
-- Backup Plan: private-dotfiles dry-run preview.
+## Sections
 
-Nightward uses Bubble Tea with Bubbles table, viewport, help, and text-input components. The current interface is still read-only, but list rendering, filter input, detail panes, footer help, and tab-specific accent colors are now component-backed instead of ad hoc terminal text.
+- Overview: risk posture, severity bars, recent findings, and next action.
+- Findings: searchable finding list with redacted detail panes.
+- Analysis: normalized offline signals and provider-warning context.
+- Fix Plan: plan-only remediation groups and review steps.
+- Inventory: discovered AI-tool paths by tool, classification, and risk.
+- Backup: dry-run dotfiles backup choices.
+- Help: key bindings and safety reminders.
+
+The Go scanner remains the source of truth. The CLI writes a private review bundle, then launches the compiled `nightward-tui` OpenTUI sidecar. Release archives, local installs, and npm-downloaded archives include that sidecar beside `nightward` and `nw`.
 
 ## Shortcuts
 
-- `1`-`6`: switch tabs.
-- `p`: open the command palette.
-- Arrow keys or `h`/`j`/`k`/`l`: navigate.
-- `/`: search findings.
-- `s`, `t`, `r`: cycle severity, tool, and rule filters.
+- `1`-`7`: switch sections.
+- `tab`, `right`, or `l`: next section.
+- `left` or `h`: previous section.
+- `up`, `down`, `j`, or `k`: move selection.
+- `/`: search.
+- `s`: cycle severity.
 - `x`: clear filters.
-- `c`: copy selected path, recommendation, or fix step.
-- `e`: export redacted fix plan.
-- `o`: open remediation docs.
-- `?`: help.
 - `q` or `esc`: quit.
 
 > [!NOTE]
-> The TUI remains read-only except explicit redacted export actions.
+> The TUI is read-only. It does not mutate MCP, agent, or dotfiles config. Fixes remain plan-only review material.
 
-## Command Palette
+## Local Development
 
-The command palette exposes the main actions without memorizing shortcuts: switch tabs, copy the current selection, export a redacted fix plan, open docs for the selected finding or fix, search findings, cycle filters, and clear filters. Palette actions stay plan-only and do not mutate agent configs.
+```sh
+make opentui-verify
+make opentui-demo
+```
+
+`make opentui-demo` regenerates the fixture-only GIF and PNG used by the README and website. Use fixture media for public docs; do not capture a real workstation.
