@@ -5,8 +5,8 @@ project_name: nightward
 before:
   hooks:
     - go mod tidy
-    - cd packages/tui && bun install --frozen-lockfile
-    - cd packages/tui && bun run sidecars
+    - sh -c "cd packages/tui && bun install --frozen-lockfile"
+    - sh -c "cd packages/tui && bun run sidecars"
 
 builds:
   - id: nightward
