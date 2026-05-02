@@ -71,10 +71,4 @@ signs:
       - --yes
 
 changelog:
-  use: github
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-      - "^chore:"
+  use: github-native

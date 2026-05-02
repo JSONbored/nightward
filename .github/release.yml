@@ -1,0 +1,46 @@
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking-change
+        - Semver-Major
+    - title: Security
+      labels:
+        - security
+    - title: Features
+      labels:
+        - enhancement
+        - feature
+    - title: Fixes
+      labels:
+        - bug
+        - fix
+    - title: Release / Distribution
+      labels:
+        - release
+        - distribution
+        - release-blocker
+        - maintainer-action
+    - title: Documentation
+      labels:
+        - documentation
+        - docs
+    - title: CI / Testing
+      labels:
+        - ci
+        - testing
+    - title: Dependencies
+      labels:
+        - dependencies
+    - title: Adapter And Rule Coverage
+      labels:
+        - adapter
+        - rule
+        - good-first-adapter
+        - good-first-rule
+    - title: Other Changes
+      labels:
+        - "*"
