@@ -4,3 +4,7 @@ args = ["-y", "@modelcontextprotocol/server-filesystem", "$HOME"]
 
 [mcp_servers.demo.env]
 API_TOKEN = "${API_TOKEN}"
+
+[mcp_servers.notes]
+command = "node"
+args = ["./tools/notes-mcp.js"]

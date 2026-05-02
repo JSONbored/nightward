@@ -61,6 +61,12 @@ Replace simple shell passthrough wrappers with direct executable invocation. Rev
 
 Replace broad filesystem mounts with explicit project or data paths after confirming the server's real access requirement.
 
+### mcp_server_review
+
+Confirm advisory MCP servers are intentional, documented, and safe to sync before
+moving them into portable dotfiles. Nightward collapses this advisory when the
+same server already has a stronger finding.
+
 ### mcp_unknown_command
 
 Review unsupported MCP server shapes manually. Add an explicit command where the client supports it, or open an adapter issue with a redacted config example.

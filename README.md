@@ -443,7 +443,7 @@ cargo run --bin nw -- scan --json
 cargo run --bin nw -- scan --workspace . --json
 cargo run --bin nw -- scan --json | jq '.summary'
 cargo run --bin nw -- findings list --json
-cargo run --bin nw -- findings list --json | jq '[.[] | select(.rule=="mcp_unknown_command")]'
+cargo run --bin nw -- findings list --json | jq '[.[] | select(.rule=="mcp_server_review")]'
 cargo run --bin nw -- analyze --all --json
 cargo run --bin nw -- providers doctor --json
 cargo run --bin nw -- rules list --json

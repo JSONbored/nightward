@@ -6,7 +6,7 @@
   "scan_mode": "home",
   "summary": {
     "total_items": 1,
-    "total_findings": 3,
+    "total_findings": 4,
     "items_by_classification": {
       "portable": 1
     },
@@ -17,16 +17,18 @@
       "Codex": 1
     },
     "findings_by_severity": {
-      "high": 2,
-      "critical": 1
+      "info": 1,
+      "medium": 2,
+      "high": 1
     },
     "findings_by_rule": {
       "mcp_broad_filesystem": 1,
       "mcp_secret_env": 1,
+      "mcp_server_review": 1,
       "mcp_unpinned_package": 1
     },
     "findings_by_tool": {
-      "Codex": 3
+      "Codex": 4
     }
   },
   "items": [
@@ -40,66 +42,11 @@
       "reason": "Path is a portable-looking configuration file.",
       "recommended_action": "Review generated findings before syncing.",
       "exists": true,
-      "size_bytes": 152,
+      "size_bytes": 222,
       "mod_time": "2026-05-01T00:00:00Z"
     }
   ],
   "findings": [
-    {
-      "id": "mcp_secret_env-2b536e661bca",
-      "tool": "Codex",
-      "path": "/tmp/nightward-fixture-home/.codex/config.toml",
-      "server": "demo",
-      "severity": "critical",
-      "rule": "mcp_secret_env",
-      "message": "MCP server \"demo\" stores sensitive env key API_TOKEN inline.",
-      "evidence": "env.API_TOKEN=${API_TOKEN}",
-      "recommended_action": "Move the value to a local secret source and keep only the variable name in portable config.",
-      "impact": "Unsafe portable config can expose secrets, stale local state, or unexpected agent capabilities.",
-      "why_this_matters": "AI agent and MCP configuration often sits in dotfiles and sync folders, so local-only values can leak or break on another machine.",
-      "docs_url": "https://jsonbored.github.io/nightward/guide/remediation",
-      "fix_available": true,
-      "fix_kind": "externalize-secret",
-      "confidence": "medium",
-      "risk": "critical",
-      "requires_review": true,
-      "fix_summary": "Move the value to a local secret source and keep only the variable name in portable config.",
-      "fix_steps": [
-        "Inspect the redacted evidence.",
-        "Move the value to a local secret source and keep only the variable name in portable config.",
-        "Re-run Nightward and compare the next report."
-      ],
-      "patch_hint": {
-        "kind": "externalize-secret",
-        "env_key": "API_TOKEN",
-        "inline_secret": true
-      }
-    },
-    {
-      "id": "mcp_broad_filesystem-8dca8b68a5eb",
-      "tool": "Codex",
-      "path": "/tmp/nightward-fixture-home/.codex/config.toml",
-      "server": "demo",
-      "severity": "high",
-      "rule": "mcp_broad_filesystem",
-      "message": "MCP server receives broad filesystem access.",
-      "evidence": "npx -y @modelcontextprotocol/server-filesystem $HOME ",
-      "recommended_action": "Narrow filesystem arguments to explicit project or vault directories.",
-      "impact": "Unsafe portable config can expose secrets, stale local state, or unexpected agent capabilities.",
-      "why_this_matters": "AI agent and MCP configuration often sits in dotfiles and sync folders, so local-only values can leak or break on another machine.",
-      "docs_url": "https://jsonbored.github.io/nightward/guide/mcp-security",
-      "fix_available": true,
-      "fix_kind": "narrow-filesystem",
-      "confidence": "medium",
-      "risk": "high",
-      "requires_review": true,
-      "fix_summary": "Narrow filesystem arguments to explicit project or vault directories.",
-      "fix_steps": [
-        "Inspect the redacted evidence.",
-        "Narrow filesystem arguments to explicit project or vault directories.",
-        "Re-run Nightward and compare the next report."
-      ]
-    },
     {
       "id": "mcp_unpinned_package-23f4e5dd9f16",
       "tool": "Codex",
@@ -128,6 +75,85 @@
         "kind": "pin-package",
         "package": "@modelcontextprotocol/server-filesystem"
       }
+    },
+    {
+      "id": "mcp_broad_filesystem-8dca8b68a5eb",
+      "tool": "Codex",
+      "path": "/tmp/nightward-fixture-home/.codex/config.toml",
+      "server": "demo",
+      "severity": "medium",
+      "rule": "mcp_broad_filesystem",
+      "message": "MCP server \"demo\" appears to reference broad filesystem access.",
+      "evidence": "npx -y @modelcontextprotocol/server-filesystem $HOME ",
+      "recommended_action": "Narrow filesystem arguments to explicit project or vault directories.",
+      "impact": "Unsafe portable config can expose secrets, stale local state, or unexpected agent capabilities.",
+      "why_this_matters": "AI agent and MCP configuration often sits in dotfiles and sync folders, so local-only values can leak or break on another machine.",
+      "docs_url": "https://jsonbored.github.io/nightward/guide/mcp-security",
+      "fix_available": true,
+      "fix_kind": "narrow-filesystem",
+      "confidence": "medium",
+      "risk": "medium",
+      "requires_review": true,
+      "fix_summary": "Narrow filesystem arguments to explicit project or vault directories.",
+      "fix_steps": [
+        "Inspect the redacted evidence.",
+        "Narrow filesystem arguments to explicit project or vault directories.",
+        "Re-run Nightward and compare the next report."
+      ]
+    },
+    {
+      "id": "mcp_secret_env-2b536e661bca",
+      "tool": "Codex",
+      "path": "/tmp/nightward-fixture-home/.codex/config.toml",
+      "server": "demo",
+      "severity": "medium",
+      "rule": "mcp_secret_env",
+      "message": "MCP server \"demo\" references a sensitive environment key.",
+      "evidence": "env.API_TOKEN=${API_TOKEN}",
+      "recommended_action": "Keep secret values outside dotfiles and document required env names only.",
+      "impact": "Unsafe portable config can expose secrets, stale local state, or unexpected agent capabilities.",
+      "why_this_matters": "AI agent and MCP configuration often sits in dotfiles and sync folders, so local-only values can leak or break on another machine.",
+      "docs_url": "https://jsonbored.github.io/nightward/guide/remediation",
+      "fix_available": true,
+      "fix_kind": "externalize-secret",
+      "confidence": "medium",
+      "risk": "medium",
+      "requires_review": true,
+      "fix_summary": "Keep secret values outside dotfiles and document required env names only.",
+      "fix_steps": [
+        "Inspect the redacted evidence.",
+        "Keep secret values outside dotfiles and document required env names only.",
+        "Re-run Nightward and compare the next report."
+      ],
+      "patch_hint": {
+        "kind": "externalize-secret",
+        "env_key": "API_TOKEN"
+      }
+    },
+    {
+      "id": "mcp_server_review-32cb8aea9ed4",
+      "tool": "Codex",
+      "path": "/tmp/nightward-fixture-home/.codex/config.toml",
+      "server": "notes",
+      "severity": "info",
+      "rule": "mcp_server_review",
+      "message": "Review MCP server \"notes\" before syncing this config.",
+      "evidence": "node ./tools/notes-mcp.js ",
+      "recommended_action": "Confirm this server is intentional and safe for the target machine before syncing.",
+      "impact": "Unsafe portable config can expose secrets, stale local state, or unexpected agent capabilities.",
+      "why_this_matters": "AI agent and MCP configuration often sits in dotfiles and sync folders, so local-only values can leak or break on another machine.",
+      "docs_url": "https://jsonbored.github.io/nightward/reference/rules",
+      "fix_available": true,
+      "fix_kind": "manual-review",
+      "confidence": "medium",
+      "risk": "info",
+      "requires_review": true,
+      "fix_summary": "Confirm this server is intentional and safe for the target machine before syncing.",
+      "fix_steps": [
+        "Inspect the redacted evidence.",
+        "Confirm this server is intentional and safe for the target machine before syncing.",
+        "Re-run Nightward and compare the next report."
+      ]
     }
   ],
   "adapters": [

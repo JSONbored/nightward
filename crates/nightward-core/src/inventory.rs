@@ -395,6 +395,7 @@ fn mcp_server_entries(value: &Value) -> Vec<(String, &Value)> {
 }
 
 fn inspect_server(report: &mut Report, tool: &str, path: &Path, server: &str, config: &Value) {
+    let finding_start = report.findings.len();
     let command = str_field(config, &["command", "cmd"]);
     let args = array_field(config, &["args", "arguments"]);
     let url = str_field(config, &["url", "endpoint"]);
@@ -460,23 +461,45 @@ fn inspect_server(report: &mut Report, tool: &str, path: &Path, server: &str, co
 
     for (key, value) in object_entries(config, &["env"]) {
         if secret_key(&key) || secret_value(&value) {
+            let value_is_inline_secret = secret_value(&value) || !env_reference(&value);
+            let severity = if value_is_inline_secret {
+                RiskLevel::Critical
+            } else {
+                RiskLevel::Medium
+            };
+            let message = if value_is_inline_secret {
+                format!(
+                    "MCP server \"{}\" stores sensitive env key {} inline.",
+                    server, key
+                )
+            } else {
+                format!(
+                    "MCP server \"{}\" references a sensitive environment key.",
+                    server
+                )
+            };
+            let action = if value_is_inline_secret {
+                "Move the value to a local secret source and keep only the variable name in portable config."
+            } else {
+                "Keep secret values outside dotfiles and document required env names only."
+            };
             push_finding(
                 report,
                 tool,
                 path,
                 server,
                 "mcp_secret_env",
-                RiskLevel::Critical,
-                &format!("MCP server \"{}\" stores sensitive env key {} inline.", server, key),
-                &format!("env.{}={}", key, redact_text(&value)),
-                "Move the value to a local secret source and keep only the variable name in portable config.",
+                severity,
+                &message,
+                &format!("env.{}={}", key, redact_secret_field_value(&value)),
+                action,
                 FixKind::ExternalizeSecret,
                 Some(PatchHint {
                     kind: Some(FixKind::ExternalizeSecret),
                     package: String::new(),
                     env_key: key,
                     header_key: String::new(),
-                    inline_secret: true,
+                    inline_secret: value_is_inline_secret,
                     direct_command: String::new(),
                     direct_args: Vec::new(),
                     replacement: String::new(),
@@ -498,7 +521,7 @@ fn inspect_server(report: &mut Report, tool: &str, path: &Path, server: &str, co
                     "MCP server \"{}\" stores sensitive header key {} inline.",
                     server, key
                 ),
-                &format!("headers.{}={}", key, redact_text(&value)),
+                &format!("headers.{}={}", key, redact_secret_field_value(&value)),
                 "Move the header value into a local environment variable or secret manager.",
                 FixKind::ExternalizeSecret,
                 Some(PatchHint {
@@ -538,8 +561,11 @@ fn inspect_server(report: &mut Report, tool: &str, path: &Path, server: &str, co
             path,
             server,
             "mcp_broad_filesystem",
-            RiskLevel::High,
-            "MCP server receives broad filesystem access.",
+            RiskLevel::Medium,
+            &format!(
+                "MCP server \"{}\" appears to reference broad filesystem access.",
+                server
+            ),
             &redact_text(&combined),
             "Narrow filesystem arguments to explicit project or vault directories.",
             FixKind::NarrowFilesystem,
@@ -557,6 +583,24 @@ fn inspect_server(report: &mut Report, tool: &str, path: &Path, server: &str, co
             "MCP server references a local credential path.",
             &redact_text(&combined),
             "Keep credential paths out of portable config and document local setup separately.",
+            FixKind::ManualReview,
+            None,
+        );
+    }
+    if report.findings.len() == finding_start {
+        push_finding(
+            report,
+            tool,
+            path,
+            server,
+            "mcp_server_review",
+            RiskLevel::Info,
+            &format!(
+                "Review MCP server \"{}\" before syncing this config.",
+                server
+            ),
+            &redact_text(&combined),
+            "Confirm this server is intentional and safe for the target machine before syncing.",
             FixKind::ManualReview,
             None,
         );
@@ -733,6 +777,20 @@ fn secret_value(value: &str) -> bool {
         .is_match(value)
 }
 
+fn env_reference(value: &str) -> bool {
+    Regex::new(r"^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$")
+        .expect("valid regex")
+        .is_match(value.trim())
+}
+
+fn redact_secret_field_value(value: &str) -> String {
+    if env_reference(value) {
+        value.trim().to_string()
+    } else {
+        "[REDACTED]".to_string()
+    }
+}
+
 pub fn redact_text(value: &str) -> String {
     let assignment = Regex::new(r#"(?i)((?:token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)[^"',\s}]+"#)
         .expect("valid regex");
@@ -823,6 +881,30 @@ mod tests {
     }
 
     #[test]
+    fn redacts_secret_key_values_even_when_token_shape_is_unknown() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = dir.path().join(".claude.json");
+        let header_key = ["CONTEXT7_", "API_", "KEY"].concat();
+        let header_value = ["ctx", "7sk-", "7f4e75c9-e4f3-4e18-b22f-832367f85b48"].concat();
+        fs::write(
+            &config,
+            format!(
+                r#"{{"mcpServers":{{"remote":{{"url":"https://example.test/mcp","headers":{{"{header_key}":"{header_value}"}}}}}}}}"#
+            ),
+        )
+        .unwrap();
+
+        let report = scan_home(dir.path()).unwrap();
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.rule == "mcp_secret_header")
+            .expect("secret header finding");
+        assert!(finding.evidence.contains("[REDACTED]"));
+        assert!(!finding.evidence.contains(&header_value));
+    }
+
+    #[test]
     fn parses_toml_mcp_servers() {
         let dir = tempfile::tempdir().unwrap();
         let config = dir.path().join(".codex");
@@ -841,5 +923,28 @@ args = ["package", "http://127.0.0.1:3000"]
             .findings
             .iter()
             .any(|finding| finding.rule == "mcp_local_endpoint"));
+    }
+
+    #[test]
+    fn adds_advisory_review_for_clean_mcp_server() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = dir.path().join(".codex");
+        fs::create_dir_all(&config).unwrap();
+        fs::write(
+            config.join("config.toml"),
+            r#"[mcp_servers.notes]
+command = "node"
+args = ["./tools/notes-mcp.js"]
+"#,
+        )
+        .unwrap();
+
+        let report = scan_home(dir.path()).unwrap();
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| finding.rule == "mcp_server_review"
+                && finding.severity == RiskLevel::Info
+                && finding.server == "notes"));
     }
 }

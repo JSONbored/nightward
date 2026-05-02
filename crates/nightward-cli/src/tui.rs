@@ -210,7 +210,7 @@ impl<'a> TuiState<'a> {
             area.x,
             area.y,
             "Review what AI tools can read, run, and accidentally sync.",
-            Style::fg(self.palette.white),
+            Style::fg(self.palette.white).with_bold(),
         );
         draw_text(
             buffer,
@@ -631,12 +631,12 @@ impl<'a> TuiState<'a> {
             buffer,
             area.x + 2,
             area.y + 2,
-            "SEV",
+            "SEVERITY",
             Style::fg(self.palette.muted),
         );
         draw_text(
             buffer,
-            area.x + 8,
+            area.x + 12,
             area.y + 2,
             "RULE",
             Style::fg(self.palette.muted),
@@ -672,9 +672,9 @@ impl<'a> TuiState<'a> {
             );
             draw_text(
                 buffer,
-                area.x + 8,
+                area.x + 12,
                 row,
-                &truncate(&finding.rule, area.w.saturating_sub(25) as usize),
+                &truncate(&finding.rule, area.w.saturating_sub(29) as usize),
                 Style::fg(if selected {
                     self.palette.white
                 } else {
@@ -998,9 +998,9 @@ fn severity_color(palette: &Palette, risk: RiskLevel) -> Rgba {
 
 fn severity_badge(risk: RiskLevel) -> &'static str {
     match risk {
-        RiskLevel::Critical => "CRIT",
+        RiskLevel::Critical => "CRITICAL",
         RiskLevel::High => "HIGH",
-        RiskLevel::Medium => "MED",
+        RiskLevel::Medium => "MEDIUM",
         RiskLevel::Low => "LOW",
         RiskLevel::Info => "INFO",
     }
@@ -1120,7 +1120,7 @@ mod tests {
 
     #[test]
     fn severity_labels_are_short() {
-        assert_eq!(severity_badge(RiskLevel::Critical), "CRIT");
+        assert_eq!(severity_badge(RiskLevel::Critical), "CRITICAL");
         assert_eq!(severity_badge(RiskLevel::Info), "INFO");
     }
 

@@ -49,7 +49,7 @@ pub fn all_rules() -> Vec<Rule> {
         },
         Rule {
             id: "mcp_broad_filesystem",
-            severity: RiskLevel::High,
+            severity: RiskLevel::Medium,
             fix_kind: FixKind::NarrowFilesystem,
             title: "MCP server can access a broad filesystem path",
             docs_url: "https://jsonbored.github.io/nightward/guide/mcp-security",
@@ -62,10 +62,17 @@ pub fn all_rules() -> Vec<Rule> {
             docs_url: "https://jsonbored.github.io/nightward/guide/privacy-model",
         },
         Rule {
-            id: "mcp_unknown_command",
+            id: "mcp_server_review",
             severity: RiskLevel::Info,
             fix_kind: FixKind::ManualReview,
             title: "MCP server should be reviewed",
+            docs_url: "https://jsonbored.github.io/nightward/reference/rules",
+        },
+        Rule {
+            id: "mcp_unknown_command",
+            severity: RiskLevel::Info,
+            fix_kind: FixKind::ManualReview,
+            title: "MCP server has an unsupported command shape",
             docs_url: "https://jsonbored.github.io/nightward/reference/rules",
         },
         Rule {
