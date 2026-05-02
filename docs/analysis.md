@@ -5,8 +5,8 @@ Nightward analysis turns scan findings and classified paths into explainable ris
 Default behavior is offline:
 
 ```sh
-nw analyze --all --json
-nw analyze --all --workspace . --json
+nw analyze --json
+nw analyze --workspace . --json
 ```
 
 Analysis output includes:
@@ -43,14 +43,14 @@ Online-capable providers remain blocked unless explicitly allowed:
 
 ```sh
 nw providers doctor --with socket --online --json
-nw analyze --all --workspace . --with trivy,osv-scanner,socket --online --json
+nw analyze --workspace . --with trivy,osv-scanner,socket --online --json
 ```
 
 Supported local providers can be executed explicitly during analysis:
 
 ```sh
-nw analyze --all --workspace . --with gitleaks --json
-nw analyze --all --workspace . --with gitleaks,trufflehog,semgrep --json
+nw analyze --workspace . --with gitleaks --json
+nw analyze --workspace . --with gitleaks,trufflehog,semgrep --json
 ```
 
 Provider runs use timeouts and bounded output capture. Nightward records redacted finding metadata, not raw secret values. Online-capable providers such as `trivy`, `osv-scanner`, and `socket` stay blocked unless the user also opts into online-capable behavior. Socket support is deliberately limited to scan creation and returned JSON parsing in v1; Nightward does not fetch or normalize remote Socket reports after creating the scan.

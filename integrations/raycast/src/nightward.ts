@@ -93,8 +93,19 @@ export async function explainFinding(
   );
 }
 
-export async function fixPlan(options: RuntimeOptions): Promise<FixPlan> {
-  return runNightwardJSON<FixPlan>(["fix", "plan", "--all", "--json"], options);
+export type FixPlanSelector = {
+  findingId?: string;
+  rule?: string;
+};
+
+export async function fixPlan(
+  options: RuntimeOptions,
+  selector: FixPlanSelector = {},
+): Promise<FixPlan> {
+  return runNightwardJSON<FixPlan>(
+    ["fix", "plan", ...fixSelectorArgs(selector), "--json"],
+    options,
+  );
 }
 
 export async function analysisReport(
@@ -181,9 +192,10 @@ export async function exportAnalysisMarkdown(
 
 export async function exportFixPlanMarkdown(
   options: RuntimeOptions,
+  selector: FixPlanSelector = {},
 ): Promise<string> {
   return runNightwardText(
-    ["fix", "export", "--all", "--format", "markdown"],
+    ["fix", "export", ...fixSelectorArgs(selector), "--format", "markdown"],
     options,
   );
 }
@@ -271,6 +283,12 @@ function execNightward(
 
 function commandLabel(executable: string, args: string[]): string {
   return [executable, ...args].join(" ");
+}
+
+function fixSelectorArgs(selector: FixPlanSelector): string[] {
+  if (selector.findingId) return ["--finding", selector.findingId];
+  if (selector.rule) return ["--rule", selector.rule];
+  return ["--all"];
 }
 
 function raycastCommandPath(executable: string): string {

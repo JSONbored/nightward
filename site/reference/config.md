@@ -1,6 +1,6 @@
 # Config Reference
 
-This page is generated from `nw policy explain` and `nw policy init --dry-run`.
+This page is generated from `nw policy explain` and `nw policy init`.
 
 ## Policy Behavior
 

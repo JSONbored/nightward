@@ -12,7 +12,7 @@ These run only when selected with `--with`:
 
 ```sh
 nw providers doctor --with gitleaks,trufflehog,semgrep
-nw analyze --all --workspace . --with gitleaks,trufflehog,semgrep --json
+nw analyze --workspace . --with gitleaks,trufflehog,semgrep --json
 ```
 
 Nightward does not install tools. It discovers them on `PATH`, runs bounded commands, parses supported JSON shapes, and redacts provider-derived evidence before emitting JSON, SARIF, TUI, Raycast, or badge output.
@@ -22,7 +22,7 @@ Nightward does not install tools. It discovers them on `PATH`, runs bounded comm
 These require both provider selection and an online gate:
 
 ```sh
-nw analyze --all --workspace . --with trivy,osv-scanner,socket --online --json
+nw analyze --workspace . --with trivy,osv-scanner,socket --online --json
 ```
 
 | Provider | Behavior |

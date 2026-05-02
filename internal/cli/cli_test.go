@@ -29,6 +29,8 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 	commands := [][]string{
 		{"scan", "--json"},
 		{"doctor", "--json"},
+		{"doctor", "fix-hints", "--json"},
+		{"plan", "backup", "--json"},
 		{"plan", "backup", "--target", targetDir, "--json"},
 		{"adapters", "explain", "Codex", "--json"},
 		{"adapters", "template", "Codex", "--json"},
@@ -36,7 +38,7 @@ func TestReadOnlyCommandsDoNotMutateHome(t *testing.T) {
 		{"fix", "plan", "--all", "--json"},
 		{"fix", "preview", "--all", "--format", "json"},
 		{"fix", "export", "--format", "markdown"},
-		{"analyze", "--all", "--json"},
+		{"analyze", "--json"},
 		{"providers", "list", "--json"},
 		{"providers", "doctor", "--json"},
 		{"rules", "list", "--json"},
@@ -90,6 +92,7 @@ API_TOKEN = "`+secretValue+`"
 	jsonCommands := [][]string{
 		{"scan", "--json"},
 		{"doctor", "--json"},
+		{"doctor", "fix-hints", "--json"},
 		{"adapters", "list", "--json"},
 		{"adapters", "explain", "--json", "Codex"},
 		{"adapters", "template", "--json", "Codex"},
@@ -97,7 +100,7 @@ API_TOKEN = "`+secretValue+`"
 		{"findings", "explain", "--json", findingID},
 		{"fix", "plan", "--all", "--json"},
 		{"fix", "preview", "--all", "--format", "json"},
-		{"analyze", "--all", "--json"},
+		{"analyze", "--json"},
 		{"analyze", "finding", "--json", findingID},
 		{"trust", "explain", "--json", findingID},
 		{"providers", "list", "--json"},
@@ -131,19 +134,21 @@ API_TOKEN = "`+secretValue+`"
 	textCommands := [][]string{
 		{"scan"},
 		{"doctor"},
+		{"doctor", "fix-hints"},
+		{"plan", "backup"},
 		{"plan", "backup", "--target", filepath.Join(home, "backup")},
 		{"findings", "list"},
 		{"findings", "explain", findingID},
 		{"fix", "plan", "--all"},
 		{"fix", "preview", "--all", "--format", "markdown"},
 		{"fix", "export", "--all", "--format", "markdown"},
-		{"analyze", "--all"},
+		{"analyze"},
 		{"trust", "explain", findingID},
 		{"rules", "list"},
 		{"rules", "explain", "mcp_secret_header"},
 		{"adapters", "explain", "Codex"},
 		{"adapters", "template", "Codex"},
-		{"policy", "init", "--dry-run"},
+		{"policy", "init"},
 		{"policy", "explain"},
 		{"schedule", "install", "--dry-run"},
 	}
@@ -159,12 +164,12 @@ API_TOKEN = "`+secretValue+`"
 	}
 
 	failures := [][]string{
-		{"plan", "backup", "--json"},
 		{"fix", "preview", "--all", "--format", "xml"},
-		{"policy", "init"},
 		{"rules", "explain", "mcp_secret"},
 		{"report", "html", "--input", "missing.json", "--output", filepath.Join(home, "report.html")},
+		{"report", "diff", "--from", "missing.json"},
 		{"snapshot", "diff", "--from", "missing.json"},
+		{"mcp"},
 		{"schedule", "install", "--preset", "bogus", "--dry-run"},
 	}
 	for _, args := range failures {
@@ -243,6 +248,14 @@ func TestReportDiffHistoryAndIndexCommands(t *testing.T) {
   ],
   "adapters": []
 }`)
+	beforeTime := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	afterTime := time.Date(2026, 5, 1, 0, 5, 0, 0, time.UTC)
+	if err := os.Chtimes(beforePath, beforeTime, beforeTime); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(afterPath, afterTime, afterTime); err != nil {
+		t.Fatal(err)
+	}
 
 	stdout, stderr, code := runCLI([]string{"report", "diff", "--from", beforePath, "--to", afterPath, "--json"})
 	if code != 0 {
@@ -255,6 +268,16 @@ func TestReportDiffHistoryAndIndexCommands(t *testing.T) {
 	stdout, stderr, code = runCLI([]string{"report", "diff", "--from", beforePath, "--to", afterPath})
 	if code != 0 || !strings.Contains(stdout, "Report diff: added=1 removed=0 changed=1") {
 		t.Fatalf("unexpected report diff text stdout=%s stderr=%s", stdout, stderr)
+	}
+
+	stdout, stderr, code = runCLI([]string{"report", "diff"})
+	if code != 0 || !strings.Contains(stdout, "Report diff: added=1 removed=0 changed=1") {
+		t.Fatalf("unexpected default report diff stdout=%s stderr=%s", stdout, stderr)
+	}
+
+	stdout, stderr, code = runCLI([]string{"report", "changes", "--json"})
+	if code != 0 || !json.Valid([]byte(stdout)) || !strings.Contains(stdout, `"added": 1`) {
+		t.Fatalf("unexpected report changes JSON stdout=%s stderr=%s", stdout, stderr)
 	}
 
 	stdout, stderr, code = runCLI([]string{"report", "history", "--json"})
@@ -285,6 +308,19 @@ func TestReportDiffHistoryAndIndexCommands(t *testing.T) {
 	}
 	if html := string(data); !strings.Contains(html, "Changes Since Previous Scan") || !strings.Contains(html, "finding-2") {
 		t.Fatalf("expected report diff section:\n%s", html)
+	}
+
+	stdout, stderr, code = runCLI([]string{"report", "html"})
+	if code != 0 {
+		t.Fatalf("default report html failed: stdout=%s stderr=%s", stdout, stderr)
+	}
+	defaultHTML := filepath.Join(reportsDir, "nightward-report-20260501-000500Z.html")
+	data, err = os.ReadFile(defaultHTML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if html := string(data); !strings.Contains(html, "Changes Since Previous Scan") || !strings.Contains(html, "finding-2") {
+		t.Fatalf("expected default report diff section:\n%s", html)
 	}
 
 	stdout, stderr, code = runCLI([]string{"report", "index", "--output", indexPath})

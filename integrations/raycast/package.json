@@ -134,6 +134,8 @@
     "build": "ray build -e dist",
     "lint": "ray lint",
     "fix-lint": "ray lint --fix",
+    "store-check": "node scripts/store-readiness.mjs",
+    "store-check:strict": "node scripts/store-readiness.mjs --strict",
     "publish": "ray publish"
   },
   "dependencies": {

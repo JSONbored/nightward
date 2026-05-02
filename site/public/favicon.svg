@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Nightward">
+  <path d="M64 14 101 29v27c0 29-15 49-37 59-22-10-37-30-37-59V29l37-15Z" fill="#0f766e"/>
+  <path d="M64 24 91 35v22c0 22-11 38-27 46-16-8-27-24-27-46V35l27-11Z" fill="#d9fffb"/>
+  <path d="M64 36c12 0 22 10 22 22 0 19-22 35-22 35S42 77 42 58c0-12 10-22 22-22Z" fill="#071014"/>
+  <circle cx="64" cy="58" r="10" fill="#5eead4"/>
+</svg>

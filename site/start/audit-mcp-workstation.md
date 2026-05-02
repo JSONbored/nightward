@@ -8,7 +8,7 @@ Nightward treats MCP config as a trust boundary, not just editor settings.
 nw scan --json
 nw findings list
 nw findings explain mcp_unpinned_package
-nw analyze --all --json
+nw analyze --json
 nw providers doctor --with gitleaks,trufflehog,semgrep --json
 ```
 
@@ -27,11 +27,11 @@ nw providers doctor --with gitleaks,trufflehog,semgrep --json
 Local providers stay opt-in:
 
 ```sh
-nw analyze --all --workspace . --with gitleaks,trufflehog,semgrep --json
+nw analyze --workspace . --with gitleaks,trufflehog,semgrep --json
 ```
 
 Online-capable providers require an explicit online gate:
 
 ```sh
-nw analyze --all --workspace . --with trivy,osv-scanner,socket --online --json
+nw analyze --workspace . --with trivy,osv-scanner,socket --online --json
 ```

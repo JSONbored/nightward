@@ -10,8 +10,13 @@ continue to use Conventional Commit style so generated notes stay readable.
 
 ## Unreleased
 
-- Replaced pre-1.0 deterministic SHA-1 IDs with SHA-256-backed IDs while
-  preserving the short ID shape.
+- Collapsed redundant `mcp_server_review` noise when stronger server-specific findings already exist.
+- Added grouped fix-plan review items for repeated package-pin remediation.
+- Added compact MCP policy output for AI-client status checks.
+- Improved CLI/Raycast provider-token redaction and scoped Raycast fix-plan actions.
+- Replaced pre-1.0 deterministic SHA-1 IDs with SHA-256-backed IDs while preserving the short ID shape.
+- Added OpenSSF Silver-ready governance, threat model, DCO, coverage, and release snapshot hardening.
+- Added a release-gated npm launcher package that downloads GitHub Release binaries on first run without `postinstall`.
 - Added VitePress documentation site scaffolding and GitHub Pages deployment workflow.
 - Added rules list/explain commands and local static HTML report generation.
 - Improved report history, website install UX, Raycast polish, and

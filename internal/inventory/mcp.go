@@ -30,6 +30,7 @@ type mcpServer struct {
 const maxMCPConfigBytes = 2 * 1024 * 1024
 
 var secretKeyPattern = regexp.MustCompile(`(?i)(token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)`)
+var providerTokenPattern = regexp.MustCompile(`(?i)^(?:sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9_]{20,}|glpat-[a-z0-9_-]{20,}|npm_[a-z0-9]{20,}|xox[abprs]-[a-z0-9-]{20,}|eyj[a-z0-9_-]{8,}\.[a-z0-9_-]{8,}\.[a-z0-9_-]{8,})$`)
 
 func inspectMCP(item Item, spec pathSpec) []Finding {
 	if !spec.CheckMCP || item.Kind == "directory" {
@@ -858,11 +859,37 @@ func redactArgSlice(parts []string) []string {
 			redactNext = true
 			continue
 		}
+		if providerTokenPattern.MatchString(strings.Trim(part, `"'`)) || looksOpaqueProviderToken(part) {
+			out[i] = "[redacted]"
+			continue
+		}
 		if secretKeyPattern.MatchString(part) {
 			out[i] = "[redacted]"
 		}
 	}
 	return out
+}
+
+func looksOpaqueProviderToken(part string) bool {
+	part = strings.Trim(part, `"'`)
+	if len(part) < 36 || strings.ContainsAny(part, `/\`) || strings.Contains(part, "@") || strings.Contains(part, ".") {
+		return false
+	}
+	var hasLower, hasUpper, hasDigit bool
+	for _, r := range part {
+		switch {
+		case r >= 'a' && r <= 'z':
+			hasLower = true
+		case r >= 'A' && r <= 'Z':
+			hasUpper = true
+		case r >= '0' && r <= '9':
+			hasDigit = true
+		case r == '-' || r == '_':
+		default:
+			return false
+		}
+	}
+	return hasDigit && (hasLower || hasUpper)
 }
 
 func secretAssignmentKey(part string) (string, bool) {

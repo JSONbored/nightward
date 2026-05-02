@@ -17,6 +17,16 @@ Nightward remediation is plan-only. It recommends changes, explains risk, and ca
 
 Package pinning does not guess versions. Choose a reviewed version from the upstream registry or release notes, then edit the package token manually.
 
+`nw fix plan` groups repeated review work where Nightward can identify a shared
+root cause. For example, repeated `mcp-remote` unpinned-package findings are
+summarized as one grouped review item so the same reviewed version can be
+applied consistently instead of triaging dozens of identical hints.
+
+Advisory `mcp_server_review` findings are collapsed when the same server already
+has a higher-severity finding. The stronger finding remains the review anchor,
+which keeps Raycast, HTML reports, MCP output, and policy results focused on the
+actionable risk.
+
 ## Rule Guidance
 
 ### mcp_secret_env

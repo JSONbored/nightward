@@ -71,7 +71,7 @@ func TestFindingSearchAndHelpRender(t *testing.T) {
 		t.Fatalf("unexpected filtered findings: %#v", filtered)
 	}
 	help := m.help(90)
-	if !strings.Contains(help, "search findings") || !strings.Contains(help, "do not mutate") {
+	if !strings.Contains(help, "search findings") || !strings.Contains(help, "command palette") || !strings.Contains(help, "do not mutate") {
 		t.Fatalf("help text missing expected content:\n%s", help)
 	}
 	if strings.Contains(help, "show first suggested") {
@@ -290,6 +290,57 @@ func TestTUIUpdateNavigationAndActionBranches(t *testing.T) {
 	}
 }
 
+func TestTUICommandPalette(t *testing.T) {
+	report := inventory.Report{Findings: []inventory.Finding{
+		{ID: "one", Tool: "Codex", Rule: "mcp_secret_env", Severity: inventory.RiskCritical, Message: "Sensitive key"},
+	}}
+	m := model{report: report, tab: 2, width: 120, height: 40}
+
+	updated, _ := m.Update(key("p"))
+	m = updated.(model)
+	if !m.palette || !strings.Contains(stripANSI(m.View()), "Command Palette") {
+		t.Fatalf("expected command palette, status=%q view=\n%s", m.status, stripANSI(m.View()))
+	}
+	commands := m.paletteCommands()
+	if len(commands) < 10 {
+		t.Fatalf("expected contextual palette commands, got %#v", commands)
+	}
+
+	for i, command := range commands {
+		if command.Action == "filter:severity" {
+			m.paletteCursor = i
+			break
+		}
+	}
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+	if cmd != nil || m.palette || m.severity != string(inventory.RiskCritical) || !strings.Contains(m.status, "severity") {
+		t.Fatalf("unexpected palette severity result: palette=%t severity=%q status=%q cmd=%v", m.palette, m.severity, m.status, cmd)
+	}
+
+	updated, _ = m.Update(key("p"))
+	m = updated.(model)
+	for i, command := range m.paletteCommands() {
+		if command.Action == "filters:clear" {
+			m.paletteCursor = i
+			break
+		}
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+	if m.severity != "" || m.status != "filters cleared" {
+		t.Fatalf("expected palette clear filters, severity=%q status=%q", m.severity, m.status)
+	}
+
+	updated, _ = m.Update(key("p"))
+	m = updated.(model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(model)
+	if m.palette {
+		t.Fatal("expected palette to close on escape")
+	}
+}
+
 func TestTUIViewResponsiveWidths(t *testing.T) {
 	report := inventory.Report{
 		GeneratedAt: time.Date(2026, 4, 30, 7, 0, 0, 0, time.UTC),
@@ -352,6 +403,12 @@ func TestTUIReportDeltaAndUtilityFallbacks(t *testing.T) {
 	if got := reportDelta([]schedule.ReportRecord{{Findings: 1, ModTime: now}, {Findings: 3, ModTime: now.Add(-time.Hour)}}); !strings.Contains(got, "-2 findings") {
 		t.Fatalf("unexpected negative delta: %q", got)
 	}
+	if got := reportSeverityDelta([]schedule.ReportRecord{
+		{FindingsBySeverity: map[inventory.RiskLevel]int{inventory.RiskCritical: 1, inventory.RiskHigh: 2}},
+		{FindingsBySeverity: map[inventory.RiskLevel]int{inventory.RiskHigh: 1, inventory.RiskMedium: 1}},
+	}); !strings.Contains(got, "critical +1") || !strings.Contains(got, "high +1") || !strings.Contains(got, "medium -1") {
+		t.Fatalf("unexpected severity delta: %q", got)
+	}
 	if got := byteSize(5 * 1024 * 1024); got != "5.0MB" {
 		t.Fatalf("unexpected byte size: %q", got)
 	}
@@ -389,15 +446,22 @@ func TestDashboardShowsReportHistoryAndNextActions(t *testing.T) {
 					Path:       "/tmp/nightward-home/.local/state/nightward/reports/new.json",
 					ReportName: "new.json",
 					Findings:   2,
-					SizeBytes:  2048,
-					ModTime:    time.Date(2026, 4, 30, 8, 0, 0, 0, time.UTC),
+					FindingsBySeverity: map[inventory.RiskLevel]int{
+						inventory.RiskCritical: 1,
+						inventory.RiskHigh:     1,
+					},
+					SizeBytes: 2048,
+					ModTime:   time.Date(2026, 4, 30, 8, 0, 0, 0, time.UTC),
 				},
 				{
 					Path:       "/tmp/nightward-home/.local/state/nightward/reports/old.json",
 					ReportName: "old.json",
 					Findings:   1,
-					SizeBytes:  1024,
-					ModTime:    time.Date(2026, 4, 29, 8, 0, 0, 0, time.UTC),
+					FindingsBySeverity: map[inventory.RiskLevel]int{
+						inventory.RiskHigh: 1,
+					},
+					SizeBytes: 1024,
+					ModTime:   time.Date(2026, 4, 29, 8, 0, 0, 0, time.UTC),
 				},
 			},
 		},
@@ -405,7 +469,7 @@ func TestDashboardShowsReportHistoryAndNextActions(t *testing.T) {
 		height: 40,
 	}
 	dashboard := stripANSI(m.dashboard(116))
-	for _, want := range []string{"Recent Reports", "new.json", "2.0KB", "Latest delta", "+1 findings", "What Next", "Review Findings and Fix Plan"} {
+	for _, want := range []string{"Recent Reports", "new.json", "2.0KB", "Latest delta", "+1 findings", "Severity delta", "critical +1", "What Next", "Review Findings and Fix Plan"} {
 		if !strings.Contains(dashboard, want) {
 			t.Fatalf("dashboard missing %q:\n%s", want, dashboard)
 		}
