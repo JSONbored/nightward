@@ -2,8 +2,8 @@
 
 NPM launcher for Nightward.
 
-Nightward is a local-first TUI/CLI for auditing AI agent state, MCP config, and
-dotfiles backup safety.
+Nightward shows what AI tools can read, run, and accidentally sync before
+configs leave your machine.
 
 ```sh
 npx @jsonbored/nightward --help

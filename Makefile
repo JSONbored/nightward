@@ -145,7 +145,7 @@ opentui-verify: opentui-test opentui-build
 
 opentui-demo:
 	PATH="$(HOME)/go/bin:$(PATH)" vhs docs/demo/nightward-opentui.tape
-	ffmpeg -y -ss 00:00:01.05 -i site/public/demo/nightward-opentui.gif -frames:v 1 -update 1 site/public/demo/nightward-opentui.png
+	ffmpeg -y -sseof -0.35 -i site/public/demo/nightward-opentui.gif -frames:v 1 -update 1 site/public/demo/nightward-opentui.png
 
 site-install:
 	cd $(SITE_DIR) && npm ci --ignore-scripts --no-audit

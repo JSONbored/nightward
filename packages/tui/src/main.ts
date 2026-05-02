@@ -243,17 +243,18 @@ function mainPanel(bundle: NightwardBundle, state: TuiState, width: number, heig
       paddingY: 1,
       backgroundColor: colors.bg
     },
-    header(bundle.scan, state),
-    content(bundle, state, width, Math.max(10, height - 8)),
+    header(bundle.scan, state, width),
+    content(bundle, state, width, Math.max(10, height - 9)),
     footer(state)
   );
 }
 
-function header(report: NightwardReport, state: TuiState) {
+function header(report: NightwardReport, state: TuiState, width: number) {
   const generated = report.generated_at ? new Date(report.generated_at).toLocaleString() : "unknown";
+  const cardWidth = Math.max(13, Math.min(18, Math.floor((width - 8) / 4)));
   return Box(
     {
-      height: 6,
+      height: 7,
       flexDirection: "column",
       border: ["bottom"],
       borderColor: colors.line
@@ -261,11 +262,11 @@ function header(report: NightwardReport, state: TuiState) {
     Text({ height: 1, content: "Review what AI tools can read, run, and accidentally sync.", fg: colors.text, attributes: 1 }),
     Text({ height: 1, content: `generated ${generated}`, fg: colors.muted }),
     Box(
-      { height: 3, flexDirection: "row", columnGap: 1, paddingY: 1 },
-      statCard("findings", String(totalFindings(report)), colorForSeverity(highestSeverity(report))),
-      statCard("items", String(report.summary?.total_items ?? report.items?.length ?? 0), colors.blue),
-      statCard("mode", report.scan_mode || (report.workspace ? "workspace" : "home"), colors.purple),
-      statCard("active", tabs[state.tab], colors.cyan)
+      { height: 4, flexDirection: "row", columnGap: 1, paddingY: 0 },
+      statCard("findings", String(totalFindings(report)), colorForSeverity(highestSeverity(report)), cardWidth),
+      statCard("items", String(report.summary?.total_items ?? report.items?.length ?? 0), colors.blue, cardWidth),
+      statCard("mode", report.scan_mode || (report.workspace ? "workspace" : "home"), colors.purple, cardWidth),
+      statCard("active", tabs[state.tab], colors.cyan, cardWidth)
     )
   );
 }
@@ -292,6 +293,7 @@ function content(bundle: NightwardBundle, state: TuiState, width: number, height
 
 function overviewView(report: NightwardReport, height: number) {
   const counts = severityCounts(report);
+  const visibleFindings = Math.max(3, Math.min(5, Math.floor((height - 10) / 3)));
   return Box(
     { height, flexDirection: "row", columnGap: 2, paddingY: 1 },
     Box(
@@ -301,13 +303,23 @@ function overviewView(report: NightwardReport, height: number) {
       ...severityOrder.map((severity) => Text({ height: 1, content: `${severity.padEnd(9)} ${bar(counts[severity], Math.max(1, totalFindings(report)), 20)} ${counts[severity]}`, fg: colorForSeverity(severity) })),
       spacer(),
       Text({ height: 1, content: "next action", fg: colors.cyan, attributes: 1 }),
-      Text({ height: 2, content: nextAction(report), fg: colors.text, wrapMode: "word" })
+      Text({ height: 2, content: nextAction(report), fg: colors.text, wrapMode: "word" }),
+      spacer(),
+      Text({ height: 1, content: "safe defaults", fg: colors.cyan, attributes: 1 }),
+      Text({ height: 1, content: "read-only scan", fg: colors.text }),
+      Text({ height: 1, content: "redacted outputs", fg: colors.text }),
+      Text({ height: 1, content: "offline unless requested", fg: colors.text })
     ),
     Box(
       { flexGrow: 1, height: "100%", flexDirection: "column", border: true, borderStyle: "rounded", borderColor: colors.blue, padding: 1, backgroundColor: colors.panel2 },
       Text({ height: 1, content: "recent findings", fg: colors.text, attributes: 1 }),
       spacer(),
-      ...filteredFindings(report, { severity: "", search: "" }).slice(0, 9).map((finding) => findingRow(finding, false, 64))
+      ...filteredFindings(report, { severity: "", search: "" }).slice(0, visibleFindings).map((finding) => findingRow(finding, false, 64)),
+      spacer(),
+      Text({ height: 1, content: "review flow", fg: colors.cyan, attributes: 1 }),
+      Text({ height: 1, content: "1. inspect finding evidence", fg: colors.text }),
+      Text({ height: 1, content: "2. export plan-only fix preview", fg: colors.text }),
+      Text({ height: 1, content: "3. apply changes manually after review", fg: colors.text })
     )
   );
 }
@@ -315,6 +327,7 @@ function overviewView(report: NightwardReport, height: number) {
 function findingsView(report: NightwardReport, state: TuiState, _width: number, height: number) {
   const findings = filteredFindings(report, state);
   const selected = selectedFinding(report, state);
+  const visibleFindings = Math.max(3, Math.min(10, Math.floor((height - 5) / 3)));
   return Box(
     { height, flexDirection: "row", columnGap: 2, paddingY: 1 },
     Box(
@@ -322,7 +335,7 @@ function findingsView(report: NightwardReport, state: TuiState, _width: number, 
       Text({ height: 1, content: `${findings.length} matching findings`, fg: colors.text, attributes: 1 }),
       Text({ height: 1, content: `severity=${state.severity || "all"} search=${state.search || "none"}`, fg: colors.muted }),
       spacer(),
-      ...findings.slice(0, 12).map((finding, index) => findingRow(finding, index === state.cursor, 72))
+      ...findings.slice(0, visibleFindings).map((finding, index) => findingRow(finding, index === state.cursor, 72))
     ),
     detailPanel(selected)
   );
@@ -343,6 +356,7 @@ function analysisView(bundle: NightwardBundle, state: TuiState, height: number) 
       .includes(query);
   });
   const selected = signals[Math.min(state.cursor, Math.max(0, signals.length - 1))];
+  const visibleSignals = Math.max(3, Math.min(10, Math.floor((height - 5) / 3)));
   return Box(
     { height, flexDirection: "row", columnGap: 2, paddingY: 1 },
     Box(
@@ -350,7 +364,7 @@ function analysisView(bundle: NightwardBundle, state: TuiState, height: number) 
       Text({ height: 1, content: `${signals.length} normalized signals`, fg: colors.text, attributes: 1 }),
       Text({ height: 1, content: `${bundle.analysis?.summary?.provider_warnings || 0} provider warnings`, fg: colors.muted }),
       spacer(),
-      ...signals.slice(0, 12).map((signal, index) => signalRow(signal, index === state.cursor))
+      ...signals.slice(0, visibleSignals).map((signal, index) => signalRow(signal, index === state.cursor))
     ),
     signalDetailPanel(selected)
   );
@@ -371,6 +385,7 @@ function fixPlanView(bundle: NightwardBundle, state: TuiState, _width: number, h
       .includes(query);
   });
   const selected = filtered[Math.min(state.cursor, Math.max(0, filtered.length - 1))];
+  const visibleFixes = Math.max(3, Math.min(10, Math.floor((height - 5) / 3)));
   return Box(
     { height, flexDirection: "row", columnGap: 2, paddingY: 1 },
     Box(
@@ -378,7 +393,7 @@ function fixPlanView(bundle: NightwardBundle, state: TuiState, _width: number, h
       Text({ height: 1, content: "plan-only remediation", fg: colors.text, attributes: 1 }),
       Text({ height: 1, content: "No config is mutated from this interface.", fg: colors.muted }),
       spacer(),
-      ...filtered.slice(0, 12).map((fix, index) => fixRow(fix, index === state.cursor))
+      ...filtered.slice(0, visibleFixes).map((fix, index) => fixRow(fix, index === state.cursor))
     ),
     fixDetailPanel(selected)
   );
@@ -387,13 +402,14 @@ function fixPlanView(bundle: NightwardBundle, state: TuiState, _width: number, h
 function inventoryView(report: NightwardReport, state: TuiState, _width: number, height: number) {
   const items = report.items || [];
   const selected = items[Math.min(state.cursor, Math.max(0, items.length - 1))];
+  const visibleItems = Math.max(4, Math.min(12, Math.floor((height - 4) / 2)));
   return Box(
     { height, flexDirection: "row", columnGap: 2, paddingY: 1 },
     Box(
       { width: "55%", height: "100%", flexDirection: "column", border: true, borderStyle: "rounded", borderColor: colors.blue, padding: 1, backgroundColor: colors.panel },
       Text({ height: 1, content: `${items.length} discovered config paths`, fg: colors.text, attributes: 1 }),
       spacer(),
-      ...items.slice(0, 14).map((item, index) => inventoryRow(item, index === state.cursor))
+      ...items.slice(0, visibleItems).map((item, index) => inventoryRow(item, index === state.cursor))
     ),
     Box(
       { flexGrow: 1, height: "100%", flexDirection: "column", border: true, borderStyle: "rounded", borderColor: colors.line, padding: 1, backgroundColor: colors.panel2 },
@@ -411,6 +427,7 @@ function backupView(bundle: NightwardBundle, state: TuiState, height: number) {
   const entries = bundle.backup_plan?.entries?.length ? bundle.backup_plan.entries : fallbackBackupEntries(bundle.scan);
   const selected = entries[Math.min(state.cursor, Math.max(0, entries.length - 1))];
   const summary = bundle.backup_plan?.summary || backupSummary(entries);
+  const visibleEntries = Math.max(3, Math.min(10, Math.floor((height - 5) / 3)));
   return Box(
     { height, flexDirection: "row", columnGap: 2, paddingY: 1 },
     Box(
@@ -418,7 +435,7 @@ function backupView(bundle: NightwardBundle, state: TuiState, height: number) {
       Text({ height: 1, content: "backup preview", fg: colors.text, attributes: 1 }),
       Text({ height: 1, content: `${summary?.included || 0} include  ${summary?.review || 0} review  ${summary?.excluded || 0} exclude`, fg: colors.muted }),
       spacer(),
-      ...entries.slice(0, 13).map((entry, index) => backupRow(entry, index === state.cursor))
+      ...entries.slice(0, visibleEntries).map((entry, index) => backupRow(entry, index === state.cursor))
     ),
     backupDetailPanel(selected, bundle.backup_plan?.target_root)
   );
@@ -428,7 +445,7 @@ function helpView(height: number) {
   return Box(
     { height, flexDirection: "column", paddingY: 1 },
     Box(
-      { width: "100%", height: 12, border: true, borderStyle: "rounded", borderColor: colors.purple, padding: 1, backgroundColor: colors.panel },
+      { width: "100%", height: 14, border: true, borderStyle: "rounded", borderColor: colors.purple, padding: 1, backgroundColor: colors.panel },
       Text({ height: 1, content: "keyboard", fg: colors.text, attributes: 1 }),
       spacer(),
       Text({ height: 1, content: "tab/1-7         switch section", fg: colors.text }),
@@ -533,11 +550,11 @@ function navItem(index: number, label: string, active: boolean) {
   );
 }
 
-function statCard(label: string, value: string, color: string) {
+function statCard(label: string, value: string, color: string, width: number) {
   return Box(
-    { width: 17, height: 3, flexDirection: "column", border: true, borderStyle: "rounded", borderColor: color, paddingX: 1, backgroundColor: colors.panel },
+    { width, height: 4, flexDirection: "column", border: true, borderStyle: "rounded", borderColor: color, paddingX: 1, backgroundColor: colors.panel },
     Text({ height: 1, content: label, fg: colors.muted }),
-    Text({ height: 1, content: truncate(value, 13), fg: color, attributes: 1 })
+    Text({ height: 1, content: truncate(value, Math.max(8, width - 4)), fg: color, attributes: 1 })
   );
 }
 

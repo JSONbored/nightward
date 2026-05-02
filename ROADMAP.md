@@ -26,7 +26,7 @@ Nightward is intentionally staged. The scanner and policy model need to stay tru
 - More MCP config shapes for Codex, Claude Code, and editor integrations.
 - Raycast screenshots, store metadata, and manual development-mode smoke evidence.
 - Golden SARIF snapshots and broader no-write tests.
-- Bubble Tea/Bubbles TUI upgrade with list, table, viewport, textinput, help, filter modal, command palette, report history, and mouse-wheel support.
+- OpenTUI interaction polish with richer list/table behavior, detail panes, command palette, report history, mouse support, and fixture-driven visual regression screenshots.
 - Deeper provider normalization, provider-specific fixtures, and clearer skip/timeout/output-cap reporting across CLI, TUI, Raycast, SARIF, policy, and HTML.
 - Fuzz coverage for MCP JSON/TOML/YAML parsing, URL/header redaction, symlink traversal, huge files, and malformed configs.
 - Add SLSA provenance/attestation after signed checksum and npm provenance flow are stable.

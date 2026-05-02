@@ -6,7 +6,9 @@ Run Nightward without arguments to open the interactive OpenTUI app:
 nw
 ```
 
-![Nightward OpenTUI fixture walkthrough](/demo/nightward-opentui.gif)
+![Nightward OpenTUI fixture dashboard](/demo/nightward-opentui.png)
+
+[Open the fixture walkthrough GIF](/demo/nightward-opentui.gif)
 
 ## Sections
 

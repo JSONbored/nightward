@@ -4,8 +4,8 @@ Require bun
 
 Set Shell "zsh"
 Set FontSize 18
-Set Width 1280
-Set Height 760
+Set Width 1440
+Set Height 900
 Set Padding 18
 Set BorderRadius 10
 Set WindowBar Colorful
@@ -37,5 +37,8 @@ Sleep 700ms
 Type "6"
 Sleep 700ms
 Type "7"
-Sleep 900ms
-Type "q"
+Sleep 700ms
+Type "1"
+Sleep 300ms
+Type "x"
+Sleep 1200ms

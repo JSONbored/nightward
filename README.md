@@ -34,7 +34,7 @@ The sample below is generated from the committed fixture home at [testdata/homes
 
 - [Scrubbed sample scan JSON](site/public/demo/nightward-sample-scan.json)
 - [Static HTML report](site/public/demo/nightward-sample-report.html)
-- [OpenTUI walkthrough GIF](site/public/demo/nightward-opentui.gif)
+- [OpenTUI screenshot](site/public/demo/nightward-opentui.png) and [walkthrough GIF](site/public/demo/nightward-opentui.gif)
 - Regenerate with `make demo-assets` using Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`
 
 ```mermaid
@@ -320,7 +320,7 @@ Keyboard shortcuts:
 
 Fixture-only TUI demo:
 
-![Nightward OpenTUI fixture walkthrough](site/public/demo/nightward-opentui.gif)
+![Nightward OpenTUI fixture dashboard](site/public/demo/nightward-opentui.png)
 
 ## MCP Server
 
