@@ -331,23 +331,21 @@ export function menuBarStatus(
     issueCount === 0
       ? ""
       : critical > 0
-        ? `${critical}C`
+        ? String(critical)
         : high > 0
-          ? `${high}H`
+          ? String(high)
           : medium > 0
-            ? `${medium}M`
+            ? String(medium)
             : String(issueCount);
   const tooltip = [
-    `${critical} critical / ${high} high / ${findings} total findings`,
-    low > 0 || info > 0 ? `${medium} medium / ${low} low / ${info} info` : "",
-    `${signals} analysis signals`,
-    `${providerWarnings} provider warnings`,
-    `max risk: ${risk}`,
+    `Nightward: ${critical} critical, ${high} high, ${findings} total`,
+    low > 0 || info > 0 ? `${medium} medium, ${low} low, ${info} info` : "",
+    `${signals} signals, ${providerWarnings} provider warnings`,
     historyDelta ? `scheduled delta: ${historyDelta}` : "",
-    doctor.schedule.installed ? "scheduled" : "not scheduled",
+    doctor.schedule.installed ? "scheduled scan on" : "scheduled scan off",
   ]
     .filter(Boolean)
-    .join(" - ");
+    .join(" • ");
 
   return {
     title,

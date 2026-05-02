@@ -106,22 +106,60 @@ function StatusItems({
   lastReport?: string;
   onRefresh: () => void;
 }) {
+  const severitySummary = [
+    status.critical > 0 ? `${status.critical} critical` : "",
+    status.high > 0 ? `${status.high} high` : "",
+    status.medium > 0 ? `${status.medium} medium` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   return (
     <>
-      <MenuBarExtra.Section title="Status">
+      <MenuBarExtra.Section title="Findings">
         <MenuBarExtra.Item
           title={`${status.findings} findings`}
-          subtitle={`critical ${status.critical} - high ${status.high} - medium ${status.medium}`}
+          subtitle={severitySummary || `Max severity: ${status.risk}`}
           icon={{ source: Icon.Warning, tintColor: severityColor(status.risk) }}
         />
+        {status.critical > 0 ? (
+          <MenuBarExtra.Item
+            title={`Critical: ${status.critical}`}
+            icon={{ source: Icon.ExclamationMark, tintColor: Color.Red }}
+          />
+        ) : null}
+        {status.high > 0 ? (
+          <MenuBarExtra.Item
+            title={`High: ${status.high}`}
+            icon={{ source: Icon.Warning, tintColor: severityColor("high") }}
+          />
+        ) : null}
+        {status.medium > 0 ? (
+          <MenuBarExtra.Item
+            title={`Medium: ${status.medium}`}
+            icon={{ source: Icon.Circle, tintColor: Color.Yellow }}
+          />
+        ) : null}
+      </MenuBarExtra.Section>
+
+      <MenuBarExtra.Section title="Analysis">
         <MenuBarExtra.Item
-          title={`${status.signals} analysis signals`}
-          subtitle={`${status.providerWarnings} provider warnings`}
+          title={`${status.signals} Signals`}
+          subtitle="Offline analysis"
           icon={Icon.MagnifyingGlass}
         />
+        {status.providerWarnings > 0 ? (
+          <MenuBarExtra.Item
+            title={`${status.providerWarnings} Provider Warnings`}
+            icon={{ source: Icon.ExclamationMark, tintColor: Color.Yellow }}
+          />
+        ) : null}
+      </MenuBarExtra.Section>
+
+      <MenuBarExtra.Section title="Schedule">
         <MenuBarExtra.Item
           title={
-            status.scheduled ? "Scheduled scan installed" : "No scheduled scan"
+            status.scheduled ? "Scheduled Scan Installed" : "No Scheduled Scan"
           }
           subtitle={
             status.lastFindings !== undefined
@@ -133,6 +171,13 @@ function StatusItems({
             tintColor: status.scheduled ? Color.Green : Color.Yellow,
           }}
         />
+        {status.historyDelta ? (
+          <MenuBarExtra.Item
+            title="Latest Change"
+            subtitle={status.historyDelta}
+            icon={Icon.ArrowClockwise}
+          />
+        ) : null}
       </MenuBarExtra.Section>
 
       <MenuBarExtra.Section title="Open">

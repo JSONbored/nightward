@@ -38,7 +38,7 @@ The package is a thin launcher:
 Example:
 
 ```sh
-npx @jsonbored/nightward --help
+npx @jsonbored/nightward scan
 npm install -g @jsonbored/nightward
 nw scan --json
 ```

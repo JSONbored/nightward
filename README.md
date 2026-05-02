@@ -103,7 +103,7 @@ This installs:
 Install the release-gated npm launcher:
 
 ```sh
-npx @jsonbored/nightward --help
+npx @jsonbored/nightward scan
 npm install -g @jsonbored/nightward
 nw scan --json
 ```
@@ -392,6 +392,7 @@ npm run dev
 Commands:
 
 - `Nightward Dashboard`
+- `Nightward Status`
 - `Nightward Findings`
 - `Nightward Analysis`
 - `Nightward Provider Doctor`
@@ -401,7 +402,7 @@ Commands:
 - `Export Nightward Analysis`
 - `Open Nightward Reports`
 
-The extension shells out to `nw` or `nightward`, renders redacted output, copies an explicitly requested fix-plan export, and opens the local reports folder. It does not mutate agent configs or install schedules.
+The extension shells out to `nw` or `nightward`, renders redacted output, copies explicitly requested exports, and opens the local reports folder. Provider Doctor can enable/disable provider selection for Raycast Analysis and show install commands/docs for missing local tools, but it does not run package managers, mutate agent configs, or install schedules.
 
 See [docs/raycast-extension.md](docs/raycast-extension.md) for preferences, validation, and read-only boundaries.
 

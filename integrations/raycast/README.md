@@ -7,10 +7,10 @@ This extension is read-only. It runs local `nw`/`nightward` commands, renders re
 ## Commands
 
 - `Nightward Dashboard`: scan summary, schedule status, adapters, and top findings.
-- `Nightward Status`: compact menu-bar marker such as `3C`, `18H`, or a total count, with detailed findings, analysis signals, provider warnings, and scheduled-report state in the dropdown.
+- `Nightward Status`: compact menu-bar marker with just the highest-risk count, plus detailed findings, analysis signals, provider warnings, and scheduled-report state in the dropdown.
 - `Nightward Findings`: searchable findings with severity filters, detail panes, scoped fix-plan exports, reviewed-policy-ignore snippets, and redacted evidence copy.
 - `Nightward Analysis`: built-in offline analysis plus any providers explicitly selected in Provider Doctor.
-- `Nightward Provider Doctor`: provider availability, privacy posture, and Raycast Analysis enable/disable controls.
+- `Nightward Provider Doctor`: provider availability, privacy posture, install guidance for missing tools, and Raycast Analysis enable/disable controls.
 - `Explain Nightward Finding`: detail view for a specific finding ID.
 - `Explain Nightward Signal`: detail view for the analysis signal attached to a finding ID.
 - `Export Nightward Fix Plan`: copies `nw fix export --format markdown` output.

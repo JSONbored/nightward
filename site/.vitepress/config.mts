@@ -47,9 +47,9 @@ export default defineConfig({
       text: "Edit this page on GitHub",
     },
     nav: [
-      { text: "Start", link: "/start/before-syncing-dotfiles" },
+      { text: "Start", link: "/guide/what-is-nightward" },
       { text: "Use Nightward", link: "/guide/getting-started" },
-      { text: "Integrations", link: "/integrations/github-action" },
+      { text: "Integrations", link: "/integrations/mcp-server" },
       { text: "Trust & Security", link: "/security/threat-model" },
       { text: "Reference", link: "/reference/cli" },
       { text: "Contribute", link: "/contribute/adapters-and-rules" },
@@ -58,65 +58,88 @@ export default defineConfig({
     sidebar: [
       {
         text: "Start",
+        collapsed: false,
         items: [
           { text: "What is Nightward?", link: "/guide/what-is-nightward" },
-          { text: "Before syncing dotfiles", link: "/start/before-syncing-dotfiles" },
-          { text: "Audit an MCP workstation", link: "/start/audit-mcp-workstation" },
-          { text: "Run in CI", link: "/start/run-in-ci" },
           { text: "Getting started", link: "/guide/getting-started" },
           { text: "Install", link: "/guide/install" },
+          {
+            text: "Quick paths",
+            collapsed: false,
+            items: [
+              { text: "Before syncing dotfiles", link: "/start/before-syncing-dotfiles" },
+              { text: "Audit an MCP workstation", link: "/start/audit-mcp-workstation" },
+              { text: "Run in CI", link: "/start/run-in-ci" },
+            ],
+          },
         ],
       },
       {
         text: "Use Nightward",
+        collapsed: false,
         items: [
-          { text: "Privacy model", link: "/guide/privacy-model" },
           { text: "TUI", link: "/guide/tui" },
           { text: "CLI", link: "/guide/cli" },
           { text: "MCP security", link: "/guide/mcp-security" },
           { text: "Remediation", link: "/guide/remediation" },
-          { text: "Policy and SARIF", link: "/guide/policy-and-sarif" },
           { text: "Provider execution", link: "/use/provider-execution" },
           { text: "Report history", link: "/use/report-history" },
+          { text: "Policy and SARIF", link: "/guide/policy-and-sarif" },
+          { text: "Privacy model", link: "/guide/privacy-model" },
           { text: "Troubleshooting", link: "/use/troubleshooting" },
         ],
       },
       {
         text: "Integrations",
+        collapsed: false,
         items: [
-          { text: "GitHub Action", link: "/integrations/github-action" },
-          { text: "Trunk", link: "/integrations/trunk" },
           { text: "MCP server", link: "/integrations/mcp-server" },
           { text: "Raycast", link: "/integrations/raycast" },
-        ],
-      },
-      {
-        text: "Reference",
-        items: [
-          { text: "CLI", link: "/reference/cli" },
-          { text: "Config", link: "/reference/config" },
-          { text: "Providers", link: "/reference/providers" },
-          { text: "JSON output", link: "/reference/json-output" },
-          { text: "Rules", link: "/reference/rules" },
-          { text: "Support matrix", link: "/reference/support-matrix" },
-          { text: "Output surfaces", link: "/reference/output-surfaces" },
-          { text: "Distribution", link: "/reference/distribution" },
+          { text: "GitHub Action", link: "/integrations/github-action" },
+          { text: "Trunk", link: "/integrations/trunk" },
         ],
       },
       {
         text: "Trust & Security",
+        collapsed: false,
         items: [
           { text: "Threat model", link: "/security/threat-model" },
           { text: "Release verification", link: "/security/release-verification" },
         ],
       },
       {
-        text: "Contribute",
+        text: "Reference",
+        collapsed: true,
         items: [
-          { text: "Adapters and rules", link: "/contribute/adapters-and-rules" },
+          {
+            text: "Commands and config",
+            items: [
+              { text: "CLI", link: "/reference/cli" },
+              { text: "Config", link: "/reference/config" },
+              { text: "JSON output", link: "/reference/json-output" },
+            ],
+          },
+          {
+            text: "Rules and coverage",
+            items: [
+              { text: "Rules", link: "/reference/rules" },
+              { text: "Providers", link: "/reference/providers" },
+              { text: "Support matrix", link: "/reference/support-matrix" },
+              { text: "Output surfaces", link: "/reference/output-surfaces" },
+            ],
+          },
+          { text: "Distribution", link: "/reference/distribution" },
         ],
       },
-      { text: "Roadmap", items: [{ text: "Roadmap", link: "/roadmap" }] },
+      {
+        text: "Contribute",
+        collapsed: true,
+        items: [
+          { text: "Adapters and rules", link: "/contribute/adapters-and-rules" },
+          { text: "Docs maintenance", link: "/contribute/docs-maintenance" },
+        ],
+      },
+      { text: "Roadmap", link: "/roadmap" },
     ],
     footer: {
       message: "Local-first. No telemetry. No default network calls. No live config mutation.",

@@ -37,12 +37,12 @@ features:
     <p>No account, no telemetry, no default network calls, and no config mutation.</p>
   </div>
   <div class="nw-install-command" aria-label="Recommended install command">
-    <span>Recommended</span>
-    <code>npx @jsonbored/nightward</code>
+    <span>Start with a read-only scan</span>
+    <code>npx @jsonbored/nightward scan</code>
   </div>
 </section>
 
-Prefer a persistent CLI? Use [npm, GitHub Releases, or `go install`](/guide/install), then run `nw scan`.
+Prefer a persistent CLI? Use [npm, GitHub Releases, or `go install`](/guide/install), then run `nw`.
 
 ## Pick A Path
 
@@ -50,7 +50,7 @@ Prefer a persistent CLI? Use [npm, GitHub Releases, or `go install`](/guide/inst
 - [Audit an MCP-heavy workstation](/start/audit-mcp-workstation): review command execution, broad filesystem access, local endpoints, and credential exposure.
 - [Run in CI](/start/run-in-ci): fail a workflow on policy violations and upload SARIF to code scanning.
 - [Use Raycast](/integrations/raycast): keep a menu-bar status surface and jump into findings without opening a terminal.
-- [Use MCP](/integrations/mcp-server): expose local Nightward context to AI clients without giving them write tools.
+- [Use MCP](/integrations/mcp-server): expose local Nightward context to Claude, Cursor, Codex, Antigravity, Windsurf, and other MCP clients without giving them write tools.
 - [Verify a release](/security/release-verification): check signatures, checksums, npm provenance, and install behavior.
 
 ## Real Fixture Output
@@ -71,7 +71,7 @@ The sample report below is generated from the committed `testdata/homes/policy` 
 | MCP security | Findings for unpinned package executors, shell wrappers, broad filesystem mounts, sensitive env/header exposure, local endpoints, token paths, symlinks, parse failures, and unknown server shapes. |
 | Report history | Compare scan JSON files, inspect latest-report status, render filterable diff-aware HTML, and generate a static local report index. |
 | Policy and CI | Reason-required ignores, policy badges, SARIF output, GitHub Action mode, and Trunk plugin support. |
-| Providers | Local `gitleaks`, `trufflehog`, and `semgrep`; online-gated `trivy`, `osv-scanner`, and remote Socket scan creation. |
+| Providers | Local [Gitleaks](https://github.com/gitleaks/gitleaks), [TruffleHog](https://github.com/trufflesecurity/trufflehog), and [Semgrep](https://semgrep.dev/); online-gated [Trivy](https://trivy.dev/), [OSV-Scanner](https://google.github.io/osv-scanner/), and remote [Socket](https://socket.dev/) scan creation. |
 | MCP server | Read-only stdio tools/resources for local AI clients; no network listener, no mutation tools, and no online providers in v1. |
 
 ## Trust Posture

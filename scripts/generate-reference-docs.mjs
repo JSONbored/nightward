@@ -29,6 +29,62 @@ const rules = parseJSON(["rules", "list", "--json"]);
 const policyExplain = runNightward(["policy", "explain"]);
 const defaultPolicy = runNightward(["policy", "init"]);
 
+const providerLinks = new Map([
+  ["nightward", { home: "https://github.com/JSONbored/nightward" }],
+  [
+    "gitleaks",
+    {
+      home: "https://github.com/gitleaks/gitleaks",
+      install: "https://github.com/gitleaks/gitleaks#installing",
+    },
+  ],
+  [
+    "trufflehog",
+    {
+      home: "https://github.com/trufflesecurity/trufflehog",
+      install: "https://github.com/trufflesecurity/trufflehog#installation",
+    },
+  ],
+  [
+    "semgrep",
+    {
+      home: "https://semgrep.dev/",
+      install: "https://semgrep.dev/docs/getting-started/",
+    },
+  ],
+  [
+    "trivy",
+    {
+      home: "https://trivy.dev/",
+      install: "https://trivy.dev/latest/getting-started/installation/",
+    },
+  ],
+  [
+    "osv-scanner",
+    {
+      home: "https://google.github.io/osv-scanner/",
+      install: "https://google.github.io/osv-scanner/installation/",
+    },
+  ],
+  [
+    "socket",
+    {
+      home: "https://socket.dev/",
+      install: "https://docs.socket.dev/docs/socket-cli",
+    },
+  ],
+]);
+
+function providerName(provider) {
+  const link = providerLinks.get(provider.name);
+  return link?.home ? `[${provider.name}](${link.home})` : provider.name;
+}
+
+function providerInstallDocs(provider) {
+  const link = providerLinks.get(provider.name);
+  return link?.install ? `[docs](${link.install})` : "built-in";
+}
+
 write(
   "cli.md",
   `# CLI Reference
@@ -49,15 +105,16 @@ This page is generated from \`nw providers list --json\`.
 
 Nightward never installs providers. Local providers run only when selected with \`--with\`. Online-capable providers also require \`--online\` or \`allow_online_providers: true\` in policy config.
 
-| Provider | Mode | Command | Default | Privacy | Capabilities |
-| --- | --- | --- | --- | --- | --- |
+| Provider | Mode | Command | Default | Install | Privacy | Capabilities |
+| --- | --- | --- | --- | --- | --- | --- |
 ${providers
   .map((provider) =>
     [
-      provider.name,
+      providerName(provider),
       provider.online ? "online-capable" : "local/offline",
       provider.command ? `\`${provider.command}\`` : "built-in",
       provider.default ? "yes" : "no",
+      providerInstallDocs(provider),
       provider.privacy,
       provider.capabilities,
     ].join(" | "),
