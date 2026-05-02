@@ -11,7 +11,9 @@ Nightward releases are human-gated. Do not create a tag until the release candid
 5. Confirm `npm audit --audit-level=moderate` passes in both `integrations/raycast` and `packages/npm`.
 6. Confirm `npm pack --dry-run` passes in `packages/npm`.
 7. Confirm `npm audit signatures` where dependencies exist; the npm launcher currently has no runtime dependencies, so this may report that there is nothing to audit.
-8. Review `CHANGELOG.md` for user-facing changes, security notes, and breaking pre-1.0 behavior.
+8. Review the generated GitHub Release notes and the curated `CHANGELOG.md`
+   index for user-facing changes, security notes, and breaking pre-1.0
+   behavior.
 9. Confirm the OpenSSF evidence doc is current.
 10. After publish, run the release and npm verification scripts for the released version.
 
@@ -40,6 +42,16 @@ Unsigned tags should not be used for public releases.
 ## GitHub Release
 
 The release workflow runs GoReleaser from strict `vX.Y.Z` tags. It builds archives, creates checksums, generates SBOMs, signs `checksums.txt` with Cosign, and publishes the GitHub Release.
+
+GitHub Releases are the canonical public release notes. GoReleaser delegates
+changelog generation to GitHub-native generated release notes, organized by
+`.github/release.yml` label categories. Keep release PR titles in Conventional
+Commit style and apply release-note labels before tagging so the generated notes
+are useful without manual editing.
+
+`CHANGELOG.md` is a lightweight curated index. Update it for stable releases,
+superseded release attempts, security notes, and important pre-1.0 compatibility
+notes, but do not duplicate every generated release-note entry there.
 
 Verify a release locally with:
 
