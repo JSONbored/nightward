@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Nightward uses Renovate instead of Dependabot for Go modules, Raycast extension packages, GitHub Actions, and pinned local tool versions.",
+  "description": "Nightward uses Renovate instead of Dependabot for Rust crates, Raycast extension packages, GitHub Actions, and pinned local tool versions.",
   "extends": [
     "config:recommended",
     ":semanticCommits",
@@ -27,10 +27,9 @@
       "labels": ["dependencies", "github-actions"]
     },
     {
-      "matchManagers": ["gomod"],
-      "groupName": "go modules",
-      "labels": ["dependencies", "go"],
-      "postUpdateOptions": ["gomodTidy"]
+      "matchManagers": ["cargo"],
+      "groupName": "rust crates",
+      "labels": ["dependencies", "rust"]
     },
     {
       "matchManagers": ["npm"],
@@ -43,30 +42,13 @@
       "labels": ["dependencies", "npm"]
     },
     {
-      "matchPackageNames": ["gotest.tools/gotestsum"],
-      "groupName": "go test tooling",
-      "labels": ["dependencies", "go", "test"]
-    },
-    {
       "matchPackageNames": [
-        "github.com/zricethezav/gitleaks/v8",
-        "golang.org/x/vuln"
+        "gitleaks/gitleaks",
+        "crate-ci/cargo-deny",
+        "rustsec/rustsec"
       ],
       "groupName": "security scan tooling",
-      "labels": ["dependencies", "go", "security"]
-    },
-    {
-      "matchPackageNames": [
-        "github.com/securego/gosec/v2",
-        "honnef.co/go/tools"
-      ],
-      "groupName": "go static analysis tooling",
-      "labels": ["dependencies", "go", "security"]
-    },
-    {
-      "matchPackageNames": ["goreleaser/goreleaser", "github.com/anchore/syft"],
-      "groupName": "release tooling",
-      "labels": ["dependencies", "release"]
+      "labels": ["dependencies", "rust", "security"]
     },
     {
       "matchPackageNames": ["trunk-io/plugins"],
@@ -77,81 +59,33 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Update gotestsum used by Makefile JUnit test reports.",
-      "fileMatch": ["^Makefile$"],
-      "matchStrings": [
-        "GOTESTSUM_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
-      ],
-      "depNameTemplate": "gotest.tools/gotestsum",
-      "datasourceTemplate": "go"
-    },
-    {
-      "customType": "regex",
       "description": "Update Gitleaks used by Makefile secret scanning.",
       "fileMatch": ["^Makefile$"],
       "matchStrings": [
         "GITLEAKS_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
       ],
-      "depNameTemplate": "github.com/zricethezav/gitleaks/v8",
-      "datasourceTemplate": "go"
-    },
-    {
-      "customType": "regex",
-      "description": "Update govulncheck used by Makefile vulnerability scanning.",
-      "fileMatch": ["^Makefile$"],
-      "matchStrings": [
-        "GOVULNCHECK_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
-      ],
-      "depNameTemplate": "golang.org/x/vuln",
-      "datasourceTemplate": "go"
-    },
-    {
-      "customType": "regex",
-      "description": "Update gosec used by Makefile static analysis.",
-      "fileMatch": ["^Makefile$"],
-      "matchStrings": [
-        "GOSEC_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
-      ],
-      "depNameTemplate": "github.com/securego/gosec/v2",
-      "datasourceTemplate": "go"
-    },
-    {
-      "customType": "regex",
-      "description": "Update staticcheck used by Makefile static analysis.",
-      "fileMatch": ["^Makefile$"],
-      "matchStrings": [
-        "STATICCHECK_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
-      ],
-      "depNameTemplate": "honnef.co/go/tools",
-      "datasourceTemplate": "go"
-    },
-    {
-      "customType": "regex",
-      "description": "Update GoReleaser used by Makefile release snapshots.",
-      "fileMatch": ["^Makefile$"],
-      "matchStrings": [
-        "GORELEASER_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
-      ],
-      "depNameTemplate": "goreleaser/goreleaser",
+      "depNameTemplate": "gitleaks/gitleaks",
       "datasourceTemplate": "github-releases"
     },
     {
       "customType": "regex",
-      "description": "Update Syft used by Makefile release SBOM snapshots.",
+      "description": "Update cargo-audit used by Makefile vulnerability scanning.",
       "fileMatch": ["^Makefile$"],
       "matchStrings": [
-        "SYFT_VERSION\\s*\\?=\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
+        "CARGO_AUDIT_VERSION\\s*\\?=\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ],
-      "depNameTemplate": "github.com/anchore/syft",
-      "datasourceTemplate": "go"
+      "depNameTemplate": "cargo-audit",
+      "datasourceTemplate": "crate"
     },
     {
       "customType": "regex",
-      "description": "Update the GoReleaser binary version used by the release workflow.",
-      "fileMatch": ["^\\.github/workflows/release\\.yml$"],
-      "matchStrings": ["version:\\s*(?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
-      "depNameTemplate": "goreleaser/goreleaser",
-      "datasourceTemplate": "github-releases"
+      "description": "Update cargo-deny used by Makefile policy scanning.",
+      "fileMatch": ["^Makefile$"],
+      "matchStrings": [
+        "CARGO_DENY_VERSION\\s*\\?=\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "cargo-deny",
+      "datasourceTemplate": "crate"
     },
     {
       "customType": "regex",

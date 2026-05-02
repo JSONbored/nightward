@@ -19,10 +19,10 @@ make test
 make test-junit
 make trunk-flaky-validate
 make trunk-check
-go run ./cmd/nw --help
-go run ./cmd/nw scan --json
-go run ./cmd/nw fix plan --all --json
-go run ./cmd/nw fix preview --all --format markdown
+cargo run --bin nw -- --help
+cargo run --bin nw -- scan --json
+cargo run --bin nw -- fix plan --all --json
+cargo run --bin nw -- fix preview --all --format markdown
 ```
 
 Use fixtures with temporary homes for adapter and policy tests. Do not add real local config files, tokens, credentials, shell history, app databases, or personal paths.
@@ -56,11 +56,13 @@ Nightward uses Renovate instead of Dependabot. Dependency PRs should use Convent
 
 Current security checks:
 
-- Go tests
+- Rust tests
+- Cargo fmt and clippy
 - Trunk Check
 - Trunk Flaky Tests JUnit validation
 - Gitleaks
-- govulncheck
+- cargo audit
+- cargo deny
 - OSV Scanner
 - Nightward SARIF upload
 - OpenSSF Scorecard

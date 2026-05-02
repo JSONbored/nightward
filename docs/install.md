@@ -16,7 +16,7 @@ GitHub Releases are the canonical binary distribution channel.
 
 Release artifacts include:
 
-- `nightward`, `nw`, and `nightward-tui` binaries for macOS, Linux, and Windows x64.
+- `nightward` and `nw` Rust binaries for macOS, Linux, and Windows x64.
 - `checksums.txt`.
 - `checksums.txt.sigstore.json` from Cosign keyless signing.
 - SBOM files for release archives.
@@ -33,9 +33,8 @@ The package is a thin launcher:
 - no bundled Node implementation of Nightward
 - downloads the matching GitHub Release archive on first run
 - verifies the archive SHA-256 from `checksums.txt`
-- caches extracted `nightward`, `nw`, and `nightward-tui` binaries locally
-
-Windows ARM64 is not published yet because the OpenTUI sidecar does not currently have a Bun compile target for that platform.
+- caches extracted `nightward` and `nw` binaries locally
+Windows ARM64 remains deferred until the release matrix includes a validated Windows ARM64 Rust build.
 
 Example:
 

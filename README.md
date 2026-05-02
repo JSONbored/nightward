@@ -34,7 +34,7 @@ The sample below is generated from the committed fixture home at [testdata/homes
 
 - [Scrubbed sample scan JSON](site/public/demo/nightward-sample-scan.json)
 - [Static HTML report](site/public/demo/nightward-sample-report.html)
-- [OpenTUI screenshot](site/public/demo/nightward-opentui.png) and [walkthrough GIF](site/public/demo/nightward-opentui.gif)
+- [TUI screenshot](site/public/demo/nightward-tui.png) and [walkthrough GIF](site/public/demo/nightward-tui.gif)
 - Regenerate with `make demo-assets` using Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`
 
 ```mermaid
@@ -65,7 +65,7 @@ Nightward answers the practical questions first:
 
 ## Highlights
 
-- OpenTUI interactive app with dashboard, findings, analysis, fix plan, inventory, backup preview, and help sections.
+- OpenTUI-powered interactive app with dashboard, findings, analysis, fix plan, inventory, backup preview, and help sections.
 - `nightward` canonical command plus `nw` short alias.
 - Redacted JSON for automation and CI.
 - HOME scanning for local machines and `--workspace` scanning for CI, Trunk, and dotfiles repos.
@@ -99,7 +99,6 @@ This installs:
 
 - `nightward`: canonical project command
 - `nw`: short alias for frequent terminal/TUI use
-- `nightward-tui`: OpenTUI renderer sidecar used by the default interactive app
 
 Install the release-gated npm launcher:
 
@@ -307,7 +306,7 @@ The default `nightward` / `nw` command opens the TUI:
 - Fix Plan: safe/review/blocked remediation groups
 - Backup Plan: private-dotfiles dry-run preview
 
-The TUI is an OpenTUI sidecar backed by the Go scanner engine. The Go binary writes a private, redacted review bundle, then launches `nightward-tui` so the interface can use richer panels, color, and navigation without reimplementing scanner logic.
+The TUI is now part of the Rust CLI binary and uses `opentui_rust` directly for the colored dashboard, filled panels, severity ribbons, and fixture-driven screenshots. Release archives and npm-downloaded binaries only need `nightward` and `nw`.
 
 Keyboard shortcuts:
 
@@ -320,7 +319,7 @@ Keyboard shortcuts:
 
 Fixture-only TUI demo:
 
-![Nightward OpenTUI fixture dashboard](site/public/demo/nightward-opentui.png)
+![Nightward TUI fixture dashboard](site/public/demo/nightward-tui.png)
 
 ## MCP Server
 
@@ -433,21 +432,20 @@ make raycast-verify
 make npm-package-verify
 make release-snapshot
 make verify
-go run ./cmd/nightward --help
-go run ./cmd/nw --help
-go run ./cmd/nw scan --json
-go run ./cmd/nw scan --workspace . --json
-go run ./cmd/nw scan --json | jq '.summary'
-go run ./cmd/nw findings list --json
-go run ./cmd/nw findings list --json | jq '[.[] | select(.rule=="mcp_unknown_command")]'
-go run ./cmd/nw analyze --json
-go run ./cmd/nw providers doctor --json
-go run ./cmd/nw rules list --json
-go run ./cmd/nw fix plan --json
-go run ./cmd/nw fix preview --all --format markdown
-go run ./cmd/nw policy sarif --output /tmp/nightward.sarif
-go run ./cmd/nw policy sarif --workspace . --include-analysis --output -
-go run ./cmd/nw schedule install --preset nightly --dry-run
+cargo run --bin nightward -- --help
+cargo run --bin nw -- scan --json
+cargo run --bin nw -- scan --workspace . --json
+cargo run --bin nw -- scan --json | jq '.summary'
+cargo run --bin nw -- findings list --json
+cargo run --bin nw -- findings list --json | jq '[.[] | select(.rule=="mcp_unknown_command")]'
+cargo run --bin nw -- analyze --all --json
+cargo run --bin nw -- providers doctor --json
+cargo run --bin nw -- rules list --json
+cargo run --bin nw -- fix plan --json
+cargo run --bin nw -- fix preview --all --format markdown
+cargo run --bin nw -- policy sarif --output /tmp/nightward.sarif
+cargo run --bin nw -- policy sarif --workspace . --include-analysis --output -
+cargo run --bin nw -- schedule plan --json
 ```
 
 Local security checks used by maintainers:
@@ -455,8 +453,8 @@ Local security checks used by maintainers:
 ```sh
 trunk check --show-existing --all
 make gitleaks
-make govulncheck
-make fuzz-smoke
+make cargo-audit
+make cargo-deny
 make coverage-check
 make release-snapshot
 ```

@@ -24,7 +24,7 @@ Nightward should have visual proof before broader promotion.
 ## Suggested Fixture Run
 
 ```sh
-NIGHTWARD_HOME="$PWD/testdata/homes/policy" go run ./cmd/nw
+NIGHTWARD_HOME="$PWD/testdata/homes/policy" cargo run --bin nw
 ```
 
 For Raycast, set the extension `Home Override` preference to the same fixture home before `npm run dev`.
@@ -34,8 +34,8 @@ For Raycast, set the extension `Home Override` preference to the same fixture ho
 | Surface | Fixture-only source | Required evidence | Status |
 | --- | --- | --- | --- |
 | Static HTML report | `testdata/homes/policy` | Scrubbed scan JSON, filterable static HTML report, and PNG screenshot generated from fixture output | captured in `site/public/demo/` with `node scripts/generate-demo-assets.mjs`; no local paths or secret values found |
-| OpenTUI dashboard | `site/public/demo/nightward-sample-scan.json` | GIF/PNG shows the left rail, status cards, severity bars, recent findings, and next action | fixture GIF and PNG captured in `site/public/demo/nightward-opentui.*` with `make opentui-demo`; no live HOME data used |
-| OpenTUI review flows | `site/public/demo/nightward-sample-scan.json` | GIF shows findings, analysis, fix plan, inventory, backup preview, search, and severity filtering | fixture GIF captured from `docs/demo/nightward-opentui.tape`; no `/Users`, username, or secret fixture values found |
+| TUI dashboard | `site/public/demo/nightward-sample-scan.json` | PNG shows the embedded Rust OpenTUI dashboard with severity colors, summary panels, findings, and next action | fixture PNG in `site/public/demo/nightward-tui.png`; no live HOME data used |
+| TUI review flows | `site/public/demo/nightward-sample-scan.json` | GIF shows findings, analysis, fix plan, inventory, backup preview, search, and severity filtering once regenerated from the Rust TUI | no `/Users`, username, or secret fixture values allowed |
 | Raycast Dashboard | fixture `Home Override` | Screenshot shows counts and top findings from synthetic data | pending `ray develop` smoke |
 | Raycast Findings/Analysis | fixture `Home Override` | Screenshots show redacted evidence and no config mutation actions | pending `ray develop` smoke |
 | Raycast Provider Doctor | fixture/default local environment | Screenshot shows provider status without implying online scans | pending `ray develop` smoke |

@@ -16,7 +16,7 @@ import {
   verifyArchiveChecksum
 } from "../bin/nightward.mjs";
 
-test("maps supported platforms to GoReleaser asset names", () => {
+test("maps supported platforms to Rust release archive names", () => {
   assert.equal(assetName("0.1.0", targetFor("darwin", "arm64")), "nightward_0.1.0_darwin_arm64.tar.gz");
   assert.equal(assetName("0.1.0", targetFor("linux", "x64")), "nightward_0.1.0_linux_amd64.tar.gz");
   assert.equal(assetName("0.1.0", targetFor("win32", "x64")), "nightward_0.1.0_windows_amd64.zip");

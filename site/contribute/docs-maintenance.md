@@ -6,7 +6,7 @@ Nightward docs are split between human-authored guides and generated references.
 
 | Surface | Source | Check |
 | --- | --- | --- |
-| CLI reference | `internal/cli` and `scripts/generate-reference-docs.mjs` | `make docs-reference-check` |
+| CLI reference | `crates/nightward-cli` and `scripts/generate-reference-docs.mjs` | `make docs-reference-check` |
 | Rules reference | rule metadata emitted by the generator | `make docs-reference-check` |
 | Provider reference | analysis provider metadata | `make docs-reference-check` |
 | Config examples | repo docs and fixture policies | `make docs-freshness` |

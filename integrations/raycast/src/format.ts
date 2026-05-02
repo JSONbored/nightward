@@ -329,13 +329,13 @@ export function menuBarStatus(
   const issueCount = findings + providerWarnings;
   const title =
     issueCount === 0
-      ? ""
+      ? "OK"
       : critical > 0
-        ? String(critical)
+        ? `${critical}C`
         : high > 0
-          ? String(high)
+          ? `${high}H`
           : medium > 0
-            ? String(medium)
+            ? `${medium}M`
             : String(issueCount);
   const tooltip = [
     `Nightward: ${critical} critical, ${high} high, ${findings} total`,

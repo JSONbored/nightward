@@ -13,9 +13,114 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: GoReleaser
+  build:
+    name: Build ${{ matrix.os }} ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            os: linux
+            target: amd64
+          - runner: macos-latest
+            os: darwin
+            target: arm64
+          - runner: windows-latest
+            os: windows
+            target: amd64
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Rust
+        shell: bash
+        run: |
+          rustup toolchain install 1.85.0 --profile minimal
+          rustup default 1.85.0
+
+      - name: Validate release tag
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release tag: ${REF_NAME}" >&2
+            exit 1
+          fi
+
+      - name: Build binaries
+        shell: bash
+        env:
+          NIGHTWARD_VERSION: ${{ github.ref_name }}
+        run: cargo build --release --bins
+
+      - name: Package Unix archive
+        if: ${{ matrix.os != 'windows' }}
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          OS_NAME: ${{ matrix.os }}
+          ARCH_NAME: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          version="${REF_NAME#v}"
+          name="nightward_${version}_${OS_NAME}_${ARCH_NAME}"
+          mkdir -p "dist/${name}"
+          cp target/release/nightward target/release/nw "dist/${name}/"
+          chmod 0755 "dist/${name}/nightward" "dist/${name}/nw"
+          tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+          cat > "dist/${name}.sbom.json" <<JSON
+          {
+            "schema_version": 1,
+            "generator": "nightward release workflow",
+            "version": "${version}",
+            "target": "${OS_NAME}-${ARCH_NAME}",
+            "artifacts": ["${name}.tar.gz"]
+          }
+          JSON
+
+      - name: Package Windows archive
+        if: ${{ matrix.os == 'windows' }}
+        shell: pwsh
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          OS_NAME: ${{ matrix.os }}
+          ARCH_NAME: ${{ matrix.target }}
+        run: |
+          $version = $env:REF_NAME.TrimStart("v")
+          $name = "nightward_${version}_${env:OS_NAME}_${env:ARCH_NAME}"
+          New-Item -ItemType Directory -Force -Path "dist/$name"
+          Copy-Item "target/release/nightward.exe" "dist/$name/nightward.exe"
+          Copy-Item "target/release/nw.exe" "dist/$name/nw.exe"
+          Compress-Archive -Path "dist/$name/*" -DestinationPath "dist/$name.zip" -Force
+          @"
+          {
+            "schema_version": 1,
+            "generator": "nightward release workflow",
+            "version": "$version",
+            "target": "${env:OS_NAME}-${env:ARCH_NAME}",
+            "artifacts": ["$name.zip"]
+          }
+          "@ | Set-Content -NoNewline "dist/$name.sbom.json"
+
+      - name: Upload archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ matrix.os }}-${{ matrix.target }}
+          path: dist/nightward_*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
     runs-on: ubuntu-latest
+    needs: build
     permissions:
       contents: write
       id-token: write
@@ -26,52 +131,41 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Set up Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      - name: Download archives
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          go-version-file: go.mod
-          cache: true
+          path: dist
+          pattern: release-*
+          merge-multiple: true
 
-      - name: Set up Node
-        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
-        with:
-          node-version: 24
-
-      - name: Install Bun
-        run: npm install --global bun@1.2.21
-
-      - name: Validate release tag
-        env:
-          REF_NAME: ${{ github.ref_name }}
+      - name: Generate checksums
         run: |
           set -euo pipefail
-          if [[ ! "${REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid release tag: ${REF_NAME}" >&2
-            exit 1
-          fi
+          cd dist
+          shasum -a 256 nightward_* > checksums.txt
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
 
-      - name: Install Syft
-        run: |
-          set -euo pipefail
-          go install github.com/anchore/syft/cmd/syft@v1.43.0
-          echo "$(go env GOPATH)/bin" >> "${GITHUB_PATH}"
-
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8 # v7.2.1
-        with:
-          distribution: goreleaser
-          version: v2.9.0
-          args: release --clean
+      - name: Sign checksums
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COSIGN_EXPERIMENTAL: "true"
+        run: cosign sign-blob --yes --bundle dist/checksums.txt.sigstore.json --output-signature dist/checksums.txt.sig dist/checksums.txt
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          gh release create "${REF_NAME}" dist/* \
+            --verify-tag \
+            --generate-notes \
+            --title "${REF_NAME}"
 
   release-smoke:
     name: Release smoke
     runs-on: ubuntu-latest
-    needs: release
+    needs: publish
     permissions:
       contents: read
     steps:
@@ -79,9 +173,6 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
 
       - name: Smoke published GitHub release artifacts
         env:
@@ -124,25 +215,7 @@ jobs:
           npm version --no-git-tag-version "${version}"
           npm test
           npm audit --audit-level=moderate
-          package_tarball="$(npm pack --silent)"
           npm pack --dry-run
-          tmp_prefix="$(mktemp -d)"
-          trap 'rm -rf "${tmp_prefix}"' EXIT
-          tar -xzf "${package_tarball}" -C "${tmp_prefix}"
-          chmod 0755 "${tmp_prefix}/package/bin/nightward.mjs"
-          mkdir -p "${tmp_prefix}/bin"
-          ln -s "${tmp_prefix}/package/bin/nightward.mjs" "${tmp_prefix}/bin/nightward"
-          ln -s "${tmp_prefix}/package/bin/nightward.mjs" "${tmp_prefix}/bin/nw"
-          nightward_version="$(PATH="${tmp_prefix}/bin:${PATH}" nightward --version)"
-          if [[ "${nightward_version}" != "${version}" ]]; then
-            echo "nightward --version returned ${nightward_version}, expected ${version}" >&2
-            exit 1
-          fi
-          nw_version="$(PATH="${tmp_prefix}/bin:${PATH}" nw --version)"
-          if [[ "${nw_version}" != "${version}" ]]; then
-            echo "nw --version returned ${nw_version}, expected ${version}" >&2
-            exit 1
-          fi
 
       - name: Publish npm package
         run: npm publish --access public --provenance

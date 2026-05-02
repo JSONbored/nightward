@@ -41,9 +41,9 @@ Unsigned tags should not be used for public releases.
 
 ## GitHub Release
 
-The release workflow runs GoReleaser from strict `vX.Y.Z` tags. It builds archives, creates checksums, generates SBOMs, signs `checksums.txt` with Cosign, and publishes the GitHub Release.
+The release workflow builds Rust binaries from strict `vX.Y.Z` tags. It packages archives, creates checksums, signs `checksums.txt` with Cosign, and publishes the GitHub Release.
 
-GitHub Releases are the canonical public release notes. GoReleaser delegates
+GitHub Releases are the canonical public release notes. The release workflow delegates
 changelog generation to GitHub-native generated release notes, organized by
 `.github/release.yml` label categories. Keep release PR titles in Conventional
 Commit style and apply release-note labels before tagging so the generated notes
@@ -77,7 +77,7 @@ The npm package is release-gated, trusted-publishing only, and disabled by defau
 2. Set repository variable `NPM_PUBLISH=true`.
 3. Push a reviewed, signed release tag.
 
-The npm job stamps `packages/npm/package.json` to the tag version, tests the launcher, audits dependencies, packs the tarball, installs that tarball into a temporary prefix, smokes both `nightward` and `nw`, dry-runs package contents, and publishes with provenance.
+The npm job stamps `packages/npm/package.json` to the tag version, tests the launcher, audits dependencies, packs the tarball, dry-runs package contents, and publishes with provenance.
 
 The npm package should remain a launcher for GitHub Release binaries. Do not add a `postinstall` downloader or a second implementation of Nightward.
 

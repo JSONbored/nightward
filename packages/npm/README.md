@@ -14,8 +14,8 @@ nw scan --json
 This package is intentionally a thin launcher for the release binaries from
 <https://github.com/JSONbored/nightward>. It does not use a `postinstall`
 script. On first run, it downloads the matching GitHub Release archive, verifies
-the archive SHA-256 against `checksums.txt`, caches the extracted `nightward`,
-`nw`, and `nightward-tui` binaries, and then executes `nightward` or `nw`.
+the archive SHA-256 against `checksums.txt`, caches the extracted `nightward`
+and `nw` Rust binaries, and then executes `nightward` or `nw`.
 
 Supported launcher platforms are macOS arm64/amd64, Linux arm64/amd64, and
 Windows amd64.

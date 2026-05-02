@@ -22,7 +22,7 @@ Nightward's growth should come from practical trust and low-friction adoption, n
 - Homebrew tap.
 - Nix/Scoop/WinGet/mise/aqua after release stability.
 - Trunk plugin and GitHub Action examples.
-- Release verification examples that cover checksums, signatures, npm provenance, `go install`, and Trunk import.
+- Release verification examples that cover checksums, signatures, npm provenance, source builds, and Trunk import.
 
 ## Community
 

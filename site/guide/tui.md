@@ -1,14 +1,14 @@
 # TUI
 
-Run Nightward without arguments to open the interactive OpenTUI app:
+Run Nightward without arguments to open the interactive terminal app:
 
 ```sh
 nw
 ```
 
-![Nightward OpenTUI fixture dashboard](/demo/nightward-opentui.png)
+![Nightward TUI fixture dashboard](/demo/nightward-tui.png)
 
-[Open the fixture walkthrough GIF](/demo/nightward-opentui.gif)
+[Open the fixture walkthrough GIF](/demo/nightward-tui.gif)
 
 ## Sections
 
@@ -20,7 +20,7 @@ nw
 - Backup: dry-run dotfiles backup choices.
 - Help: key bindings and safety reminders.
 
-The Go scanner remains the source of truth. The CLI writes a private review bundle, then launches the compiled `nightward-tui` OpenTUI sidecar. Release archives, local installs, and npm-downloaded archives include that sidecar beside `nightward` and `nw`.
+The Rust CLI is the source of truth. The TUI uses embedded `opentui_rust` rendering for the colored dashboard; there is no Bun package or `nightward-tui` sidecar.
 
 ## Shortcuts
 
@@ -39,8 +39,8 @@ The Go scanner remains the source of truth. The CLI writes a private review bund
 ## Local Development
 
 ```sh
-make opentui-verify
-make opentui-demo
+cargo run --bin nw
+make demo-assets
 ```
 
-`make opentui-demo` regenerates the fixture-only GIF and PNG used by the README and website. Use fixture media for public docs; do not capture a real workstation.
+Use fixture media for public docs; do not capture a real workstation.

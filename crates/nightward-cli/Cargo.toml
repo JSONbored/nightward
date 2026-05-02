@@ -1,0 +1,30 @@
+[package]
+name = "nightward-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "nightward"
+path = "src/bin/nightward.rs"
+
+[[bin]]
+name = "nw"
+path = "src/bin/nw.rs"
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+clap.workspace = true
+dirs.workspace = true
+nightward-core = { path = "../nightward-core" }
+opentui_rust.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

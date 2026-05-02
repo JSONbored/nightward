@@ -6,7 +6,7 @@ Nightward distribution should optimize for trust first, then convenience.
 
 1. GitHub Releases with signed checksums and SBOMs. Shipped in `v0.1.4`.
 2. Scoped npm launcher `@jsonbored/nightward` with trusted publishing and provenance. Shipped in `v0.1.4`.
-3. `go install github.com/jsonbored/nightward/cmd/nw@vX.Y.Z`. Shipped.
+3. Source builds with `make install-local`. Development-only.
 4. Trunk plugin import from a release tag. Shipped.
 5. GitHub Action release tags. Shipped.
 6. Homebrew tap.
@@ -18,7 +18,7 @@ Docker is deferred until Nightward has a useful local report browser. A containe
 
 ## Homebrew Tap Plan
 
-Homebrew is straightforward once the release archive layout stays stable. Add a dedicated tap repository, then let GoReleaser publish a formula from the signed GitHub Release archive and checksum data. The formula should install both `nightward` and `nw`, include a lightweight `nightward --version` test, and avoid becoming a separate packaging implementation.
+Homebrew is straightforward once the release archive layout stays stable. Add a dedicated tap repository, then generate a formula from the signed GitHub Release archive and checksum data. The formula should install both `nightward` and `nw`, include a lightweight `nightward --version` test, and avoid becoming a separate packaging implementation.
 
 ## NPM Posture
 

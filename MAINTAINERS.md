@@ -8,7 +8,7 @@ Current maintainer:
 
 - Keep GitHub 2FA enabled.
 - Use pull requests and human review for normal changes.
-- Keep CI, CodeQL, Nightward Policy, OpenSSF Scorecard, Gitleaks, govulncheck, OSV, and Trunk checks healthy.
+- Keep CI, CodeQL, Nightward Policy, OpenSSF Scorecard, Gitleaks, cargo audit, cargo deny, OSV, and Trunk checks healthy.
 - Keep release tags intentional, signed where practical, and tied to human-readable release notes.
 - Treat reports that include private paths, credentials, or agent state as sensitive.
 

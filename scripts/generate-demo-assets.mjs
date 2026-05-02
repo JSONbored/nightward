@@ -283,7 +283,7 @@ function writeOgPreviewHTML() {
 
 try {
   mkdirSync(outputDir, { recursive: true });
-  run("go", ["run", "./cmd/nw", "scan", "--json", "--output", rawScan], {
+  run("cargo", ["run", "--quiet", "--bin", "nw", "--", "scan", "--json", "--output", rawScan], {
     env: { NIGHTWARD_HOME: fixtureHome },
   });
 
@@ -293,7 +293,7 @@ try {
   writeFileSync(scanOutput, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o644 });
   assertScrubbed("sample scan", readFileSync(scanOutput));
 
-  run("go", ["run", "./cmd/nw", "report", "html", "--input", scanOutput, "--output", htmlOutput], {
+  run("cargo", ["run", "--quiet", "--bin", "nw", "--", "report", "html", "--input", scanOutput, "--output", htmlOutput], {
     env: { NIGHTWARD_HOME: fixtureHome },
   });
   const html = readFileSync(htmlOutput, "utf8").replace(/[ \t]+$/gm, "");

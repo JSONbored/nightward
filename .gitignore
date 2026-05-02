@@ -2,6 +2,7 @@
 /bin/
 /build/opentui/
 /dist/
+/target/
 /nightward
 /nw
 coverage.out

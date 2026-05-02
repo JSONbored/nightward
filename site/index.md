@@ -42,7 +42,7 @@ features:
   </div>
 </section>
 
-Prefer a persistent CLI? Use [npm, GitHub Releases, or `go install`](/guide/install), then run `nw`.
+Prefer a persistent CLI? Use [npm, GitHub Releases, or a source build](/guide/install), then run `nw`.
 
 ## Pick A Path
 
@@ -59,9 +59,9 @@ The sample report below is generated from the committed `testdata/homes/policy` 
 
 [![Scrubbed Nightward HTML report showing fixture MCP findings](/demo/nightward-sample-report.png)](/demo/nightward-sample-report.html)
 
-[Sample scan JSON](/demo/nightward-sample-scan.json) · [Static HTML report](/demo/nightward-sample-report.html) · [OpenTUI screenshot](/demo/nightward-opentui.png) · [OpenTUI GIF](/demo/nightward-opentui.gif) · [Provider reference](/reference/providers) · [Output surfaces](/reference/output-surfaces)
+[Sample scan JSON](/demo/nightward-sample-scan.json) · [Static HTML report](/demo/nightward-sample-report.html) · [TUI screenshot](/demo/nightward-tui.png) · [TUI GIF](/demo/nightward-tui.gif) · [Provider reference](/reference/providers) · [Output surfaces](/reference/output-surfaces)
 
-![Nightward OpenTUI dashboard](/demo/nightward-opentui.png)
+![Nightward TUI dashboard](/demo/nightward-tui.png)
 
 ## What Nightward Checks
 
@@ -76,6 +76,6 @@ The sample report below is generated from the committed `testdata/homes/policy` 
 
 ## Trust Posture
 
-Nightward v0.1.4 ships through signed GitHub Releases and a no-`postinstall` npm launcher that verifies GitHub Release checksums before running a cached binary. The project keeps OpenSSF evidence in-repo, runs CodeQL/Scorecard/Gitleaks/govulncheck/gosec/staticcheck, and keeps online-capable providers blocked until explicitly enabled.
+Nightward ships through signed GitHub Releases and a no-`postinstall` npm launcher that verifies GitHub Release checksums before running a cached Rust binary. The project keeps OpenSSF evidence in-repo, runs CodeQL/Scorecard/Gitleaks/OSV/Clippy, and keeps online-capable providers blocked until explicitly enabled.
 
 Nightward does not copy secrets, push to Git, restore configs, sync machines, or apply live mutations in v1.

@@ -68,7 +68,7 @@ Cover:
 Run the focused tests first, then the repo gate:
 
 ```sh
-go test ./internal/inventory ./internal/analysis ./internal/cli
+cargo test --workspace
 make docs-reference-check
 make test-prepush
 ```

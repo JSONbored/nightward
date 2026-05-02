@@ -2,14 +2,14 @@ version: 0.1
 required_trunk_version: ">=1.25.0"
 runtimes:
   enabled:
-    - go@1.25.9
+    - system
 tools:
   definitions:
     - name: nightward
-      runtime: go
-      package: github.com/jsonbored/nightward/cmd/nw
+      runtime: system
+      package: nw
       shims: [nw]
-      known_good_version: 0.1.0
+      known_good_version: 0.1.5
 lint:
   definitions:
     - name: nightward-policy
@@ -22,7 +22,7 @@ lint:
         - mcp.json
         - AGENTS.md
       suggest_if: config_present
-      known_good_version: 0.1.0
+      known_good_version: 0.1.5
       commands:
         - name: lint
           output: sarif
@@ -42,7 +42,7 @@ lint:
         - mcp.json
         - AGENTS.md
       suggest_if: config_present
-      known_good_version: 0.1.0
+      known_good_version: 0.1.5
       commands:
         - name: lint
           output: sarif
