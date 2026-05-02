@@ -19,7 +19,8 @@ Project badge: <https://www.bestpractices.dev/projects/12713>
 - Static analysis: `go vet`, `staticcheck`, `gosec`, Trunk Check, CodeQL, Gitleaks, govulncheck, OSV, and Nightward SARIF.
 - Dynamic analysis: automated tests, race tests, Raycast tests/build, and Go fuzz smoke tests.
 - Secret scanning: Gitleaks in CI and `make gitleaks`.
-- Release notes: <https://github.com/JSONbored/nightward/blob/main/CHANGELOG.md>
+- Release notes: <https://github.com/JSONbored/nightward/releases>
+- Curated changelog index: <https://github.com/JSONbored/nightward/blob/main/CHANGELOG.md>
 - Maintained status evidence: CI-green `main`, Renovate dependency updates, issue response history, immutable signed release tags, and published release artifacts. Scorecard's repository-age portion still needs time to age out.
 
 ## N/A Crypto Fields
