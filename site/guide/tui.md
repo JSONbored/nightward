@@ -12,9 +12,9 @@ Review a saved report without scanning again:
 nw tui --input scan.json
 ```
 
-![Nightward TUI fixture dashboard](/demo/nightward-tui.png)
+![Nightward OpenTUI fixture dashboard](/demo/nightward-opentui.png)
 
-[Open the fixture walkthrough GIF](/demo/nightward-tui.gif)
+[Open the fixture walkthrough GIF](/demo/nightward-opentui.gif)
 
 ## Sections
 

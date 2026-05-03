@@ -2,14 +2,15 @@
 
 ## `nw` Is Not Found
 
-Use the canonical command or install locally:
+Install the release-backed npm launcher, then open the TUI or run a CLI command:
 
 ```sh
-nightward --help
-make install-local
+npm install -g @jsonbored/nightward
+nw
+nw scan --json
 ```
 
-The npm package exposes both `nightward` and `nw`.
+The npm package exposes both `nightward` and `nw`. If you are working from a source checkout instead, run `make install-local` to install both binaries into `~/.local/bin` by default.
 
 ## Provider Is Missing
 

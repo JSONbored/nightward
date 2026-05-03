@@ -1,4 +1,4 @@
-Output site/public/demo/nightward-tui.gif
+Output site/public/demo/nightward-opentui.gif
 
 Set Shell "zsh"
 Set FontSize 18

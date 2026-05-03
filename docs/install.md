@@ -2,13 +2,23 @@
 
 Nightward should be easy to try without weakening its security posture. The preferred release model is signed GitHub Release artifacts first, then convenience installers that point back to those artifacts.
 
-## Current Local Install
+## Recommended Install
+
+```sh
+npx @jsonbored/nightward scan
+npm install -g @jsonbored/nightward
+nw
+```
+
+`npx @jsonbored/nightward scan` is the fastest read-only trial. `npm install -g @jsonbored/nightward` installs the same release-backed launcher for repeated CLI and TUI use. The TUI and CLI are not separate packages: `nw` opens the TUI, and `nw scan`, `nw policy`, `nw report`, and the other subcommands use the same installed binary.
+
+## Local Source Install
 
 ```sh
 make install-local
 ```
 
-This builds `nightward` and `nw` from the local checkout into `~/.local/bin` by default.
+This builds `nightward` and `nw` from the local checkout into `~/.local/bin` by default. Use this for development or branch comparison, not as the recommended end-user install path.
 
 ## GitHub Releases
 

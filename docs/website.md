@@ -11,7 +11,7 @@ make demo-assets
 ```
 
 The generator rewrites hostname, HOME, local paths, timestamps, and secret-looking fixture values before writing the sample scan JSON, static HTML report, and PNG screenshot.
-The TUI GIF is generated from `docs/demo/nightward-tui.tape` with VHS using scrubbed fixture output.
+The OpenTUI GIF is generated from `docs/demo/nightward-tui.tape` with VHS using scrubbed fixture output and writes to `site/public/demo/nightward-opentui.gif`. Extract and review the dashboard frame before replacing `site/public/demo/nightward-opentui.png`.
 It also renders the static Open Graph preview image used by the website metadata.
 Screenshot capture requires Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`.
 

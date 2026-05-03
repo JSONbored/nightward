@@ -34,8 +34,8 @@ The sample below is generated from the committed fixture home at [testdata/homes
 
 - [Scrubbed sample scan JSON](site/public/demo/nightward-sample-scan.json)
 - [Static HTML report](site/public/demo/nightward-sample-report.html)
-- [TUI screenshot](site/public/demo/nightward-tui.png) and [walkthrough GIF](site/public/demo/nightward-tui.gif)
-- Regenerate with `make demo-assets` using Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`
+- [OpenTUI screenshot](site/public/demo/nightward-opentui.png) and [walkthrough GIF](site/public/demo/nightward-opentui.gif)
+- Regenerate the JSON, HTML report, and report screenshot with `make demo-assets` using Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`. Regenerate TUI media with `vhs docs/demo/nightward-tui.tape` and review every frame before committing.
 
 ```mermaid
 flowchart LR
@@ -75,7 +75,7 @@ Nightward answers the practical questions first:
 - Scan summaries separate inventory buckets from finding buckets: item classification/risk/tool counts are distinct from finding severity/rule/tool counts.
 - Plan-only remediation metadata: fix kind, confidence, risk, review requirement, impact, and steps.
 - SARIF output for GitHub code scanning.
-- Importable Trunk plugin definition for `nightward-policy` and `nightward-analyze` after release tags exist.
+- Importable Trunk plugin definition for `nightward-policy` and `nightward-analyze` from pinned release tags.
 - Optional `.nightward.yml` policy config with reason-required ignores.
 - Redacted patch previews for parseable MCP config fixes.
 - Read-only snapshot plan/diff commands.
@@ -91,21 +91,23 @@ Nightward answers the practical questions first:
 
 ## Install
 
-```sh
-make install-local
-```
-
-This installs:
-
-- `nightward`: canonical project command
-- `nw`: short alias for frequent terminal/TUI use
-
-Install the release-gated npm launcher:
+Try the release-gated npm launcher:
 
 ```sh
 npx @jsonbored/nightward scan
 npm install -g @jsonbored/nightward
-nw scan --json
+nw
+```
+
+This installs one Nightward CLI distribution with two command names:
+
+- `nightward`: canonical project command
+- `nw`: short alias for frequent terminal/TUI use
+
+For local development from this checkout:
+
+```sh
+make install-local
 ```
 
 The npm package is intentionally a thin launcher for GitHub Release binaries. It does not run a `postinstall` script; on first execution it downloads the matching release archive, verifies the archive SHA-256 from `checksums.txt`, caches the binaries locally, and then runs `nightward` or `nw`.
@@ -323,9 +325,9 @@ Keyboard shortcuts:
 - `x`: clear filters
 - `q` or `esc`: quit
 
-Fixture-only TUI demo:
+Fixture-only OpenTUI demo:
 
-![Nightward TUI fixture dashboard](site/public/demo/nightward-tui.png)
+![Nightward OpenTUI fixture dashboard](site/public/demo/nightward-opentui.png)
 
 ## MCP Server
 
