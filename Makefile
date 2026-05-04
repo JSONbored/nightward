@@ -7,6 +7,11 @@ SITE_DIR ?= site
 RUST_PATH ?= $(HOME)/.cargo/bin:/opt/homebrew/bin:$(PATH)
 CARGO ?= env PATH="$(RUST_PATH)" cargo
 RUST_BINS ?= nightward nw
+RUSTUP ?= env PATH="$(RUST_PATH)" rustup
+CARGO_DEV_TOOLCHAIN ?= 1.88.0
+CARGO_AUDIT_VERSION ?= 0.22.1
+CARGO_DENY_VERSION ?= 0.19.4
+CARGO_LLVM_COV_VERSION ?= 0.8.5
 
 .PHONY: doctor install-dev-tools test test-fast test-security test-ux test-release test-local test-prepush test-release-install fmt clippy cargo-test cargo-nextest cargo-doc cargo-audit cargo-deny cargo-llvm-cov coverage-check test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test gitleaks raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-store-check raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify docs-reference docs-reference-check docs-freshness docs-qa site-install site-audit site-build site-verify demo-assets release-snapshot verify build install-local clean-reports
 
@@ -14,7 +19,11 @@ doctor:
 	bash scripts/dev-doctor.sh
 
 install-dev-tools:
-	$(CARGO) install cargo-audit cargo-deny cargo-llvm-cov --locked
+	$(CARGO) install cargo-audit --version $(CARGO_AUDIT_VERSION) --locked
+	$(RUSTUP) toolchain install $(CARGO_DEV_TOOLCHAIN) --profile minimal
+	$(CARGO) +$(CARGO_DEV_TOOLCHAIN) install cargo-deny --version $(CARGO_DENY_VERSION) --locked
+	$(RUSTUP) component add llvm-tools-preview
+	$(CARGO) +$(CARGO_DEV_TOOLCHAIN) install cargo-llvm-cov --version $(CARGO_LLVM_COV_VERSION) --locked
 
 test: cargo-test
 

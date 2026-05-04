@@ -22,6 +22,10 @@ Optional Cargo security/coverage tools can be installed with:
 make install-dev-tools
 ```
 
+This installs pinned tool versions. Some optional tools have newer Rust MSRVs
+than the project runtime, so the target installs them with an auxiliary Rust
+toolchain while keeping Nightward itself on the repo-pinned toolchain.
+
 Use the suite aliases first. They are intentionally shaped around the same surfaces CI and release workflows gate, so local failures are caught before a branch is pushed.
 
 ```sh
