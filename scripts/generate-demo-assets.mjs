@@ -9,7 +9,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureHome = join(repoRoot, "testdata", "homes", "policy");
 const publicHome = "/tmp/nightward-fixture-home";
 const publicHost = "nightward-fixture";
-const generatedAt = "2026-05-01T00:00:00Z";
+const generatedAt = "2026-04-30T18:00:00Z";
 const outputDir = join(repoRoot, "site", "public", "demo");
 const scanOutput = join(outputDir, "nightward-sample-scan.json");
 const htmlOutput = join(outputDir, "nightward-sample-report.html");
@@ -18,12 +18,13 @@ const ogImageOutput = join(repoRoot, "site", "public", "og-image.png");
 const faviconPath = join(repoRoot, "site", "public", "favicon.svg");
 const tempDir = mkdtempSync(join(tmpdir(), "nightward-demo-"));
 const rawScan = join(tempDir, "raw-scan.json");
+const toolPath = `${process.env.HOME}/.cargo/bin:/opt/homebrew/bin:${process.env.PATH || ""}`;
 let sourceHost = "";
 
 function run(command, args, options = {}) {
   execFileSync(command, args, {
     cwd: repoRoot,
-    env: { ...process.env, ...options.env },
+    env: { ...process.env, PATH: toolPath, ...options.env },
     stdio: options.stdio ?? "pipe",
   });
 }
@@ -283,7 +284,7 @@ function writeOgPreviewHTML() {
 
 try {
   mkdirSync(outputDir, { recursive: true });
-  run("go", ["run", "./cmd/nw", "scan", "--json", "--output", rawScan], {
+  run("cargo", ["run", "--quiet", "--bin", "nw", "--", "scan", "--json", "--output", rawScan], {
     env: { NIGHTWARD_HOME: fixtureHome },
   });
 
@@ -293,7 +294,7 @@ try {
   writeFileSync(scanOutput, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o644 });
   assertScrubbed("sample scan", readFileSync(scanOutput));
 
-  run("go", ["run", "./cmd/nw", "report", "html", "--input", scanOutput, "--output", htmlOutput], {
+  run("cargo", ["run", "--quiet", "--bin", "nw", "--", "report", "html", "--input", scanOutput, "--output", htmlOutput], {
     env: { NIGHTWARD_HOME: fixtureHome },
   });
   const html = readFileSync(htmlOutput, "utf8").replace(/[ \t]+$/gm, "");

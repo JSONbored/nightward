@@ -11,7 +11,7 @@ import type {
 } from "./types";
 
 const secretAssignmentPattern =
-  /((?:token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)[^"',\s}]+/gi;
+  /((?:token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)(?:\$\{[A-Za-z_][A-Za-z0-9_]*\}|[^"',\s}]+)/gi;
 const providerTokenPattern =
   /\b(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b/g;
 
@@ -86,14 +86,6 @@ export function findingTitle(finding: Finding): string {
   return humanizeIdentifier(finding.rule);
 }
 
-export function findingSubtitle(finding: Finding): string {
-  const parts = [finding.tool];
-  if (finding.server) parts.push(`server ${finding.server}`);
-  const file = basename(finding.path);
-  if (file) parts.push(file);
-  return parts.join(" - ");
-}
-
 export function findingFixLabel(finding: Finding): string {
   if (!finding.fix_available) return "review";
   if (!finding.fix_kind) return "fix";
@@ -147,10 +139,6 @@ export function findingMarkdown(finding: Finding): string {
 
   if (finding.fix_available) {
     lines.push("", "## Suggested Fix");
-    lines.push(`Kind: \`${finding.fix_kind ?? "manual-review"}\``);
-    lines.push(`Confidence: \`${finding.confidence ?? "unknown"}\``);
-    lines.push(`Risk: \`${finding.risk ?? "unknown"}\``);
-    lines.push(`Requires review: \`${String(finding.requires_review)}\``);
     if (finding.fix_summary) lines.push("", redactText(finding.fix_summary));
     if (finding.fix_steps && finding.fix_steps.length > 0) {
       lines.push("");
@@ -190,13 +178,6 @@ export function signalMarkdown(signal: AnalysisSignal): string {
     "",
     "## Recommended Action",
     redactText(signal.recommended_action),
-    "",
-    "## Metadata",
-    `- Provider: \`${signal.provider}\``,
-    `- Category: \`${signal.category}\``,
-    `- Severity: \`${signal.severity}\``,
-    `- Confidence: \`${signal.confidence}\``,
-    signal.path ? `- Path: ${markdownCode(signal.path)}` : "",
     signal.why_this_matters ? "" : "",
     signal.why_this_matters ? "## Why This Matters" : "",
     signal.why_this_matters ? redactText(signal.why_this_matters) : "",
@@ -210,24 +191,12 @@ export function signalTitle(signal: AnalysisSignal): string {
 }
 
 export function signalSubtitle(signal: AnalysisSignal): string {
-  const parts = [signal.provider, signal.category.replace(/-/g, " ")];
-  if (signal.path) parts.push(basename(signal.path));
-  return parts.join(" - ");
+  return signal.provider;
 }
 
 export function analysisMarkdown(report: AnalysisReport): string {
   const lines = [
     "# Nightward Analysis",
-    "",
-    `Generated: \`${report.generated_at}\``,
-    `Mode: \`${report.mode}\``,
-    report.workspace ? `Workspace: \`${report.workspace}\`` : "",
-    "",
-    "## Summary",
-    `Signals: \`${report.summary.total_signals}\``,
-    `Subjects: \`${report.summary.total_subjects}\``,
-    `Highest severity: \`${report.summary.highest_severity || "info"}\``,
-    `Provider warnings: \`${report.summary.provider_warnings}\``,
     "",
     "Nightward analysis is offline by default and does not claim a package or server is safe.",
   ].filter(Boolean);
@@ -257,33 +226,76 @@ export function dashboardMarkdown(
       }>;
     };
   },
+  plan?: FixPlan,
+  analysis?: AnalysisReport,
 ): string {
   const max = maxSeverity(report.findings);
-  const lines = [
-    "# Nightward Dashboard",
-    "",
-    `Generated: \`${report.generated_at}\``,
-    `Host: \`${report.hostname}\``,
-    `Home: \`${report.home}\``,
-    "",
-    "## Scan",
-    `Items: \`${report.summary.total_items}\``,
-    `Findings: \`${report.summary.total_findings}\``,
-    `Max severity: \`${max}\``,
-    `Critical findings: \`${report.summary.findings_by_severity.critical ?? 0}\``,
-    `High findings: \`${report.summary.findings_by_severity.high ?? 0}\``,
-    "",
-    "## Schedule",
-    `Installed: \`${doctor.schedule?.installed ? "yes" : "no"}\``,
-    `Report dir: \`${doctor.schedule?.report_dir ?? ""}\``,
-  ];
-  if (doctor.schedule?.last_report)
-    lines.push(`Last report: \`${doctor.schedule.last_report}\``);
-  if (doctor.schedule?.last_findings !== undefined)
-    lines.push(`Last findings: \`${doctor.schedule.last_findings}\``);
+  const critical = report.summary.findings_by_severity.critical ?? 0;
+  const high = report.summary.findings_by_severity.high ?? 0;
+  const medium = report.summary.findings_by_severity.medium ?? 0;
+  const planTotal = plan ? fixPlanTotal(plan) : undefined;
+  const signals = analysis?.summary.total_signals;
   const delta = reportHistoryDelta(doctor.schedule?.history);
-  if (delta) lines.push(`Change since previous scheduled scan: \`${delta}\``);
+  const lines = [
+    "# Nightward Review",
+    "",
+    `**${humanizeIdentifier(max)} posture** across \`${report.summary.total_findings}\` findings from \`${report.summary.total_items}\` scanned item${report.summary.total_items === 1 ? "" : "s"}.`,
+    "",
+    "| Critical | High | Medium | Signals | Fix Plan |",
+    "| ---: | ---: | ---: | ---: | ---: |",
+    `| ${critical} | ${high} | ${medium} | ${signals ?? "n/a"} | ${planTotal ?? "n/a"} |`,
+    "",
+    "## Next Action",
+    nextActionForReport(report),
+    "",
+    "## Review Queue",
+  ];
+  const topFindings = sortedFindings(report.findings).slice(0, 5);
+  if (topFindings.length === 0) {
+    lines.push("No findings were emitted for this scan.");
+  } else {
+    for (const finding of topFindings) {
+      lines.push(
+        `- \`${finding.severity}\` ${finding.rule}: ${redactText(finding.message)}`,
+      );
+    }
+  }
+  lines.push(
+    "",
+    "## Safety",
+    "Raycast actions stay read-only: view, copy, export, and open local reports. Nightward does not mutate MCP config, dotfiles, schedules, or secrets from this dashboard.",
+  );
+  if (doctor.schedule?.installed || doctor.schedule?.last_report || delta) {
+    lines.push("", "## Scheduled Reports");
+    lines.push(
+      `Status: \`${doctor.schedule?.installed ? "installed" : "off"}\``,
+    );
+    if (doctor.schedule?.last_report)
+      lines.push(`Latest report: \`${doctor.schedule.last_report}\``);
+    if (doctor.schedule?.last_findings !== undefined)
+      lines.push(`Latest findings: \`${doctor.schedule.last_findings}\``);
+    if (delta) lines.push(`Change: \`${delta}\``);
+  }
   return lines.join("\n");
+}
+
+function nextActionForReport(report: ScanReport): string {
+  const critical = report.summary.findings_by_severity.critical ?? 0;
+  const high = report.summary.findings_by_severity.high ?? 0;
+  const medium = report.summary.findings_by_severity.medium ?? 0;
+  if (critical > 0) {
+    return "Externalize inline secrets first, then rerun the scan before reviewing lower-severity items.";
+  }
+  if (high > 0) {
+    return "Pin package executors and review remote MCP wrappers before syncing this configuration.";
+  }
+  if (medium > 0) {
+    return "Review filesystem scope and local endpoint assumptions before treating this config as portable.";
+  }
+  if (report.summary.total_findings > 0) {
+    return "Review accepted informational findings and add policy ignores only with clear reasons.";
+  }
+  return "No findings in this scan. Keep scheduled reports on if this machine changes frequently.";
 }
 
 export function adapterSummary(adapters: AdapterStatus[]): string {
@@ -292,7 +304,17 @@ export function adapterSummary(adapters: AdapterStatus[]): string {
 }
 
 export function fixPlanSummary(plan: FixPlan): string {
-  return `Safe ${plan.summary.safe} - Review ${plan.summary.review} - Blocked ${plan.summary.blocked}`;
+  return `Total ${fixPlanTotal(plan)} - Safe ${plan.summary.safe} - Review ${plan.summary.review} - Blocked ${plan.summary.blocked}`;
+}
+
+export function fixPlanTotal(plan: FixPlan): number {
+  if (typeof plan.summary.total === "number") return plan.summary.total;
+  const summaryTotal =
+    (plan.summary.safe ?? 0) +
+    (plan.summary.review ?? 0) +
+    (plan.summary.blocked ?? 0);
+  if (summaryTotal > 0) return summaryTotal;
+  return plan.actions?.length ?? plan.fixes?.length ?? 0;
 }
 
 export type MenuBarStatus = {
@@ -326,17 +348,7 @@ export function menuBarStatus(
   const signals = analysis.summary.total_signals;
   const providerWarnings = analysis.summary.provider_warnings;
   const historyDelta = reportHistoryDelta(doctor.schedule.history);
-  const issueCount = findings + providerWarnings;
-  const title =
-    issueCount === 0
-      ? ""
-      : critical > 0
-        ? String(critical)
-        : high > 0
-          ? String(high)
-          : medium > 0
-            ? String(medium)
-            : String(issueCount);
+  const title = findings === 0 ? "OK" : String(findings);
   const tooltip = [
     `Nightward: ${critical} critical, ${high} high, ${findings} total`,
     low > 0 || info > 0 ? `${medium} medium, ${low} low, ${info} info` : "",

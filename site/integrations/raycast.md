@@ -7,7 +7,7 @@ Nightward’s [Raycast](https://www.raycast.com/) extension is a read-only macOS
 | Command | Use it for | Writes |
 | --- | --- | --- |
 | Nightward Dashboard | Scan counts, adapters, schedule state, top findings, and fix-plan summary. | No |
-| Nightward Status | Compact menu-bar risk count with a structured dropdown. | No |
+| Nightward Status | Compact menu-bar finding count with a structured dropdown. | No |
 | Nightward Findings | Browse findings, copy redacted evidence, export finding/rule fix plans, and copy reviewed-ignore snippets. | Clipboard only |
 | Nightward Analysis | Browse built-in and selected-provider analysis signals. | No |
 | Nightward Provider Doctor | Check provider availability and choose providers for Raycast Analysis. | Raycast local preference only |
@@ -15,7 +15,7 @@ Nightward’s [Raycast](https://www.raycast.com/) extension is a read-only macOS
 | Export Fix Plan / Export Analysis | Copy redacted Markdown for review. | Clipboard only |
 | Open Nightward Reports | Open the local report folder in Finder. | Finder open only |
 
-The menu-bar title stays intentionally small: icon plus the highest-risk count. The dropdown carries the detail, split into Findings, Analysis, Schedule, Open, and Actions sections so it does not read like one long paragraph.
+The menu-bar title stays intentionally small: icon plus the current finding count. The dropdown carries severity, analysis, provider-warning, schedule, open, and action detail so it does not read like one long paragraph.
 
 ## Preferences
 
@@ -38,7 +38,7 @@ Provider Doctor can select `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-sc
 
 ## Store Submission
 
-The extension is close to store-ready, but submission still needs manual evidence:
+The extension now has fixture-only metadata screenshots for Dashboard, Findings, and Provider Doctor. Before a store PR, rerun the package checks from the extension directory:
 
 ```sh
 cd integrations/raycast
@@ -49,13 +49,13 @@ npm run build
 npm run store-check:strict
 ```
 
-Raycast’s public publishing flow runs from an extension directory with `npm run build` for validation and `npm run publish` to open a PR against [`raycast/extensions`](https://github.com/raycast/extensions). Their [store preparation guide](https://developers.raycast.com/basics/prepare-an-extension-for-store) also expects npm lockfiles, local lint/build validation, clear metadata, and store screenshots. Nightward should not run `npm run publish` until the fixture screenshot set and PR metadata are ready.
+Raycast’s public publishing flow runs from an extension directory with `npm run build` for validation and `npm run publish` to open a PR against [`raycast/extensions`](https://github.com/raycast/extensions). Their [store preparation guide](https://developers.raycast.com/basics/prepare-an-extension-for-store) expects npm lockfiles, local lint/build validation, clear metadata, and 2000x1250 PNG screenshots. Nightward should not run `npm run publish` until the `raycast/extensions` fork is synced and a maintainer is ready to open the draft submission PR.
 
 Before a draft PR:
 
 1. Sync the `raycast/extensions` fork.
 2. Copy the self-contained package into `extensions/nightward`.
-3. Capture at least three fixture-only metadata screenshots from `ray develop`.
+3. Re-capture fixture-only metadata screenshots from `ray develop` if the UI changed.
 4. Confirm icon, README, CHANGELOG, categories, command descriptions, and preferences match the store package.
 5. Run `npm run store-check:strict`, `npm run lint`, `npm run build`, and `npm test`.
 6. Open a draft PR and link Nightward’s GitHub repo, docs, and fixture evidence.

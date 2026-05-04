@@ -1,7 +1,7 @@
 # Changelog
 
 GitHub Releases are the canonical public release notes for Nightward. They are
-generated with GitHub-native release notes through GoReleaser and organized by
+generated with GitHub-native release notes and organized by
 the label categories in `.github/release.yml`.
 
 This file is a lightweight curated index for shipped releases, superseded
@@ -26,7 +26,7 @@ continue to use Conventional Commit style so generated notes stay readable.
 
 First stable Nightward release.
 
-- Added the `nightward` and `nw` Go CLIs for local-first AI agent state, MCP
+- Added the `nightward` and `nw` CLIs for local-first AI agent state, MCP
   config, and dotfiles backup-safety audits.
 - Added MCP security findings for unpinned package execution, sensitive
   env/header references, local endpoints, broad filesystem access, local

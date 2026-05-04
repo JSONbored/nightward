@@ -24,7 +24,7 @@ inputs:
     required: false
     default: ""
   workspace:
-    description: Repository/workspace path Nightward should scan instead of HOME.
+    description: Repository/workspace path Nightward should scan. Defaults to GITHUB_WORKSPACE unless home is set.
     required: false
     default: ""
   include-analysis:
@@ -50,11 +50,11 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Set up Go
-      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-      with:
-        go-version-file: ${{ github.action_path }}/go.mod
-        cache: true
+    - name: Set up Rust
+      shell: bash
+      run: |
+        rustup toolchain install 1.85.0 --profile minimal
+        rustup default 1.85.0
 
     - name: Run Nightward
       id: run-nightward
@@ -82,21 +82,29 @@ runs:
 
         if [[ -n "${scan_home}" ]]; then
           export NIGHTWARD_HOME="${scan_home}"
+        elif [[ -z "${scan_workspace}" ]]; then
+          scan_workspace="${GITHUB_WORKSPACE}"
         fi
+
+        workspace_output_path() {
+          local value="${1:?output path required}"
+          bash "${GITHUB_ACTION_PATH}/scripts/validate-action-path.sh" output "${value}"
+          printf '%s/%s' "${GITHUB_WORKSPACE}" "${value}"
+        }
 
         config_args=()
         if [[ -n "${config}" ]]; then
           bash "${GITHUB_ACTION_PATH}/scripts/validate-action-path.sh" config "${config}"
           config_args+=(--config "${GITHUB_WORKSPACE}/${config}")
         fi
-        bash "${GITHUB_ACTION_PATH}/scripts/validate-action-path.sh" output "${output}"
-        output_path="${GITHUB_WORKSPACE}/${output}"
-        summary_path="${output_path}"
         if [[ "${output}" == "-" ]]; then
-          summary_path="${GITHUB_WORKSPACE}/nightward-output.json"
+          summary_path="$(workspace_output_path "nightward-output.json")"
         else
+          output_path="$(workspace_output_path "${output}")"
+          summary_path="${output_path}"
           mkdir -p "$(dirname "${output_path}")"
         fi
+        policy_path="$(workspace_output_path "nightward-policy.json")"
         workspace_args=()
         if [[ -n "${scan_workspace}" ]]; then
           workspace_args+=(--workspace "${scan_workspace}")
@@ -110,10 +118,10 @@ runs:
         case "${mode}" in
           scan)
             if [[ "${output}" == "-" ]]; then
-              go run ./cmd/nw scan "${workspace_args[@]}" --json --output - >"${summary_path}"
+              cargo run --quiet --bin nw -- scan "${workspace_args[@]}" --json --output - >"${summary_path}"
               echo "output=nightward-output.json" >>"${GITHUB_OUTPUT}"
             else
-              go run ./cmd/nw scan "${workspace_args[@]}" --json --output "${output_path}"
+              cargo run --quiet --bin nw -- scan "${workspace_args[@]}" --json --output "${output_path}" >"${summary_path}"
               echo "output=${output}" >>"${GITHUB_OUTPUT}"
             fi
             echo "output-path=${summary_path}" >>"${GITHUB_OUTPUT}"
@@ -124,29 +132,29 @@ runs:
               args+=(--strict)
             fi
             set +e
-            go run ./cmd/nw "${args[@]}" >"${GITHUB_WORKSPACE}/nightward-policy.json"
+            cargo run --quiet --bin nw -- "${args[@]}" >"${policy_path}"
             policy_exit=$?
             set -e
             echo "policy-exit-code=${policy_exit}" >>"${GITHUB_OUTPUT}"
             echo "output=nightward-policy.json" >>"${GITHUB_OUTPUT}"
-            echo "output-path=${GITHUB_WORKSPACE}/nightward-policy.json" >>"${GITHUB_OUTPUT}"
+            echo "output-path=${policy_path}" >>"${GITHUB_OUTPUT}"
             ;;
           sarif)
             if [[ "${output}" == "-" ]]; then
-              go run ./cmd/nw policy sarif "${config_args[@]}" "${workspace_args[@]}" "${analysis_args[@]}" --output - >"${summary_path}"
+              cargo run --quiet --bin nw -- policy sarif "${config_args[@]}" "${workspace_args[@]}" "${analysis_args[@]}" --output - >"${summary_path}"
               echo "output=nightward-output.json" >>"${GITHUB_OUTPUT}"
             else
-              go run ./cmd/nw policy sarif "${config_args[@]}" "${workspace_args[@]}" "${analysis_args[@]}" --output "${output_path}"
+              cargo run --quiet --bin nw -- policy sarif "${config_args[@]}" "${workspace_args[@]}" "${analysis_args[@]}" --output "${output_path}" >"${summary_path}"
               echo "output=${output}" >>"${GITHUB_OUTPUT}"
             fi
             echo "output-path=${summary_path}" >>"${GITHUB_OUTPUT}"
             ;;
           badge)
             if [[ "${output}" == "-" ]]; then
-              go run ./cmd/nw policy badge "${config_args[@]}" "${workspace_args[@]}" "${analysis_args[@]}" --sarif-url "${sarif_url}" --output - >"${summary_path}"
+              cargo run --quiet --bin nw -- policy badge "${config_args[@]}" "${workspace_args[@]}" "${analysis_args[@]}" --sarif-url "${sarif_url}" --output - >"${summary_path}"
               echo "output=nightward-output.json" >>"${GITHUB_OUTPUT}"
             else
-              go run ./cmd/nw policy badge "${config_args[@]}" "${workspace_args[@]}" "${analysis_args[@]}" --sarif-url "${sarif_url}" --output "${output_path}"
+              cargo run --quiet --bin nw -- policy badge "${config_args[@]}" "${workspace_args[@]}" "${analysis_args[@]}" --sarif-url "${sarif_url}" --output "${output_path}" >"${summary_path}"
               echo "output=${output}" >>"${GITHUB_OUTPUT}"
             fi
             echo "output-path=${summary_path}" >>"${GITHUB_OUTPUT}"
@@ -171,13 +179,13 @@ runs:
             python3 -c 'import json, sys; data=json.load(open(sys.argv[1], encoding="utf-8")); print("findings-count=%s" % data.get("summary", {}).get("total_findings", 0)); print("policy-passed=")' "${{ steps.run-nightward.outputs.output-path }}" >>"${GITHUB_OUTPUT}"
             ;;
           policy)
-            python3 -c 'import json, sys; data=json.load(open(sys.argv[1], encoding="utf-8")); print("findings-count=%s" % data.get("summary", {}).get("total_findings", 0)); print("policy-passed=%s" % str(data.get("passed", False)).lower())' "${{ steps.run-nightward.outputs.output-path }}" >>"${GITHUB_OUTPUT}"
+            python3 -c 'import json, sys; data=json.load(open(sys.argv[1], encoding="utf-8")); count=data.get("finding_count", data.get("summary", {}).get("total_findings", 0)); print("findings-count=%s" % count); print("policy-passed=%s" % str(data.get("passed", False)).lower())' "${{ steps.run-nightward.outputs.output-path }}" >>"${GITHUB_OUTPUT}"
             ;;
           sarif)
             python3 -c 'import json, sys; data=json.load(open(sys.argv[1], encoding="utf-8")); count=sum(len(run.get("results", [])) for run in data.get("runs", [])); print(f"findings-count={count}"); print("policy-passed=")' "${{ steps.run-nightward.outputs.output-path }}" >>"${GITHUB_OUTPUT}"
             ;;
           badge)
-            python3 -c 'import json, sys; data=json.load(open(sys.argv[1], encoding="utf-8")); print("findings-count=%s" % data.get("total_findings", 0)); print("policy-passed=%s" % str(data.get("passed", False)).lower())' "${{ steps.run-nightward.outputs.output-path }}" >>"${GITHUB_OUTPUT}"
+            python3 -c 'import json, sys; data=json.load(open(sys.argv[1], encoding="utf-8")); count=data.get("finding_count", data.get("total_findings", 0)); print("findings-count=%s" % count); print("policy-passed=%s" % str(data.get("passed", False)).lower())' "${{ steps.run-nightward.outputs.output-path }}" >>"${GITHUB_OUTPUT}"
             ;;
         esac
 

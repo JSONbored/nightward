@@ -1,6 +1,6 @@
 # Remediation
 
-Nightward remediation is plan-only. It recommends changes, explains risk, and can preview redacted patch hunks, but it does not mutate agent configs.
+Nightward remediation is plan-only. It recommends changes, explains risk, and can export redacted review material, but it does not mutate agent configs.
 
 ## Fix Kinds
 
@@ -11,9 +11,9 @@ Nightward remediation is plan-only. It recommends changes, explains risk, and ca
 - `manual-review`: inspect unsupported or ambiguous config shapes.
 - `ignore-with-reason`: accept advisory findings only with documented reasoning.
 
-## Preview Rules
+## Export Rules
 
-`nw fix preview` generates redacted patch previews only when Nightward can parse the config and target a specific MCP server. It does not show raw file diffs because raw config diffs can leak inline secrets.
+`nw fix export --format markdown` generates redacted review material for matching findings. It does not show raw file diffs because raw config diffs can leak inline secrets.
 
 Package pinning does not guess versions. Choose a reviewed version from the upstream registry or release notes, then edit the package token manually.
 
@@ -22,10 +22,9 @@ root cause. For example, repeated `mcp-remote` unpinned-package findings are
 summarized as one grouped review item so the same reviewed version can be
 applied consistently instead of triaging dozens of identical hints.
 
-Advisory `mcp_server_review` findings are collapsed when the same server already
-has a higher-severity finding. The stronger finding remains the review anchor,
-which keeps Raycast, HTML reports, MCP output, and policy results focused on the
-actionable risk.
+Advisory `mcp_server_review` findings stay visible alongside stronger findings
+so review surfaces can show both the concrete issue and the final server-level
+approval step.
 
 ## Rule Guidance
 
@@ -60,6 +59,13 @@ Replace simple shell passthrough wrappers with direct executable invocation. Rev
 ### mcp_broad_filesystem
 
 Replace broad filesystem mounts with explicit project or data paths after confirming the server's real access requirement.
+
+### mcp_server_review
+
+Confirm advisory MCP servers are intentional, documented, and safe to sync before
+moving them into portable dotfiles. Nightward keeps this advisory visible so
+review flows can distinguish concrete findings from the final server-level
+approval step.
 
 ### mcp_unknown_command
 

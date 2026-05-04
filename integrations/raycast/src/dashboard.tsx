@@ -9,13 +9,11 @@ import {
 } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
 import {
-  adapterSummary,
-  classificationColor,
   dashboardMarkdown,
   findingFixLabel,
   findingMarkdown,
-  findingSubtitle,
   findingTitle,
+  fixPlanTotal,
   maxSeverity,
   severityColor,
   sortedFindings,
@@ -29,7 +27,6 @@ import {
   scan,
 } from "./nightward";
 import type {
-  Classification,
   AnalysisReport,
   DoctorReport,
   FixPlan,
@@ -84,18 +81,17 @@ export default function Command() {
   return (
     <List
       isLoading={isLoading}
-      searchBarPlaceholder="Search Nightward status..."
+      searchBarPlaceholder="Search findings, actions, adapters, or report status..."
       isShowingDetail
     >
-      <List.Section title="Status">
+      <List.Section title="Review">
         <List.Item
-          title="Scan Summary"
-          subtitle={`${data.report.summary.total_items} items - ${data.report.summary.total_findings} findings`}
+          title="Findings"
+          subtitle={`${titleCase(maxSeverity(data.report.findings))} risk`}
           icon={{
             source: Icon.Shield,
             tintColor: severityColor(maxSeverity(data.report.findings)),
           }}
-          accessories={[{ text: maxSeverity(data.report.findings) }]}
           detail={<DashboardDetail data={data} />}
           actions={
             <DashboardActions
@@ -106,40 +102,8 @@ export default function Command() {
           }
         />
         <List.Item
-          title="Scheduled Scan"
-          subtitle={
-            data.doctor.schedule.installed ? "installed" : "not installed"
-          }
-          icon={{
-            source: Icon.Clock,
-            tintColor: data.doctor.schedule.installed
-              ? Color.Green
-              : Color.Yellow,
-          }}
-          accessories={[
-            {
-              text:
-                data.doctor.schedule.last_findings !== undefined
-                  ? `${data.doctor.schedule.last_findings} last findings`
-                  : "no report yet",
-            },
-            ...(data.doctor.schedule.history &&
-            data.doctor.schedule.history.length > 1
-              ? [{ text: `${data.doctor.schedule.history.length} reports` }]
-              : []),
-          ]}
-          detail={<ScheduleDetail doctor={data.doctor} />}
-          actions={
-            <DashboardActions
-              onRefresh={revalidate}
-              reportDir={data.doctor.schedule.report_dir}
-              lastReport={data.doctor.schedule.last_report}
-            />
-          }
-        />
-        <List.Item
           title="Fix Plan"
-          subtitle={`${data.fixPlan.summary.safe} safe - ${data.fixPlan.summary.review} review - ${data.fixPlan.summary.blocked} blocked`}
+          subtitle={`${fixPlanTotal(data.fixPlan)} items`}
           icon={{
             source: Icon.List,
             tintColor:
@@ -156,21 +120,14 @@ export default function Command() {
         />
         <List.Item
           title="Analysis"
-          subtitle={`${data.analysis.summary.total_signals} signals - ${data.analysis.summary.provider_warnings} provider warnings`}
+          subtitle="Offline context"
           icon={{
             source: Icon.MagnifyingGlass,
             tintColor: severityColor(
               data.analysis.summary.highest_severity || "info",
             ),
           }}
-          accessories={[
-            { text: data.analysis.summary.highest_severity || "info" },
-          ]}
-          detail={
-            <List.Item.Detail
-              markdown={`# Analysis\n\nSignals: \`${data.analysis.summary.total_signals}\`\n\nProvider warnings: \`${data.analysis.summary.provider_warnings}\`\n\nOffline analysis does not claim a server or package is safe.`}
-            />
-          }
+          detail={<AnalysisDetail analysis={data.analysis} />}
           actions={
             <DashboardActions
               onRefresh={revalidate}
@@ -181,54 +138,57 @@ export default function Command() {
         />
       </List.Section>
 
-      <List.Section title="Classifications">
-        {classificationRows(data.report).map(([classification, count]) => (
-          <List.Item
-            key={classification}
-            title={classification}
-            subtitle={`${count} item${count === 1 ? "" : "s"}`}
-            icon={{
-              source: Icon.Dot,
-              tintColor: classificationColor(classification),
-            }}
-            detail={
-              <List.Item.Detail
-                markdown={`# ${classification}\n\n${count} discovered item${count === 1 ? "" : "s"}.`}
-              />
-            }
-            actions={
-              <DashboardActions
-                onRefresh={revalidate}
-                reportDir={data.doctor.schedule.report_dir}
-                lastReport={data.doctor.schedule.last_report}
-              />
-            }
-          />
-        ))}
+      <List.Section title="Environment">
+        <List.Item
+          title="Schedule"
+          subtitle={data.doctor.schedule.installed ? "On" : "Off"}
+          icon={{
+            source: Icon.Clock,
+            tintColor: data.doctor.schedule.installed
+              ? Color.Green
+              : Color.Yellow,
+          }}
+          detail={<ScheduleDetail doctor={data.doctor} />}
+          actions={
+            <DashboardActions
+              onRefresh={revalidate}
+              reportDir={data.doctor.schedule.report_dir}
+              lastReport={data.doctor.schedule.last_report}
+            />
+          }
+        />
+        <List.Item
+          title="Adapters"
+          subtitle={adapterSubtitle(data.report)}
+          icon={{
+            source: Icon.HardDrive,
+            tintColor: data.report.adapters.some((adapter) => adapter.available)
+              ? Color.Green
+              : Color.SecondaryText,
+          }}
+          detail={<AdaptersDetail data={data} />}
+          actions={
+            <DashboardActions
+              onRefresh={revalidate}
+              reportDir={data.doctor.schedule.report_dir}
+              lastReport={data.doctor.schedule.last_report}
+            />
+          }
+        />
       </List.Section>
 
-      <List.Section title="Top Findings">
+      <List.Section title="Findings To Review">
         {sortedFindings(data.report.findings)
           .slice(0, 8)
           .map((finding) => (
             <List.Item
               key={finding.id}
               title={findingTitle(finding)}
-              subtitle={findingSubtitle(finding)}
               icon={{
                 source: Icon.Warning,
                 tintColor: severityColor(finding.severity),
               }}
-              accessories={[
-                {
-                  tag: {
-                    value: finding.severity,
-                    color: severityColor(finding.severity),
-                  },
-                },
-                { text: findingFixLabel(finding) },
-              ]}
-              detail={<List.Item.Detail markdown={findingMarkdown(finding)} />}
+              detail={<FindingPreviewDetail finding={finding} />}
               actions={
                 <ActionPanel>
                   <Action.CopyToClipboard
@@ -260,24 +220,125 @@ export default function Command() {
 function DashboardDetail({ data }: { data: DashboardData }) {
   return (
     <List.Item.Detail
-      markdown={dashboardMarkdown(data.report, data.doctor)}
+      markdown={dashboardMarkdown(
+        data.report,
+        data.doctor,
+        data.fixPlan,
+        data.analysis,
+      )}
       metadata={
         <List.Item.Detail.Metadata>
+          <List.Item.Detail.Metadata.TagList title="Posture">
+            <List.Item.Detail.Metadata.TagList.Item
+              text={maxSeverity(data.report.findings)}
+              color={severityColor(maxSeverity(data.report.findings))}
+            />
+          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Separator />
           <List.Item.Detail.Metadata.Label
-            title="Adapters"
-            text={adapterSummary(data.report.adapters)}
+            title="Findings"
+            text={String(data.report.summary.total_findings)}
           />
           <List.Item.Detail.Metadata.Label
-            title="Fix Plan"
-            text={`${data.fixPlan.summary.total} total`}
+            title="Items"
+            text={String(data.report.summary.total_items)}
           />
           <List.Item.Detail.Metadata.Label
-            title="Analysis"
-            text={`${data.analysis.summary.total_signals} signals`}
+            title="Analysis Signals"
+            text={String(data.analysis.summary.total_signals)}
           />
           <List.Item.Detail.Metadata.Label
-            title="Report Directory"
-            text={data.doctor.schedule.report_dir}
+            title="Fix Plan Items"
+            text={String(fixPlanTotal(data.fixPlan))}
+          />
+          <List.Item.Detail.Metadata.Separator />
+          <List.Item.Detail.Metadata.Label
+            title="Home"
+            text={data.report.home}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Generated"
+            text={data.report.generated_at}
+          />
+        </List.Item.Detail.Metadata>
+      }
+    />
+  );
+}
+
+function AnalysisDetail({ analysis }: { analysis: AnalysisReport }) {
+  return (
+    <List.Item.Detail
+      markdown={[
+        "# Analysis",
+        "",
+        "Offline analysis adds context to Nightward findings. It does not prove that an MCP server, package, or endpoint is safe.",
+      ].join("\n")}
+      metadata={
+        <List.Item.Detail.Metadata>
+          <List.Item.Detail.Metadata.TagList title="Mode">
+            <List.Item.Detail.Metadata.TagList.Item
+              text={analysis.mode}
+              color={Color.Blue}
+            />
+          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Separator />
+          <List.Item.Detail.Metadata.Label
+            title="Signals"
+            text={String(analysis.summary.total_signals)}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Subjects"
+            text={String(analysis.summary.total_subjects)}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Providers"
+            text={`${analysis.providers.length} checked`}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Provider Warnings"
+            text={String(analysis.summary.provider_warnings)}
+          />
+        </List.Item.Detail.Metadata>
+      }
+    />
+  );
+}
+
+function AdaptersDetail({ data }: { data: DashboardData }) {
+  const found = data.report.adapters.filter((adapter) => adapter.available);
+  const missing = data.report.adapters.filter((adapter) => !adapter.available);
+  return (
+    <List.Item.Detail
+      markdown={[
+        "# Adapters",
+        "",
+        `${found.length}/${data.report.adapters.length} adapter surfaces were discovered in this scan.`,
+        "",
+        "## Found",
+        ...(found.length > 0
+          ? found.map((adapter) => `- ${adapter.name}`)
+          : ["No adapter-specific config was found."]),
+        "",
+        "## Not Found",
+        ...missing.slice(0, 8).map((adapter) => `- ${adapter.name}`),
+      ].join("\n")}
+      metadata={
+        <List.Item.Detail.Metadata>
+          <List.Item.Detail.Metadata.TagList title="Adapters">
+            <List.Item.Detail.Metadata.TagList.Item
+              text={`${found.length} found`}
+              color={found.length > 0 ? Color.Green : Color.SecondaryText}
+            />
+          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Separator />
+          <List.Item.Detail.Metadata.Label
+            title="Found"
+            text={String(found.length)}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Checked"
+            text={String(data.report.adapters.length)}
           />
         </List.Item.Detail.Metadata>
       }
@@ -289,17 +350,10 @@ function ScheduleDetail({ doctor }: { doctor: DoctorReport }) {
   const lines = [
     "# Scheduled Scan",
     "",
-    `Installed: \`${doctor.schedule.installed ? "yes" : "no"}\``,
-    `Platform: \`${doctor.schedule.platform}\``,
-    `Report dir: \`${doctor.schedule.report_dir}\``,
-    `Log dir: \`${doctor.schedule.log_dir}\``,
+    doctor.schedule.installed
+      ? "Scheduled scans are installed for this machine."
+      : "Scheduled scans are off for this machine.",
   ];
-  if (doctor.schedule.last_run)
-    lines.push(`Last run: \`${doctor.schedule.last_run}\``);
-  if (doctor.schedule.last_report)
-    lines.push(`Last report: \`${doctor.schedule.last_report}\``);
-  if (doctor.schedule.last_findings !== undefined)
-    lines.push(`Last findings: \`${doctor.schedule.last_findings}\``);
   if (doctor.schedule.history && doctor.schedule.history.length > 0) {
     lines.push("", "## Report History");
     for (const record of doctor.schedule.history.slice(0, 5)) {
@@ -308,27 +362,129 @@ function ScheduleDetail({ doctor }: { doctor: DoctorReport }) {
       );
     }
   }
-  return <List.Item.Detail markdown={lines.join("\n")} />;
+  return (
+    <List.Item.Detail
+      markdown={lines.join("\n")}
+      metadata={
+        <List.Item.Detail.Metadata>
+          <List.Item.Detail.Metadata.TagList title="Schedule">
+            <List.Item.Detail.Metadata.TagList.Item
+              text={doctor.schedule.installed ? "on" : "off"}
+              color={doctor.schedule.installed ? Color.Green : Color.Yellow}
+            />
+          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Separator />
+          <List.Item.Detail.Metadata.Label
+            title="Platform"
+            text={doctor.schedule.platform}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Reports"
+            text={String(doctor.schedule.history?.length ?? 0)}
+          />
+          {doctor.schedule.last_run ? (
+            <List.Item.Detail.Metadata.Label
+              title="Last Run"
+              text={doctor.schedule.last_run}
+            />
+          ) : null}
+          {doctor.schedule.last_findings !== undefined ? (
+            <List.Item.Detail.Metadata.Label
+              title="Last Findings"
+              text={String(doctor.schedule.last_findings)}
+            />
+          ) : null}
+          <List.Item.Detail.Metadata.Label
+            title="Report Dir"
+            text={doctor.schedule.report_dir}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Log Dir"
+            text={doctor.schedule.log_dir}
+          />
+        </List.Item.Detail.Metadata>
+      }
+    />
+  );
 }
 
 function FixPlanDetail({ plan }: { plan: FixPlan }) {
   const lines = [
     "# Fix Plan",
     "",
-    `Total: \`${plan.summary.total}\``,
-    `Safe: \`${plan.summary.safe}\``,
-    `Review: \`${plan.summary.review}\``,
-    `Blocked: \`${plan.summary.blocked}\``,
-    "",
     "Nightward exports fix plans only. It does not mutate local configs from Raycast.",
   ];
   if (plan.groups && plan.groups.length > 0) {
     lines.push("", "## Grouped Review");
     for (const group of plan.groups.slice(0, 8)) {
-      lines.push(`- \`${group.label}\` (${group.count}): ${group.summary}`);
+      const title = group.label ?? group.title ?? group.key;
+      const count = group.count ?? group.finding_count ?? 0;
+      const summary =
+        group.summary ?? group.actions?.[0] ?? "Review this group.";
+      lines.push(`- \`${title}\` (${count}): ${summary}`);
     }
   }
-  return <List.Item.Detail markdown={lines.join("\n")} />;
+  return (
+    <List.Item.Detail
+      markdown={lines.join("\n")}
+      metadata={
+        <List.Item.Detail.Metadata>
+          <List.Item.Detail.Metadata.Label
+            title="Total"
+            text={String(fixPlanTotal(plan))}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Safe"
+            text={{ value: String(plan.summary.safe), color: Color.Green }}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Review"
+            text={{ value: String(plan.summary.review), color: Color.Yellow }}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Blocked"
+            text={{ value: String(plan.summary.blocked), color: Color.Red }}
+          />
+        </List.Item.Detail.Metadata>
+      }
+    />
+  );
+}
+
+function FindingPreviewDetail({
+  finding,
+}: {
+  finding: ScanReport["findings"][number];
+}) {
+  return (
+    <List.Item.Detail
+      markdown={findingMarkdown(finding)}
+      metadata={
+        <List.Item.Detail.Metadata>
+          <List.Item.Detail.Metadata.TagList title="Severity">
+            <List.Item.Detail.Metadata.TagList.Item
+              text={finding.severity}
+              color={severityColor(finding.severity)}
+            />
+          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Separator />
+          <List.Item.Detail.Metadata.Label title="Rule" text={finding.rule} />
+          <List.Item.Detail.Metadata.Label title="Tool" text={finding.tool} />
+          {finding.server ? (
+            <List.Item.Detail.Metadata.Label
+              title="Server"
+              text={finding.server}
+            />
+          ) : null}
+          <List.Item.Detail.Metadata.Label title="Path" text={finding.path} />
+          <List.Item.Detail.Metadata.Label
+            title="Fix"
+            text={findingFixLabel(finding)}
+          />
+        </List.Item.Detail.Metadata>
+      }
+    />
+  );
 }
 
 function DashboardActions({
@@ -359,21 +515,11 @@ function DashboardActions({
   );
 }
 
-function classificationRows(
-  report: ScanReport,
-): Array<[Classification, number]> {
-  const order: Classification[] = [
-    "portable",
-    "machine-local",
-    "secret-auth",
-    "runtime-cache",
-    "app-owned",
-    "unknown",
-  ];
-  return order
-    .map((classification): [Classification, number] => [
-      classification,
-      report.summary.items_by_classification[classification] ?? 0,
-    ])
-    .filter(([, count]) => count > 0);
+function adapterSubtitle(report: ScanReport): string {
+  const found = report.adapters.filter((adapter) => adapter.available).length;
+  return `${found}/${report.adapters.length} found`;
+}
+
+function titleCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

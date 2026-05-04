@@ -19,13 +19,13 @@
 
 ## Validation
 
-- [ ] `go test ./...`
+- [ ] `cargo test --workspace`
 - [ ] `make coverage-check`
 - [ ] `make test-junit`
 - [ ] `make trunk-flaky-validate`
 - [ ] `trunk check --show-existing --all`
 - [ ] `make gitleaks`
-- [ ] `make govulncheck`
+- [ ] `make cargo-audit`
 - [ ] `make fuzz-smoke`
 - [ ] `make release-snapshot` when release/build behavior changed
 

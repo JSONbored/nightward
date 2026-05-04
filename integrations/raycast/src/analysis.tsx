@@ -4,8 +4,12 @@ import {
   Color,
   Detail,
   Icon,
+  LaunchType,
   List,
   getPreferenceValues,
+  launchCommand,
+  showToast,
+  Toast,
 } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
 import {
@@ -21,7 +25,10 @@ import {
   selectedAnalysisProviders,
   selectedOnlineProviders,
 } from "./provider-options";
-import { readSelectedProviders } from "./provider-settings";
+import {
+  clearSelectedProviders,
+  readSelectedProviders,
+} from "./provider-settings";
 import type { AnalysisReport, AnalysisSignal } from "./types";
 
 const docsUrl =
@@ -45,8 +52,17 @@ export default function Command() {
   if (error) {
     return (
       <Detail
-        markdown={`# Nightward Analysis\n\n${error.message}`}
-        actions={<AnalysisActions onRefresh={revalidate} />}
+        markdown={[
+          "# Nightward Analysis",
+          "",
+          "Nightward could not run the selected analysis providers.",
+          "",
+          "Open Provider Doctor to install missing tools, or clear the Raycast provider selection to return to built-in offline analysis.",
+          "",
+          "## Error",
+          `\`${error.message}\``,
+        ].join("\n")}
+        actions={<AnalysisErrorActions onRefresh={revalidate} />}
       />
     );
   }
@@ -63,13 +79,13 @@ export default function Command() {
   return (
     <List
       isLoading={isLoading}
-      searchBarPlaceholder="Search analysis signals..."
+      searchBarPlaceholder="Search signals..."
       isShowingDetail
     >
       <List.Section title="Summary">
         <List.Item
-          title="Analysis Summary"
-          subtitle={`${data.report.summary.total_signals} signals - ${data.report.summary.provider_warnings} provider warnings`}
+          title="Analysis"
+          subtitle={`${data.report.summary.total_signals} signals`}
           icon={{
             source: Icon.MagnifyingGlass,
             tintColor: severityColor(
@@ -86,11 +102,28 @@ export default function Command() {
           actions={<AnalysisActions onRefresh={revalidate} />}
         />
       </List.Section>
-      <List.Section title="Signals">
-        {sortedSignals(data.report.signals).map((signal) => (
-          <SignalItem key={signal.id} signal={signal} onRefresh={revalidate} />
-        ))}
-      </List.Section>
+      {signalSections(data.report.signals).length === 0 ? (
+        <List.EmptyView
+          title="No analysis signals"
+          description="Nightward did not emit any analysis signals for this scan."
+          icon={Icon.CheckCircle}
+        />
+      ) : null}
+      {signalSections(data.report.signals).map(([severity, signals]) => (
+        <List.Section
+          key={severity}
+          title={`${severity.charAt(0).toUpperCase() + severity.slice(1)} Signals`}
+          subtitle={String(signals.length)}
+        >
+          {signals.map((signal) => (
+            <SignalItem
+              key={signal.id}
+              signal={signal}
+              onRefresh={revalidate}
+            />
+          ))}
+        </List.Section>
+      ))}
     </List>
   );
 }
@@ -107,20 +140,18 @@ function SignalItem({
       title={signalTitle(signal)}
       subtitle={signalSubtitle(signal)}
       icon={{ source: Icon.Warning, tintColor: severityColor(signal.severity) }}
-      accessories={[
-        {
-          tag: {
-            value: signal.severity,
-            color: severityColor(signal.severity),
-          },
-        },
-        { text: signal.confidence },
-      ]}
       detail={
         <List.Item.Detail
           markdown={signalMarkdown(signal)}
           metadata={
             <List.Item.Detail.Metadata>
+              <List.Item.Detail.Metadata.TagList title="Severity">
+                <List.Item.Detail.Metadata.TagList.Item
+                  text={signal.severity}
+                  color={severityColor(signal.severity)}
+                />
+              </List.Item.Detail.Metadata.TagList>
+              <List.Item.Detail.Metadata.Separator />
               <List.Item.Detail.Metadata.Label
                 title="Provider"
                 text={signal.provider}
@@ -128,10 +159,6 @@ function SignalItem({
               <List.Item.Detail.Metadata.Label
                 title="Category"
                 text={signal.category}
-              />
-              <List.Item.Detail.Metadata.Label
-                title="Severity"
-                text={signal.severity}
               />
               <List.Item.Detail.Metadata.Label
                 title="Confidence"
@@ -180,13 +207,12 @@ function AnalysisDetail({
     <List.Item.Detail
       markdown={[
         analysisMarkdown(report),
-        "",
-        "## Raycast Provider Selection",
-        activeProviders.length > 0
-          ? `Active providers: \`${activeProviders.join(", ")}\``
-          : "Active providers: built-in offline analysis only.",
         blockedProviders.length > 0
-          ? `Blocked online-capable providers: \`${blockedProviders.join(", ")}\``
+          ? [
+              "",
+              "## Online Providers Blocked",
+              "Enable online providers in extension preferences before running selected online-capable providers.",
+            ].join("\n")
           : "",
       ]
         .filter(Boolean)
@@ -211,6 +237,7 @@ function AnalysisDetail({
               color={Color.Blue}
             />
           </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Separator />
           <List.Item.Detail.Metadata.Label
             title="Selected Providers"
             text={
@@ -231,6 +258,17 @@ function AnalysisDetail({
   );
 }
 
+function signalSections(
+  signals: AnalysisSignal[],
+): Array<[AnalysisSignal["severity"], AnalysisSignal[]]> {
+  return (["critical", "high", "medium", "low", "info"] as const)
+    .map((severity): [AnalysisSignal["severity"], AnalysisSignal[]] => [
+      severity,
+      sortedSignals(signals).filter((signal) => signal.severity === severity),
+    ])
+    .filter(([, sectionSignals]) => sectionSignals.length > 0);
+}
+
 function AnalysisActions({ onRefresh }: { onRefresh: () => void }) {
   return (
     <ActionPanel>
@@ -238,4 +276,56 @@ function AnalysisActions({ onRefresh }: { onRefresh: () => void }) {
       <Action.OpenInBrowser title="Open Privacy Model" url={docsUrl} />
     </ActionPanel>
   );
+}
+
+function AnalysisErrorActions({ onRefresh }: { onRefresh: () => void }) {
+  return (
+    <ActionPanel>
+      <ActionPanel.Section title="Recover">
+        <Action
+          title="Open Provider Doctor"
+          icon={Icon.Heartbeat}
+          onAction={() => void openProviderDoctor()}
+        />
+        <Action
+          title="Clear Selected Providers"
+          icon={Icon.Trash}
+          onAction={() => void clearProviders(onRefresh)}
+        />
+      </ActionPanel.Section>
+      <ActionPanel.Section title="Refresh">
+        <Action
+          title="Refresh"
+          icon={Icon.ArrowClockwise}
+          onAction={onRefresh}
+        />
+        <Action.OpenInBrowser title="Open Privacy Model" url={docsUrl} />
+      </ActionPanel.Section>
+    </ActionPanel>
+  );
+}
+
+async function openProviderDoctor() {
+  try {
+    await launchCommand({
+      name: "provider-doctor",
+      type: LaunchType.UserInitiated,
+    });
+  } catch (error) {
+    await showToast({
+      style: Toast.Style.Failure,
+      title: "Could not open Provider Doctor",
+      message: error instanceof Error ? error.message : "Unknown Raycast error",
+    });
+  }
+}
+
+async function clearProviders(onRefresh: () => void) {
+  await clearSelectedProviders();
+  await showToast({
+    style: Toast.Style.Success,
+    title: "Provider selection cleared",
+    message: "Nightward Analysis will use built-in offline analysis.",
+  });
+  onRefresh();
 }

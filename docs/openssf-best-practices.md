@@ -13,11 +13,11 @@ Project badge: <https://www.bestpractices.dev/projects/12713>
 - Documentation basics and interface docs: README, `site/`, plus `docs/action.md`, `docs/analysis.md`, `docs/remediation.md`, `docs/privacy-model.md`, and `docs/adapters.md`.
 - Discussion and report archive: <https://github.com/JSONbored/nightward/issues>
 - Vulnerability reporting: <https://github.com/JSONbored/nightward/blob/main/SECURITY.md>
-- Build system: `Makefile`, `go.mod`, Raycast and npm launcher `package-lock.json` files, and GitHub Actions.
+- Build system: Rust workspace `Cargo.toml`/`Cargo.lock`, `Makefile`, Raycast and npm launcher `package-lock.json` files, and GitHub Actions.
 - Tests: `make test`, `make test-race`, `make test-junit`, `make coverage-check`, `make verify`.
 - CI: `.github/workflows/ci.yml`, `.github/workflows/nightward-policy.yml`, `.github/workflows/scorecard.yml`.
-- Static analysis: `go vet`, `staticcheck`, `gosec`, Trunk Check, CodeQL, Gitleaks, govulncheck, OSV, and Nightward SARIF.
-- Dynamic analysis: automated tests, race tests, Raycast tests/build, and Go fuzz smoke tests.
+- Static analysis: `cargo fmt`, `cargo clippy`, Trunk Check, CodeQL, Gitleaks, OSV, and Nightward SARIF.
+- Dynamic analysis: automated tests, Rust tests, Raycast tests/build, and parser/property smoke tests.
 - Secret scanning: Gitleaks in CI and `make gitleaks`.
 - Release notes: <https://github.com/JSONbored/nightward/releases>
 - Curated changelog index: <https://github.com/JSONbored/nightward/blob/main/CHANGELOG.md>
@@ -38,7 +38,7 @@ The release pipeline uses external tools for signing release checksums and SBOM 
 - Architecture/security model: `docs/privacy-model.md`, `docs/threat-model.md`, `docs/ci-security.md`, and `docs/remediation.md`.
 - Dependency maintenance: <https://github.com/JSONbored/nightward/blob/main/docs/dependency-maintenance.md>
 - DCO: `CONTRIBUTING.md` and the CI DCO sign-off job.
-- Release readiness: `.goreleaser.yml`, `make release-snapshot`, signed checksum config, SBOM config, release workflow, release smoke, and trusted-publishing-only npm launcher package.
+- Release readiness: `make release-snapshot`, signed checksum config, SBOM planning, release workflow, release smoke, and trusted-publishing-only npm launcher package.
 - Website/docs readiness: `site/` VitePress source and `.github/workflows/pages.yml`.
 - Distribution plan: <https://github.com/JSONbored/nightward/blob/main/docs/distribution.md>
 - npm provenance: `@jsonbored/nightward` publishes through trusted publishing/OIDC with provenance and no long-lived npm token.
@@ -47,7 +47,7 @@ The release pipeline uses external tools for signing release checksums and SBOM 
 ## Gold-Oriented Backlog
 
 - SLSA provenance/attestations for future release workflows.
-- Reproducible-build comparison using `CGO_ENABLED=0`, `-trimpath`, pinned Go toolchain, and rebuild verification.
+- Reproducible-build comparison using pinned Rust toolchains, deterministic Cargo lockfiles, release archive checksums, and rebuild verification.
 - Wider fuzz/property tests for MCP parsing, redaction, symlink traversal, huge files, malformed configs, and permission-denied paths.
 - More maintainer depth and documented two-person review coverage once the project has additional maintainers.
 - Package-manager ecosystem coverage beyond npm and GitHub Releases.

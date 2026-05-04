@@ -18,3 +18,43 @@ case "${value}" in
     exit 2
     ;;
 esac
+
+if [[ -n "${GITHUB_WORKSPACE:-}" ]]; then
+  workspace_real="$(cd "${GITHUB_WORKSPACE}" && pwd -P)"
+  candidate="${GITHUB_WORKSPACE}/${value}"
+  current="${GITHUB_WORKSPACE}"
+  IFS='/' read -r -a parts <<<"${value}"
+  for part in "${parts[@]}"; do
+    [[ -z "${part}" || "${part}" == "." ]] && continue
+    current="${current}/${part}"
+    if [[ -L "${current}" ]]; then
+      echo "unsafe ${name} path: ${value}" >&2
+      echo "${name} must not contain symlinked path components." >&2
+      exit 2
+    fi
+  done
+
+  parent="$(dirname "${candidate}")"
+  nearest="${parent}"
+  while [[ ! -e "${nearest}" ]]; do
+    next="$(dirname "${nearest}")"
+    if [[ "${next}" == "${nearest}" ]]; then
+      break
+    fi
+    nearest="${next}"
+  done
+  if [[ ! -d "${nearest}" ]]; then
+    echo "unsafe ${name} path: ${value}" >&2
+    echo "${name} parent must resolve inside GITHUB_WORKSPACE." >&2
+    exit 2
+  fi
+  nearest_real="$(cd "${nearest}" && pwd -P)"
+  case "${nearest_real}/" in
+    "${workspace_real}/"*) ;;
+    *)
+      echo "unsafe ${name} path: ${value}" >&2
+      echo "${name} parent must resolve inside GITHUB_WORKSPACE." >&2
+      exit 2
+      ;;
+  esac
+fi

@@ -30,6 +30,10 @@ features:
 
 <!-- markdownlint-disable MD041 MD033 -->
 
+<script setup>
+import { withBase } from "vitepress";
+</script>
+
 <section class="nw-install-strip" aria-label="Install Nightward">
   <div class="nw-install-copy">
     <p class="nw-eyebrow">Start now</p>
@@ -42,7 +46,7 @@ features:
   </div>
 </section>
 
-Prefer a persistent CLI? Use [npm, GitHub Releases, or `go install`](/guide/install), then run `nw`.
+Prefer a persistent CLI? Use [npm, GitHub Releases, or a source build](/guide/install), then run `nw`.
 
 ## Pick A Path
 
@@ -59,9 +63,25 @@ The sample report below is generated from the committed `testdata/homes/policy` 
 
 [![Scrubbed Nightward HTML report showing fixture MCP findings](/demo/nightward-sample-report.png)](/demo/nightward-sample-report.html)
 
-[Sample scan JSON](/demo/nightward-sample-scan.json) · [Static HTML report](/demo/nightward-sample-report.html) · [OpenTUI screenshot](/demo/nightward-opentui.png) · [OpenTUI GIF](/demo/nightward-opentui.gif) · [Provider reference](/reference/providers) · [Output surfaces](/reference/output-surfaces)
+[Sample scan JSON](/demo/nightward-sample-scan.json) · [Static HTML report](/demo/nightward-sample-report.html) · [OpenTUI gallery](/guide/tui) · [OpenTUI GIF](/demo/nightward-opentui.gif) · [Provider reference](/reference/providers) · [Output surfaces](/reference/output-surfaces)
 
-![Nightward OpenTUI dashboard](/demo/nightward-opentui.png)
+<section id="tui-media" class="nw-tui-media" aria-labelledby="nw-tui-media-title">
+  <div class="nw-tui-media__copy">
+    <p class="nw-eyebrow">Terminal review flow</p>
+    <h2 id="nw-tui-media-title">Move from posture to evidence without leaving the terminal.</h2>
+    <p>The loop uses the scrubbed fixture report: overview, findings, offline analysis, plan-only fixes, inventory, backup choices, and safety reminders.</p>
+    <p class="nw-tui-media__links">
+      <a :href="withBase('/guide/tui')">Open the TUI guide</a>
+      <a href="https://github.com/JSONbored/nightward">Star on GitHub</a>
+    </p>
+  </div>
+  <a class="nw-tui-media__frame" :href="withBase('/guide/tui')" aria-label="Open the Nightward TUI guide">
+    <video class="nw-tui-media__video" autoplay muted loop playsinline :poster="withBase('/demo/tui/overview.png')">
+      <source :src="withBase('/demo/tui/nightward-opentui.webm')" type="video/webm">
+    </video>
+    <img class="nw-tui-media__fallback" :src="withBase('/demo/tui/overview.png')" alt="Nightward OpenTUI dashboard from scrubbed fixture output">
+  </a>
+</section>
 
 ## What Nightward Checks
 
@@ -76,6 +96,6 @@ The sample report below is generated from the committed `testdata/homes/policy` 
 
 ## Trust Posture
 
-Nightward v0.1.4 ships through signed GitHub Releases and a no-`postinstall` npm launcher that verifies GitHub Release checksums before running a cached binary. The project keeps OpenSSF evidence in-repo, runs CodeQL/Scorecard/Gitleaks/govulncheck/gosec/staticcheck, and keeps online-capable providers blocked until explicitly enabled.
+Nightward ships through signed GitHub Releases and a no-`postinstall` npm launcher that verifies GitHub Release checksums before running a cached Rust binary. The project keeps OpenSSF evidence in-repo, runs CodeQL/Scorecard/Gitleaks/OSV/Clippy, and keeps online-capable providers blocked until explicitly enabled.
 
 Nightward does not copy secrets, push to Git, restore configs, sync machines, or apply live mutations in v1.

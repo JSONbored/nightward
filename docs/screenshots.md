@@ -24,8 +24,11 @@ Nightward should have visual proof before broader promotion.
 ## Suggested Fixture Run
 
 ```sh
-NIGHTWARD_HOME="$PWD/testdata/homes/policy" go run ./cmd/nw
+target/debug/nw tui --input site/public/demo/nightward-sample-scan.json
+make tui-media
 ```
+
+`make tui-media` uses the committed scrubbed sample scan, the `NIGHTWARD_TUI_VIEW` capture hook, VHS, and ffmpeg. It writes the reviewed gallery PNGs under `site/public/demo/tui/`, refreshes the legacy `site/public/demo/nightward-opentui.png` and GIF, and builds the homepage WebM loop. Keep `make demo-assets` scoped to JSON, HTML, report PNG, and Open Graph assets.
 
 For Raycast, set the extension `Home Override` preference to the same fixture home before `npm run dev`.
 
@@ -34,10 +37,10 @@ For Raycast, set the extension `Home Override` preference to the same fixture ho
 | Surface | Fixture-only source | Required evidence | Status |
 | --- | --- | --- | --- |
 | Static HTML report | `testdata/homes/policy` | Scrubbed scan JSON, filterable static HTML report, and PNG screenshot generated from fixture output | captured in `site/public/demo/` with `node scripts/generate-demo-assets.mjs`; no local paths or secret values found |
-| OpenTUI dashboard | `site/public/demo/nightward-sample-scan.json` | GIF/PNG shows the left rail, status cards, severity bars, recent findings, and next action | fixture GIF and PNG captured in `site/public/demo/nightward-opentui.*` with `make opentui-demo`; no live HOME data used |
-| OpenTUI review flows | `site/public/demo/nightward-sample-scan.json` | GIF shows findings, analysis, fix plan, inventory, backup preview, search, and severity filtering | fixture GIF captured from `docs/demo/nightward-opentui.tape`; no `/Users`, username, or secret fixture values found |
-| Raycast Dashboard | fixture `Home Override` | Screenshot shows counts and top findings from synthetic data | pending `ray develop` smoke |
-| Raycast Findings/Analysis | fixture `Home Override` | Screenshots show redacted evidence and no config mutation actions | pending `ray develop` smoke |
-| Raycast Provider Doctor | fixture/default local environment | Screenshot shows provider status without implying online scans | pending `ray develop` smoke |
+| TUI dashboard | `site/public/demo/nightward-sample-scan.json` | PNG shows the embedded Rust OpenTUI dashboard with severity colors, summary panels, findings, next action, footer metadata, and terminal-native mark | fixture PNGs in `site/public/demo/tui/` plus legacy `site/public/demo/nightward-opentui.png`; no live HOME data used |
+| TUI review flows | `site/public/demo/nightward-sample-scan.json` | GIF/WebM shows findings, analysis, fix plan, inventory, backup preview, search, and severity filtering once regenerated from the Rust TUI | fixture GIF in `site/public/demo/nightward-opentui.gif` and WebM in `site/public/demo/tui/nightward-opentui.webm`; no `/Users`, username, hostnames, private MCP names, or secret-looking values allowed |
+| Raycast Dashboard | `/tmp/nightward-raycast-home` copied from `testdata/homes/policy` | Screenshot shows counts and top findings from synthetic data | captured in `integrations/raycast/metadata/dashboard.png` via `npm run dev`; no live HOME data visible |
+| Raycast Findings/Analysis | `/tmp/nightward-raycast-home` copied from `testdata/homes/policy` | Screenshots show redacted evidence and no config mutation actions | findings captured in `integrations/raycast/metadata/findings.png` via `npm run dev`; analysis command passed automated tests |
+| Raycast Provider Doctor | fixture `Home Override` plus local provider availability | Screenshot shows provider status without implying online scans | captured in `integrations/raycast/metadata/providers.png` via `npm run dev`; online-capable providers remain blocked without opt-in |
 
-Record the commit SHA, fixture path, command used, and reviewer initials beside the captured assets before linking them from README or store metadata.
+Record the commit SHA, fixture path, command used, and reviewer initials beside the captured assets before linking them from README or store metadata. Public TUI media must remain fixture-only: do not capture live HOME data, a real hostname, private MCP server names, or local project paths for docs, homepage, README, or store surfaces.

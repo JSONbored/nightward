@@ -6,13 +6,13 @@ Nightward’s roadmap is intentionally conservative. The next releases should ma
 
 - Local inventory and MCP security review.
 - Redacted JSON, SARIF, policy output, and TUI workflows.
-- Plan-only remediation and fix previews.
+- Plan-only remediation and fix exports.
 - GitHub Action, Trunk plugin definition, Raycast extension, and npm launcher.
 - Signed v0.1.x releases with npm provenance and release-checksum verification.
 - Explicit provider execution for local providers and online-gated provider runs.
 - Static HTML reports with local finding filters, report diffs, report history, and sample fixture assets.
 - Read-only stdio MCP server for local AI-client integration.
-- OpenTUI sidecar with colored dashboard, findings, analysis, fix plan, inventory, backup preview, and help sections.
+- Embedded Rust OpenTUI dashboard with colored severity panels, findings, analysis, fix plan, inventory, backup preview, and help sections.
 - OpenSSF-oriented governance, coverage, DCO, threat model, and release hardening.
 - Generated CLI, provider, rule, and config reference pages.
 

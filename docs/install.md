@@ -2,13 +2,23 @@
 
 Nightward should be easy to try without weakening its security posture. The preferred release model is signed GitHub Release artifacts first, then convenience installers that point back to those artifacts.
 
-## Current Local Install
+## Recommended Install
+
+```sh
+npx @jsonbored/nightward scan
+npm install -g @jsonbored/nightward
+nw
+```
+
+`npx @jsonbored/nightward scan` is the fastest read-only trial. `npm install -g @jsonbored/nightward` installs the same release-backed launcher for repeated CLI and TUI use. The TUI and CLI are not separate packages: `nw` opens the TUI, and `nw scan`, `nw policy`, `nw report`, and the other subcommands use the same installed binary.
+
+## Local Source Install
 
 ```sh
 make install-local
 ```
 
-This builds `nightward` and `nw` from the local checkout into `~/.local/bin` by default.
+This builds `nightward` and `nw` from the local checkout into `~/.local/bin` by default. Use this for development or branch comparison, not as the recommended end-user install path.
 
 ## GitHub Releases
 
@@ -16,7 +26,7 @@ GitHub Releases are the canonical binary distribution channel.
 
 Release artifacts include:
 
-- `nightward`, `nw`, and `nightward-tui` binaries for macOS, Linux, and Windows x64.
+- `nightward` and `nw` Rust binaries for macOS, Linux, and Windows x64.
 - `checksums.txt`.
 - `checksums.txt.sigstore.json` from Cosign keyless signing.
 - SBOM files for release archives.
@@ -33,9 +43,8 @@ The package is a thin launcher:
 - no bundled Node implementation of Nightward
 - downloads the matching GitHub Release archive on first run
 - verifies the archive SHA-256 from `checksums.txt`
-- caches extracted `nightward`, `nw`, and `nightward-tui` binaries locally
-
-Windows ARM64 is not published yet because the OpenTUI sidecar does not currently have a Bun compile target for that platform.
+- caches extracted `nightward` and `nw` binaries locally
+Windows ARM64 remains deferred until the release matrix includes a validated Windows ARM64 Rust build.
 
 Example:
 

@@ -153,7 +153,7 @@ export async function explainSignal(
   options: RuntimeOptions,
 ): Promise<AnalysisReport> {
   return runNightwardJSON<AnalysisReport>(
-    ["analyze", "finding", "--json", findingId],
+    ["analyze", "finding", findingId, "--json"],
     options,
   );
 }
@@ -296,7 +296,7 @@ function raycastCommandPath(executable: string): string {
   const extra = [
     executable.includes("/") ? dirname(executable) : "",
     join(homedir(), ".local", "bin"),
-    join(homedir(), "go", "bin"),
+    join(homedir(), ".cargo", "bin"),
     "/opt/homebrew/bin",
     "/usr/local/bin",
     "/usr/bin",

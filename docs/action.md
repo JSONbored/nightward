@@ -24,7 +24,7 @@ Inputs:
 - `strict`: fail policy checks on medium or higher findings
 - `output`: output path for scan JSON or SARIF
 - `home`: optional HOME override for fixture scans
-- `workspace`: optional repository/workspace path to scan instead of HOME
+- `workspace`: optional repository/workspace path to scan; defaults to `GITHUB_WORKSPACE` unless `home` is set
 - `include-analysis`: include offline analysis signals in policy or SARIF modes
 - `sarif-url`: optional SARIF URL included in badge mode
 
@@ -38,7 +38,7 @@ The action runs Nightward locally. It does not upload findings unless your workf
 
 `config` and `output` must be relative paths inside `GITHUB_WORKSPACE`. The action rejects absolute paths, parent traversal, backslashes, and newline characters before invoking Nightward.
 
-For repository CI, prefer workspace mode:
+For repository CI, the action defaults to `GITHUB_WORKSPACE`; pass `workspace` explicitly when you want to scan a narrower checkout path:
 
 ```yaml
 - uses: JSONbored/nightward@v0.1.4

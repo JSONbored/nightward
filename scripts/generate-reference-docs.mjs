@@ -6,11 +6,12 @@ import { join } from "node:path";
 
 const check = process.argv.includes("--check");
 const outDir = check ? mkdtempSync(join(tmpdir(), "nightward-docs-")) : "site/reference";
+const toolPath = `${process.env.HOME}/.cargo/bin:/opt/homebrew/bin:${process.env.PATH || ""}`;
 
 function runNightward(args) {
-  return execFileSync("go", ["run", "./cmd/nw", ...args], {
+  return execFileSync("cargo", ["run", "--quiet", "--bin", "nw", "--", ...args], {
     encoding: "utf8",
-    env: { ...process.env, NIGHTWARD_HOME: join(tmpdir(), "nightward-docs-home") },
+    env: { ...process.env, PATH: toolPath, NIGHTWARD_HOME: join(tmpdir(), "nightward-docs-home") },
     stdio: ["ignore", "pipe", "pipe"],
   }).trimEnd();
 }
@@ -27,7 +28,11 @@ const help = runNightward(["--help"]);
 const providers = parseJSON(["providers", "list", "--json"]);
 const rules = parseJSON(["rules", "list", "--json"]);
 const policyExplain = runNightward(["policy", "explain"]);
-const defaultPolicy = runNightward(["policy", "init"]);
+const policyTempDir = mkdtempSync(join(tmpdir(), "nightward-policy-docs-"));
+const policyPath = join(policyTempDir, "nightward-policy.yml");
+runNightward(["policy", "init", "--output", policyPath]);
+const defaultPolicy = readFileSync(policyPath, "utf8").trimEnd();
+rmSync(policyTempDir, { recursive: true, force: true });
 
 const providerLinks = new Map([
   ["nightward", { home: "https://github.com/JSONbored/nightward" }],
@@ -89,7 +94,7 @@ write(
   "cli.md",
   `# CLI Reference
 
-This page is generated from \`go run ./cmd/nw --help\`.
+This page is generated from \`cargo run --bin nw -- --help\`.
 
 \`\`\`text
 ${help}
@@ -136,14 +141,14 @@ write(
 
 This page is generated from \`nw rules list --json\`.
 
-| Rule | Severity | Category | Fix | Summary |
+| Rule | Severity | Docs | Fix | Summary |
 | --- | --- | --- | --- | --- |
 ${rules
   .map((rule) =>
     [
       `\`${rule.id}\``,
-      rule.default_severity,
-      rule.category,
+      rule.severity,
+      `[docs](${rule.docs_url})`,
       rule.fix_kind ? `\`${rule.fix_kind}\`` : "manual",
       rule.title,
     ].join(" | "),
@@ -170,6 +175,8 @@ ${policyExplain}
 \`\`\`yaml
 ${defaultPolicy}
 \`\`\`
+
+Finding ignores use \`id\` plus a non-empty \`reason\`. Rule ignores should use \`rule\` plus a non-empty \`reason\`; legacy \`id\` remains accepted as an alias for rule ignores.
 `,
 );
 

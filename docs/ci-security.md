@@ -4,14 +4,14 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 
 ## Workflows
 
-- `ci.yml`: Go tests, race tests, coverage gate, `go vet`, `staticcheck`, `gosec`, fuzz smoke tests, JUnit reports, local JUnit shape validation, gated Trunk Flaky Tests uploads, explicit Trunk Check CLI execution, Raycast extension tests/build/audit, npm launcher tests/audit/package dry-run, Gitleaks, govulncheck, OSV dependency scanning, DCO checking, and GoReleaser snapshot validation.
+- `ci.yml`: Rust formatting, Clippy, tests, doc tests, coverage gate, explicit Trunk Check CLI execution, Raycast extension tests/build/audit, npm launcher tests/audit/package dry-run, Gitleaks, OSV dependency scanning, DCO checking, and Rust release snapshot validation.
 - `nightward-policy.yml`: generates workspace Nightward SARIF, uploads a Nightward badge JSON artifact, and uploads SARIF to GitHub code scanning without scanning synthetic risky fixture homes.
 - `nw policy badge`: writes a local JSON status artifact for dashboards or release evidence when a workflow explicitly requests it.
 - `plugin.yaml`: defines Trunk Check linters for workspace policy and analysis SARIF once release tags are available.
 - `scorecard.yml`: runs OpenSSF Scorecard on PRs, `main`, branch-protection changes, and a weekly schedule. PR runs do not publish results or upload SARIF; `main` and scheduled runs upload SARIF.
-- `release.yml`: publishes signed GoReleaser artifacts from strict `vX.Y.Z` tags, smokes published Linux archives, and can publish the npm launcher only through trusted publishing when explicitly enabled.
+- `release.yml`: publishes signed Rust artifacts from strict `vX.Y.Z` tags, smokes published Linux archives, and can publish the npm launcher only through trusted publishing when explicitly enabled.
 - `pages.yml`: builds and deploys the VitePress documentation site from `site/` to GitHub Pages.
-- `renovate.json`: manages Go modules, Raycast npm packages, pinned GitHub Actions, local tool pins, and release tooling updates.
+- `renovate.json`: manages Cargo dependencies, Raycast/npm packages, pinned GitHub Actions, local tool pins, and release tooling updates.
 
 ## Action Policy
 
@@ -26,7 +26,7 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 - Use Renovate instead of Dependabot whenever possible.
 - Keep dependency PRs reviewed; do not enable broad automerge by default.
 - `main` branch protection requires two approving reviews and CODEOWNERS review. While Nightward has only one maintainer, maintainer merges require an explicit admin bypass and an issue/PR note explaining why normal review could not be satisfied.
-- Use repo-controlled `make gitleaks` and `make govulncheck` targets in CI so local and remote behavior match.
+- Use repo-controlled `make gitleaks`, `make cargo-audit`, and `make cargo-deny` targets locally so local and remote behavior stay aligned.
 - Install Trunk in CI from a pinned release archive with a checked SHA-256 instead of a moving launcher URL.
 - Keep Trunk Flaky Tests secrets scoped to the detection/upload steps only.
 - Keep composite action output/config paths relative to `GITHUB_WORKSPACE`; reject absolute paths, parent traversal, and newlines.

@@ -11,9 +11,16 @@ make demo-assets
 ```
 
 The generator rewrites hostname, HOME, local paths, timestamps, and secret-looking fixture values before writing the sample scan JSON, static HTML report, and PNG screenshot.
-The TUI GIF is generated from `docs/demo/nightward-opentui.tape` with VHS using scrubbed fixture output.
 It also renders the static Open Graph preview image used by the website metadata.
 Screenshot capture requires Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`.
+
+TUI media is generated separately because it needs VHS and ffmpeg:
+
+```sh
+make tui-media
+```
+
+That target uses the scrubbed sample scan plus `NIGHTWARD_TUI_VIEW` to write seven gallery PNGs under `site/public/demo/tui/`, refresh the legacy TUI PNG/GIF, and build `site/public/demo/tui/nightward-opentui.webm` for the homepage animation. Review generated frames for `/Users`, username, hostname, private MCP names, real project paths, and secret-looking values before committing.
 
 ## Site Goals
 
@@ -21,6 +28,7 @@ Screenshot capture requires Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/
 - Make the install path obvious.
 - Keep favicon, social preview metadata, and release-current copy in the repo.
 - Show the local-first privacy stance clearly.
+- Use fixture-only terminal media on the homepage, with a reduced-motion static fallback.
 - Document CLI, TUI, policy, integrations, security, and release verification.
 - Document the read-only MCP server as an AI-client integration, not a write/control surface.
 - Avoid analytics, telemetry, or hosted-docs dependencies by default.

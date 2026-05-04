@@ -63,6 +63,13 @@ export default function Command() {
       searchBarPlaceholder="Search Nightward providers..."
       isShowingDetail
     >
+      {(data ?? []).length === 0 && !isLoading ? (
+        <List.EmptyView
+          title="No providers returned"
+          description="Nightward provider doctor did not return provider status."
+          icon={Icon.ExclamationMark}
+        />
+      ) : null}
       <List.Section title="Local Providers">
         {(data ?? [])
           .filter((provider) => !provider.online)
@@ -116,9 +123,11 @@ function ProviderItem({
     ? "built-in"
     : blockedByPreference
       ? "online blocked"
-      : selected
-        ? "selected"
-        : provider.status;
+      : selected && !provider.available
+        ? "missing selected"
+        : selected
+          ? "selected"
+          : provider.status;
   return (
     <List.Item
       title={provider.name}
@@ -127,28 +136,26 @@ function ProviderItem({
         source: providerIcon(provider),
         tintColor: providerColor(provider),
       }}
-      accessories={[
-        {
-          tag: {
-            value: selectionLabel,
-            color: blockedByPreference
-              ? Color.Yellow
-              : selected || provider.default
-                ? Color.Blue
-                : providerColor(provider),
-          },
-        },
-        { text: provider.online ? "online" : "local" },
-      ]}
       detail={
         <List.Item.Detail
           markdown={providerMarkdown(provider, selected, onlineAllowed)}
           metadata={
             <List.Item.Detail.Metadata>
-              <List.Item.Detail.Metadata.Label
-                title="Status"
-                text={provider.status}
-              />
+              <List.Item.Detail.Metadata.TagList title="Status">
+                <List.Item.Detail.Metadata.TagList.Item
+                  text={selectionLabel}
+                  color={
+                    !provider.available
+                      ? Color.Red
+                      : blockedByPreference
+                        ? Color.Yellow
+                        : selected || provider.default
+                          ? Color.Blue
+                          : providerColor(provider)
+                  }
+                />
+              </List.Item.Detail.Metadata.TagList>
+              <List.Item.Detail.Metadata.Separator />
               <List.Item.Detail.Metadata.Label
                 title="Available"
                 text={provider.available ? "yes" : "no"}
@@ -156,6 +163,16 @@ function ProviderItem({
               <List.Item.Detail.Metadata.Label
                 title="Selected"
                 text={provider.default ? "built-in" : selected ? "yes" : "no"}
+              />
+              <List.Item.Detail.Metadata.Label
+                title="Online Gate"
+                text={
+                  provider.online
+                    ? onlineAllowed
+                      ? "allowed"
+                      : "blocked"
+                    : "not needed"
+                }
               />
               <List.Item.Detail.Metadata.Label
                 title="Execution"
@@ -271,14 +288,17 @@ function providerSubtitle(
   onlineAllowed: boolean,
 ): string {
   if (provider.default) {
-    return "Built-in offline analysis provider";
+    return "built-in";
   }
   if (selected && provider.online && !onlineAllowed) {
-    return "Selected, but blocked until Allow Online Providers is enabled";
+    return "online blocked";
   }
-  const location = provider.online ? "online-capable" : "local";
-  if (provider.available) return `${provider.status} ${location} provider`;
-  return `${provider.status} ${location} provider - ${provider.capabilities}`;
+  if (selected && !provider.available) {
+    return "missing selected";
+  }
+  if (selected) return "selected";
+  if (provider.available) return provider.status;
+  return "missing";
 }
 
 function providerMarkdown(
@@ -291,20 +311,18 @@ function providerMarkdown(
   return [
     `# ${provider.name}`,
     "",
-    "## Runtime",
-    `- Status: \`${provider.status}\``,
-    `- Available: \`${provider.available ? "yes" : "no"}\``,
-    `- Selected for Raycast Analysis: \`${provider.default ? "built-in" : selected ? "yes" : "no"}\``,
-    `- Execution: \`${provider.online ? "online-capable" : "local"}\``,
-    onlineBlocked
-      ? "- Online gate: `blocked until Allow Online Providers is enabled`"
-      : "",
-    "",
     "## Privacy",
     provider.privacy,
     "",
     "## Capability",
     provider.capabilities,
+    onlineBlocked
+      ? [
+          "",
+          "## Online Gate",
+          "This provider is selected, but Raycast will not run it until **Allow Online Providers** is enabled in extension preferences.",
+        ].join("\n")
+      : "",
     installInfo ? "" : "",
     installInfo ? "## Install" : "",
     installInfo?.command ? `Command: \`${installInfo.command}\`` : "",

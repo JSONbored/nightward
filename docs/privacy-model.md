@@ -20,16 +20,14 @@ Nightward is designed around local custody. The scanner inspects local file meta
 Nightward writes only when explicitly asked:
 
 - `scan --output FILE`
-- `scan --output-dir DIR`
 - `policy sarif --output FILE`
 - `policy sarif --output -` writes SARIF to stdout only.
 - TUI `e` key: redacted fix-plan export under `~/.local/state/nightward/exports`
-- `schedule install`
-- `schedule remove`
+- Raycast clipboard exports and report-folder open actions after explicit command invocation
 
-Schedule install/remove writes only user-level scheduler files. It does not copy configs, secrets, dotfiles, or reports into Git.
+Schedule install/remove is plan-only in v1. It describes intended launchd/systemd/cron commands, but does not write user-level scheduler files yet.
 
-`nw mcp serve` is not a write path. It can run read-only scan, policy, finding, rule, report, and fix-plan preview operations for an MCP client, but it cannot install schedules, mutate agent config, or enable online providers.
+`nw mcp serve` is not a write path. It can run read-only scan, policy, finding, rule, report, and fix-plan context operations for an MCP client, but it cannot install schedules, mutate agent config, or enable online providers.
 
 The TUI docs action opens an http(s) documentation URL through the OS default opener after the user presses `o`; Nightward itself does not fetch docs content.
 

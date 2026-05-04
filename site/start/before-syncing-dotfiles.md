@@ -26,5 +26,5 @@ For scheduled scans, compare the newest report with the prior one:
 ```sh
 nw report history
 nw report diff --from previous.json --to current.json
-nw report html --input current.json --previous previous.json --output current.html
+nw report html --input current.json --output current.html
 ```

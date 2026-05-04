@@ -11,7 +11,7 @@ integrations/raycast
 ## Commands
 
 - `Nightward Dashboard`: scan counts, schedule status, adapter summary, and top findings.
-- `Nightward Status`: compact menu-bar severity marker with just the highest-risk count, plus full critical/high/total counts, analysis signals, provider warnings, scheduled-report state, and latest-report access in the dropdown.
+- `Nightward Status`: compact menu-bar finding count, plus full critical/high/total counts, analysis signals, provider warnings, scheduled-report state, and latest-report access in the dropdown.
 - `Nightward Findings`: searchable findings with a severity filter, detail pane, scoped fix-plan exports, reviewed-policy-ignore snippets, redacted evidence copy, and open-doc actions.
 - `Nightward Analysis`: built-in offline signals plus explicitly selected providers.
 - `Nightward Provider Doctor`: optional provider availability, privacy posture, install guidance for missing tools, and Raycast Analysis enable/disable controls.
@@ -80,7 +80,7 @@ Do not run `npm run publish` unless publishing is explicitly in scope.
 
 ## Store Submission Readiness
 
-`npm run store-check` verifies the self-contained package shape, required manifest fields, matching command source files, 512x512 manifest icon, README, CHANGELOG, and metadata screenshot count. It reports missing screenshots as warnings so regular local validation can pass before manual Raycast capture is complete.
+`npm run store-check` verifies the self-contained package shape, required manifest fields, matching command source files, 512x512 manifest icon, README, CHANGELOG, and metadata screenshot count. It reports screenshot gaps as warnings so regular local validation can pass before manual Raycast capture is complete.
 
 Use the strict gate immediately before preparing a draft PR to `raycast/extensions`:
 
@@ -88,7 +88,7 @@ Use the strict gate immediately before preparing a draft PR to `raycast/extensio
 npm run store-check:strict
 ```
 
-Current expected blocker: store metadata screenshots are not committed yet. Capture them from `ray develop` with fixture `Home Override` and Raycast Window Capture before opening the draft submission PR.
+Current expected blocker: the package still needs to be copied into a synced `raycast/extensions` fork and reviewed as a store PR. Fixture metadata screenshots are present under `integrations/raycast/metadata/`; re-capture them from `ray develop` with fixture `Home Override` whenever the UI changes.
 
 Draft submission prep:
 

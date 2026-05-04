@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   analysisMarkdown,
   findingMarkdown,
+  fixPlanTotal,
   menuBarStatus,
   menuBarStatusMarkdown,
   maxSeverity,
@@ -18,6 +19,7 @@ import type {
   AnalysisSignal,
   DoctorReport,
   Finding,
+  FixPlan,
   ScanReport,
 } from "../src/types";
 
@@ -46,6 +48,13 @@ test("redacts obvious secret assignments and long token-like values", () => {
   assert.doesNotMatch(output, /abcdefghijklmnopqrstuvwxyz123456/);
   assert.doesNotMatch(output, /eyJhbGci/);
   assert.doesNotMatch(output, /providerTokenValue/);
+});
+
+test("redacts env reference assignments without trailing braces", () => {
+  const keyName = "API_" + "TOKEN";
+  const output = redactText(`env.${keyName}=${"${"}${keyName}}`);
+
+  assert.equal(output, "env.API_TOKEN=[redacted]");
 });
 
 test("finding markdown keeps guidance while avoiding secret values", () => {
@@ -224,7 +233,7 @@ test("menu bar status summarizes risk and schedule state", () => {
   };
 
   const status = menuBarStatus(report, doctor, analysis);
-  assert.equal(status.title, "1");
+  assert.equal(status.title, "3");
   assert.equal(status.risk, "critical");
   assert.match(status.tooltip, /Nightward: 1 critical, 1 high, 3 total/);
   assert.match(status.tooltip, /1 provider warnings/);
@@ -234,6 +243,64 @@ test("menu bar status summarizes risk and schedule state", () => {
     menuBarStatusMarkdown(status),
     /Change since previous scheduled scan: `\+2 findings`/,
   );
+});
+
+test("menu bar status title ignores provider warnings when there are no findings", () => {
+  const report: ScanReport = {
+    generated_at: "2026-05-01T00:00:00Z",
+    hostname: "fixture",
+    home: "/tmp/nightward-home",
+    summary: {
+      total_items: 2,
+      total_findings: 0,
+      items_by_classification: {},
+      items_by_risk: {},
+      items_by_tool: {},
+      findings_by_severity: {},
+      findings_by_rule: {},
+      findings_by_tool: {},
+    },
+    items: [],
+    findings: [],
+    adapters: [],
+  };
+  const doctor: DoctorReport = {
+    generated_at: "2026-05-01T00:00:00Z",
+    version: "0.1.4",
+    home: "/tmp/nightward-home",
+    executable: "/tmp/nw",
+    checks: [],
+    adapters: [],
+    schedule: {
+      preset: "daily",
+      platform: "darwin",
+      report_dir: "/tmp/reports",
+      log_dir: "/tmp/logs",
+      installed: false,
+    },
+  };
+  const analysis: AnalysisReport = {
+    generated_at: "2026-05-01T00:00:00Z",
+    mode: "home",
+    summary: {
+      total_subjects: 1,
+      total_signals: 1,
+      signals_by_severity: { medium: 1 },
+      signals_by_category: { "execution-risk": 1 },
+      signals_by_provider: { nightward: 1 },
+      highest_severity: "medium",
+      provider_warnings: 2,
+      no_known_risk_signals: false,
+    },
+    providers: [],
+    subjects: [],
+    signals: [],
+  };
+
+  const status = menuBarStatus(report, doctor, analysis);
+
+  assert.equal(status.title, "OK");
+  assert.match(status.tooltip, /2 provider warnings/);
 });
 
 test("policy ignore snippets are explicit and reasoned", () => {
@@ -251,6 +318,22 @@ test("report history delta handles missing and equal histories", () => {
     "no change",
   );
   assert.equal(reportHistoryDelta([{ findings: 1 }, { findings: 4 }]), "-3 findings");
+});
+
+test("fix plan totals support rust and legacy shapes", () => {
+  const rustPlan: FixPlan = {
+    generated_at: "2026-05-01T00:00:00Z",
+    summary: { safe: 1, review: 2, blocked: 3 },
+    actions: [],
+  };
+  const explicitPlan: FixPlan = {
+    generated_at: "2026-05-01T00:00:00Z",
+    summary: { total: 9, safe: 1, review: 2, blocked: 3 },
+    actions: [],
+  };
+
+  assert.equal(fixPlanTotal(rustPlan), 6);
+  assert.equal(fixPlanTotal(explicitPlan), 9);
 });
 
 function baseFinding(

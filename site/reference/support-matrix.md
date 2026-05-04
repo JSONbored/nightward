@@ -51,7 +51,7 @@ Run `nw adapters list --json` or `nw adapters explain <name>` for the exact path
 
 | Surface | macOS | Linux | Windows |
 | --- | --- | --- | --- |
-| CLI/TUI | Supported arm64/amd64 | Supported arm64/amd64 | Supported amd64; ARM64 deferred until the OpenTUI sidecar has a Bun compile target |
+| CLI/TUI | Supported arm64/amd64 | Supported arm64/amd64 | Supported amd64; ARM64 deferred until a validated Rust release target is added |
 | Schedule install | launchd | systemd user timers | dry-run/fallback only |
 | Raycast | Supported | Not applicable | Not applicable |
 | MCP server | Supported arm64/amd64 | Supported arm64/amd64 | Supported amd64; ARM64 deferred with the release archive |
