@@ -16,30 +16,30 @@ Type "stty rows 36 cols 120"
 Enter
 Type "target/debug/nw tui --input site/public/demo/nightward-sample-scan.json"
 Enter
-Sleep 1800ms
+Sleep 2600ms
 
 Type "2"
-Sleep 800ms
+Sleep 2600ms
 Down
-Sleep 500ms
+Sleep 600ms
 Type "/"
 Type "package"
 Enter
-Sleep 800ms
+Sleep 2200ms
 Type "3"
-Sleep 800ms
+Sleep 2600ms
 Down
 Sleep 500ms
 Type "4"
-Sleep 800ms
+Sleep 2600ms
 Type "5"
-Sleep 700ms
+Sleep 2600ms
 Type "6"
-Sleep 700ms
+Sleep 2600ms
 Type "7"
-Sleep 700ms
+Sleep 2800ms
 Type "1"
-Sleep 300ms
+Sleep 1400ms
 Type "x"
 Sleep 1200ms
 Type "q"

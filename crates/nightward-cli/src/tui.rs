@@ -83,6 +83,11 @@ pub fn run(report: &Report) -> Result<()> {
         renderer.present()?;
 
         if std::env::var("NIGHTWARD_TUI_CAPTURE").as_deref() == Ok("1") {
+            let hold_ms = std::env::var("NIGHTWARD_TUI_CAPTURE_HOLD_MS")
+                .ok()
+                .and_then(|value| value.parse::<u64>().ok())
+                .unwrap_or(1200);
+            std::thread::sleep(Duration::from_millis(hold_ms));
             break;
         }
 

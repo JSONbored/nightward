@@ -76,12 +76,10 @@ Set Theme "TokyoNight"
 Hide
 Type "stty rows 36 cols 120"
 Enter
-Type "NIGHTWARD_TUI_VIEW=${view} target/debug/nw tui --input site/public/demo/nightward-sample-scan.json"
+Type "NIGHTWARD_TUI_CAPTURE=1 NIGHTWARD_TUI_CAPTURE_HOLD_MS=2600 NIGHTWARD_TUI_VIEW=${view} target/debug/nw tui --input site/public/demo/nightward-sample-scan.json"
 Enter
 Show
-Sleep 3500ms
-Type "q"
-Sleep 200ms
+Sleep 3000ms
 `,
   );
   return tape;
@@ -99,8 +97,8 @@ function extractBestPng(inputGif, outputPng) {
   ]).toString("utf8");
   const duration = Number.parseFloat(durationRaw);
   const stamps = Number.isFinite(duration) && duration > 0
-    ? [0.35, 0.45, 0.55, 0.65, 0.75].map((pct) => (duration * pct).toFixed(2))
-    : ["1.20", "1.60", "2.00", "2.40", "2.80"];
+    ? [0.18, 0.28, 0.38, 0.48, 0.58].map((pct) => (duration * pct).toFixed(2))
+    : ["0.80", "1.10", "1.40", "1.70", "2.00"];
   const candidates = [];
   for (const stamp of stamps) {
     const candidate = join(tempDir, `${Date.now()}-${stamp}.png`);

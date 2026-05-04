@@ -5,7 +5,7 @@ Nightward is designed around local custody. The scanner inspects local file meta
 ## Runtime Boundaries
 
 - No telemetry.
-- No analytics.
+- No Nightward runtime analytics.
 - No cloud dashboard.
 - No network calls from Nightward runtime.
 - Offline analysis is the default. Local provider execution happens only when the user explicitly selects providers with `--with` or policy config. Online-capable providers stay blocked unless the user explicitly passes `--online` or opts in through policy/config. `socket` is online-capable because it creates a remote Socket scan artifact from dependency manifest metadata.
@@ -32,6 +32,14 @@ Schedule install/remove is plan-only in v1. It describes intended launchd/system
 The TUI docs action opens an http(s) documentation URL through the OS default opener after the user presses `o`; Nightward itself does not fetch docs content.
 
 The Raycast extension does not add a Nightward config write path. `Export Nightward Fix Plan` copies redacted Markdown to the clipboard after the user invokes that command. `Open Nightward Reports` opens the existing reports folder and does not create it.
+
+## Public Website Analytics
+
+Nightward's runtime privacy model is separate from the public docs/marketing website. The CLI, TUI, MCP server, Raycast extension, npm launcher, and local docs preview do not send analytics.
+
+The deployed website may use explicitly configured, self-hosted Umami for aggregate visitor analytics. That script is build-time gated and is absent unless the Pages build receives Umami environment values. When enabled, it is configured for `nightward.aethereal.dev`, respects browser Do Not Track, and excludes URL search parameters and hash fragments.
+
+Do not add analytics keys, tracker URLs, or visitor identifiers to Nightward reports, runtime config, README media, fixture captures, or local development defaults.
 
 ## Redaction Rules
 
