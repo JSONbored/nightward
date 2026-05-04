@@ -7,7 +7,7 @@ Nightward’s [Raycast](https://www.raycast.com/) extension is a read-only macOS
 | Command | Use it for | Writes |
 | --- | --- | --- |
 | Nightward Dashboard | Scan counts, adapters, schedule state, top findings, and fix-plan summary. | No |
-| Nightward Status | Compact menu-bar risk count with a structured dropdown. | No |
+| Nightward Status | Compact menu-bar finding count with a structured dropdown. | No |
 | Nightward Findings | Browse findings, copy redacted evidence, export finding/rule fix plans, and copy reviewed-ignore snippets. | Clipboard only |
 | Nightward Analysis | Browse built-in and selected-provider analysis signals. | No |
 | Nightward Provider Doctor | Check provider availability and choose providers for Raycast Analysis. | Raycast local preference only |
@@ -15,7 +15,7 @@ Nightward’s [Raycast](https://www.raycast.com/) extension is a read-only macOS
 | Export Fix Plan / Export Analysis | Copy redacted Markdown for review. | Clipboard only |
 | Open Nightward Reports | Open the local report folder in Finder. | Finder open only |
 
-The menu-bar title stays intentionally small: icon plus the highest-risk count. The dropdown carries the detail, split into Findings, Analysis, Schedule, Open, and Actions sections so it does not read like one long paragraph.
+The menu-bar title stays intentionally small: icon plus the current finding count. The dropdown carries severity, analysis, provider-warning, schedule, open, and action detail so it does not read like one long paragraph.
 
 ## Preferences
 

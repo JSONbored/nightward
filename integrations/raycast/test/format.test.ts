@@ -233,7 +233,7 @@ test("menu bar status summarizes risk and schedule state", () => {
   };
 
   const status = menuBarStatus(report, doctor, analysis);
-  assert.equal(status.title, "1C");
+  assert.equal(status.title, "3");
   assert.equal(status.risk, "critical");
   assert.match(status.tooltip, /Nightward: 1 critical, 1 high, 3 total/);
   assert.match(status.tooltip, /1 provider warnings/);
@@ -243,6 +243,64 @@ test("menu bar status summarizes risk and schedule state", () => {
     menuBarStatusMarkdown(status),
     /Change since previous scheduled scan: `\+2 findings`/,
   );
+});
+
+test("menu bar status title ignores provider warnings when there are no findings", () => {
+  const report: ScanReport = {
+    generated_at: "2026-05-01T00:00:00Z",
+    hostname: "fixture",
+    home: "/tmp/nightward-home",
+    summary: {
+      total_items: 2,
+      total_findings: 0,
+      items_by_classification: {},
+      items_by_risk: {},
+      items_by_tool: {},
+      findings_by_severity: {},
+      findings_by_rule: {},
+      findings_by_tool: {},
+    },
+    items: [],
+    findings: [],
+    adapters: [],
+  };
+  const doctor: DoctorReport = {
+    generated_at: "2026-05-01T00:00:00Z",
+    version: "0.1.4",
+    home: "/tmp/nightward-home",
+    executable: "/tmp/nw",
+    checks: [],
+    adapters: [],
+    schedule: {
+      preset: "daily",
+      platform: "darwin",
+      report_dir: "/tmp/reports",
+      log_dir: "/tmp/logs",
+      installed: false,
+    },
+  };
+  const analysis: AnalysisReport = {
+    generated_at: "2026-05-01T00:00:00Z",
+    mode: "home",
+    summary: {
+      total_subjects: 1,
+      total_signals: 1,
+      signals_by_severity: { medium: 1 },
+      signals_by_category: { "execution-risk": 1 },
+      signals_by_provider: { nightward: 1 },
+      highest_severity: "medium",
+      provider_warnings: 2,
+      no_known_risk_signals: false,
+    },
+    providers: [],
+    subjects: [],
+    signals: [],
+  };
+
+  const status = menuBarStatus(report, doctor, analysis);
+
+  assert.equal(status.title, "OK");
+  assert.match(status.tooltip, /2 provider warnings/);
 });
 
 test("policy ignore snippets are explicit and reasoned", () => {

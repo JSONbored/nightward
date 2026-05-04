@@ -348,17 +348,7 @@ export function menuBarStatus(
   const signals = analysis.summary.total_signals;
   const providerWarnings = analysis.summary.provider_warnings;
   const historyDelta = reportHistoryDelta(doctor.schedule.history);
-  const issueCount = findings + providerWarnings;
-  const title =
-    issueCount === 0
-      ? "OK"
-      : critical > 0
-        ? `${critical}C`
-        : high > 0
-          ? `${high}H`
-          : medium > 0
-            ? `${medium}M`
-            : String(issueCount);
+  const title = findings === 0 ? "OK" : String(findings);
   const tooltip = [
     `Nightward: ${critical} critical, ${high} high, ${findings} total`,
     low > 0 || info > 0 ? `${medium} medium, ${low} low, ${info} info` : "",

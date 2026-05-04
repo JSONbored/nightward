@@ -11,7 +11,7 @@ integrations/raycast
 ## Commands
 
 - `Nightward Dashboard`: scan counts, schedule status, adapter summary, and top findings.
-- `Nightward Status`: compact menu-bar severity marker with just the highest-risk count, plus full critical/high/total counts, analysis signals, provider warnings, scheduled-report state, and latest-report access in the dropdown.
+- `Nightward Status`: compact menu-bar finding count, plus full critical/high/total counts, analysis signals, provider warnings, scheduled-report state, and latest-report access in the dropdown.
 - `Nightward Findings`: searchable findings with a severity filter, detail pane, scoped fix-plan exports, reviewed-policy-ignore snippets, redacted evidence copy, and open-doc actions.
 - `Nightward Analysis`: built-in offline signals plus explicitly selected providers.
 - `Nightward Provider Doctor`: optional provider availability, privacy posture, install guidance for missing tools, and Raycast Analysis enable/disable controls.
