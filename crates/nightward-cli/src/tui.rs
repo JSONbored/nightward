@@ -803,8 +803,15 @@ impl<'a> TuiState<'a> {
 
         let max_rows = area.h.saturating_sub(5) as usize;
         let display_findings = self.display_findings();
-        for (idx, finding) in display_findings.into_iter().take(max_rows).enumerate() {
-            let row = area.y + 4 + u32::try_from(idx).unwrap_or(0);
+        let start = visible_window_start(self.selected_finding, display_findings.len(), max_rows);
+        for (row_idx, finding) in display_findings
+            .into_iter()
+            .skip(start)
+            .take(max_rows)
+            .enumerate()
+        {
+            let idx = start + row_idx;
+            let row = area.y + 4 + u32::try_from(row_idx).unwrap_or(0);
             let selected = idx == self.selected_finding;
             let color = severity_color(&self.palette, finding.severity);
             if selected {
@@ -853,9 +860,32 @@ impl<'a> TuiState<'a> {
             self.palette.green,
             self.palette.panel,
         );
+        if area.w < 8 || area.h < 5 {
+            return;
+        }
         let inner_x = area.x + 2;
         let mut row = area.y + 2;
         let inner_w = area.w.saturating_sub(4) as usize;
+        let bottom_inner = area.y + area.h.saturating_sub(2);
+        let show_action = area.h >= 12 && area.w >= 26;
+        let action_h = if show_action { 6 } else { 0 };
+        let action_y = if show_action {
+            bottom_inner.saturating_sub(action_h - 1)
+        } else {
+            bottom_inner.saturating_add(1)
+        };
+        let content_limit = if show_action {
+            action_y.saturating_sub(1)
+        } else {
+            bottom_inner
+        };
+
+        buffer.push_scissor(ClipRect::new(
+            i32::try_from(area.x + 1).unwrap_or(0),
+            i32::try_from(area.y + 1).unwrap_or(0),
+            area.w.saturating_sub(2),
+            area.h.saturating_sub(2),
+        ));
 
         let visible_findings = self.display_findings();
         if let Some(finding) = visible_findings.get(self.selected_finding) {
@@ -878,61 +908,75 @@ impl<'a> TuiState<'a> {
             );
             row += 2;
 
-            for line in wrap(&finding.message, inner_w) {
+            for line in wrap(&finding.message, inner_w)
+                .into_iter()
+                .take(rows_available(row, content_limit))
+            {
                 draw_text(buffer, inner_x, row, &line, Style::fg(self.palette.white));
                 row += 1;
             }
             row += 1;
 
-            section_label(buffer, inner_x, row, "Evidence", self.palette.cyan);
-            row += 1;
-            for line in wrap(&finding.evidence, inner_w).into_iter().take(4) {
-                draw_text(
+            if row < content_limit {
+                section_label(buffer, inner_x, row, "Evidence", self.palette.cyan);
+                row += 1;
+                for line in wrap(&finding.evidence, inner_w)
+                    .into_iter()
+                    .take(rows_available(row, content_limit).min(4))
+                {
+                    draw_text(
+                        buffer,
+                        inner_x,
+                        row,
+                        &line,
+                        Style::fg(self.palette.muted).with_bg(self.palette.code_bg),
+                    );
+                    row += 1;
+                }
+                row += 1;
+            }
+
+            if area.h >= 20 && row < content_limit {
+                section_label(buffer, inner_x, row, "Why it matters", self.palette.amber);
+                row += 1;
+                for line in wrap(&finding.why, inner_w)
+                    .into_iter()
+                    .take(rows_available(row, content_limit).min(5))
+                {
+                    draw_text(buffer, inner_x, row, &line, Style::fg(self.palette.muted));
+                    row += 1;
+                }
+            }
+
+            if show_action {
+                draw_panel(
                     buffer,
-                    inner_x,
-                    row,
-                    &line,
-                    Style::fg(self.palette.muted).with_bg(self.palette.code_bg),
+                    Area::new(inner_x, action_y, area.w.saturating_sub(4), action_h),
+                    "Next Action",
+                    self.palette.amber,
+                    self.palette.surface,
                 );
-                row += 1;
-            }
-            row += 1;
-
-            section_label(buffer, inner_x, row, "Why it matters", self.palette.amber);
-            row += 1;
-            for line in wrap(&finding.why, inner_w).into_iter().take(5) {
-                draw_text(buffer, inner_x, row, &line, Style::fg(self.palette.muted));
-                row += 1;
-            }
-
-            let action_y = area.y + area.h.saturating_sub(7);
-            draw_panel(
-                buffer,
-                Area::new(inner_x, action_y, area.w.saturating_sub(4), 5),
-                "Next Action",
-                self.palette.amber,
-                self.palette.surface,
-            );
-            for (idx, line) in wrap(&finding.recommended_action, inner_w.saturating_sub(2))
-                .into_iter()
-                .take(2)
-                .enumerate()
-            {
+                for (idx, line) in wrap(&finding.recommended_action, inner_w.saturating_sub(2))
+                    .into_iter()
+                    .take(2)
+                    .enumerate()
+                {
+                    draw_text(
+                        buffer,
+                        inner_x + 2,
+                        action_y + 2 + u32::try_from(idx).unwrap_or(0),
+                        &line,
+                        Style::fg(self.palette.white),
+                    );
+                }
                 draw_text(
                     buffer,
                     inner_x + 2,
-                    action_y + 2 + u32::try_from(idx).unwrap_or(0),
-                    &line,
-                    Style::fg(self.palette.white),
+                    action_y + 4,
+                    "nw fix plan --all --json",
+                    Style::fg(self.palette.green).with_bold(),
                 );
             }
-            draw_text(
-                buffer,
-                inner_x + 2,
-                action_y + 4,
-                "nw fix plan --all --json",
-                Style::fg(self.palette.green).with_bold(),
-            );
         } else {
             draw_text(
                 buffer,
@@ -949,6 +993,7 @@ impl<'a> TuiState<'a> {
                 Style::fg(self.palette.muted),
             );
         }
+        buffer.pop_scissor();
     }
 
     fn display_findings(&self) -> Vec<&Finding> {
@@ -1420,14 +1465,14 @@ impl<'a> TuiState<'a> {
                 buffer,
                 area.x + 2,
                 row,
-                key,
+                &truncate(key, 16),
                 Style::fg(self.palette.cyan).with_bold(),
             );
             draw_text(
                 buffer,
                 area.x + 20,
                 row,
-                label,
+                &truncate(label, left_w.saturating_sub(22) as usize),
                 Style::fg(self.palette.white),
             );
             row += 2;
@@ -1778,6 +1823,21 @@ fn responsive_width(total: u32, percent: u32, minimum: u32, reserve: u32) -> u32
     (total.saturating_mul(percent) / 100).clamp(minimum, maximum)
 }
 
+fn rows_available(row: u32, limit: u32) -> usize {
+    if row > limit {
+        return 0;
+    }
+    usize::try_from(limit - row + 1).unwrap_or(usize::MAX)
+}
+
+fn visible_window_start(selected: usize, total: usize, visible: usize) -> usize {
+    if visible == 0 || total <= visible {
+        return 0;
+    }
+    let selected = selected.min(total.saturating_sub(1));
+    selected.saturating_sub(visible / 2).min(total - visible)
+}
+
 fn truncate(text: &str, max: usize) -> String {
     if max < 2 {
         return String::new();
@@ -1971,6 +2031,71 @@ mod tests {
 
         for y in 12..=16 {
             assert_eq!(cell_char(&buffer, 30, y), '│');
+        }
+    }
+
+    #[test]
+    fn compact_findings_detail_does_not_bleed_into_footer() {
+        let report = fixture_report();
+        let mut app = TuiState::new(&report);
+        app.active_view = 1;
+        let text = render_text(&app, 80, 24);
+        let lines = text.lines().collect::<Vec<_>>();
+
+        assert!(lines[22].contains("1 Overview  2 Findings"));
+        assert!(!lines[22].contains("folders"));
+        assert!(!lines[22].contains("local-only"));
+        assert!(!lines[23].contains("leak"));
+    }
+
+    #[test]
+    fn next_action_command_does_not_overwrite_panel_border() {
+        let report = fixture_report();
+        let mut app = TuiState::new(&report);
+        app.active_view = 1;
+        let text = render_text(&app, 80, 24);
+
+        assert!(text.contains("nw fix plan --all --json"));
+        for line in text.lines() {
+            assert!(!line.contains("╰─nw fix"));
+        }
+    }
+
+    #[test]
+    fn findings_list_scrolls_to_selected_row() {
+        let mut report = fixture_report();
+        let template = report.findings[0].clone();
+        report.findings = (0..30)
+            .map(|idx| {
+                let mut finding = template.clone();
+                finding.id = format!("finding-{idx:03}");
+                finding.rule = format!("scroll_rule_{idx:03}");
+                finding.server = format!("srv{idx:03}");
+                finding.message = format!("message {idx:03}");
+                finding.severity = RiskLevel::High;
+                finding
+            })
+            .collect();
+        report.recompute_summary();
+
+        let mut app = TuiState::new(&report);
+        app.active_view = 1;
+        app.selected_finding = 20;
+        let text = render_text(&app, 120, 36);
+
+        assert!(text.contains("srv020"));
+    }
+
+    #[test]
+    fn full_help_keyboard_text_does_not_overwrite_panel_border() {
+        let report = fixture_report();
+        let mut app = TuiState::new(&report);
+        app.active_view = 6;
+        let mut buffer = OptimizedBuffer::new(120, 36);
+        app.render(&mut buffer, 120, 36);
+
+        for y in 10..32 {
+            assert_eq!(cell_char(&buffer, 69, y), '│');
         }
     }
 }
