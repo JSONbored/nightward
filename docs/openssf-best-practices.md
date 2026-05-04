@@ -42,7 +42,7 @@ The release pipeline uses external tools for signing release checksums and SBOM 
 - Website/docs readiness: `site/` VitePress source and `.github/workflows/pages.yml`.
 - Distribution plan: <https://github.com/JSONbored/nightward/blob/main/docs/distribution.md>
 - npm provenance: `@jsonbored/nightward` publishes through trusted publishing/OIDC with provenance and no long-lived npm token.
-- GitHub Pages: <https://jsonbored.github.io/nightward/>
+- GitHub Pages: <https://nightward.aethereal.dev/>
 
 ## Gold-Oriented Backlog
 

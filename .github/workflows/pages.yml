@@ -45,6 +45,12 @@ jobs:
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       - name: Build site
+        env:
+          NIGHTWARD_SITE_URL: https://nightward.aethereal.dev/
+          NIGHTWARD_SITE_BASE: /
+          NIGHTWARD_UMAMI_SCRIPT_URL: ${{ vars.NIGHTWARD_UMAMI_SCRIPT_URL }}
+          NIGHTWARD_UMAMI_WEBSITE_ID: ${{ secrets.NIGHTWARD_UMAMI_WEBSITE_ID }}
+          NIGHTWARD_UMAMI_DOMAINS: nightward.aethereal.dev
         run: npm run build
         working-directory: site
 

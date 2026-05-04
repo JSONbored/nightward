@@ -10,6 +10,8 @@ Nightward finds AI-tool risks before you sync: MCP risk, local-only state, secre
 
 It scans common Codex, Claude, Cursor, Windsurf, VS Code, Raycast, JetBrains, Zed, Continue, Cline/Roo, Aider, OpenCode, Goose, LM Studio, Ollama/Open WebUI, Neovim, MCP config locations, and repo/workspace AI config; classifies what is portable versus local-only or secret; highlights MCP security findings; and produces redacted analysis signals, fix plans, SARIF policy output, snapshot plans, and dry-run backup plans.
 
+Public docs and the fixture TUI walkthrough live at <https://nightward.aethereal.dev/>.
+
 Nightward does not mutate agent configs. It only writes explicit report/SARIF files when requested. Schedule install/remove commands are plan-only in v1.
 
 > [!IMPORTANT]
@@ -360,7 +362,7 @@ See [docs/action.md](docs/action.md) for inputs, outputs, and SARIF upload examp
 
 ## Website
 
-Nightward's public docs/marketing site lives in [site](site) and uses VitePress with local search. It is designed as a repo-owned static site with no analytics by default.
+Nightward's public docs/marketing site lives in [site](site) and uses VitePress with local search. It is designed as a repo-owned static site with no analytics by default; the deployed public site can opt into self-hosted Umami through build-time environment variables.
 
 ```sh
 cd site
@@ -368,7 +370,7 @@ npm ci
 npm run build
 ```
 
-See [docs/website.md](docs/website.md) for the page map and Stitch landing-page brief.
+See [docs/website.md](docs/website.md) for the page map, custom-domain notes, analytics boundary, and Stitch landing-page brief.
 
 ## Trunk Plugin
 

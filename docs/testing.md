@@ -154,7 +154,7 @@ npm audit --audit-level=moderate
 npm run build
 ```
 
-`make site-verify` also runs `make docs-qa` from the repository root. The site should not add analytics or third-party runtime scripts by default.
+`make site-verify` also runs `make docs-qa` from the repository root. The site should not add analytics or third-party runtime scripts by default. If validating the public website analytics path, build once without Umami env values and confirm no tracker script exists, then build once with `NIGHTWARD_UMAMI_SCRIPT_URL` and `NIGHTWARD_UMAMI_WEBSITE_ID` set and confirm the script is scoped to `nightward.aethereal.dev`, respects Do Not Track, and excludes search/hash data.
 
 The launcher must remain dependency-light, avoid `postinstall`, and verify downloaded GitHub Release archives against `checksums.txt` before extraction.
 

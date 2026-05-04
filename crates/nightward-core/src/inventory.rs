@@ -621,7 +621,7 @@ fn push_finding(
 ) {
     let docs_url = rules::explain_rule(rule)
         .map(|rule| rule.docs_url.to_string())
-        .unwrap_or_else(|| "https://jsonbored.github.io/nightward/reference/rules".to_string());
+        .unwrap_or_else(|| "https://nightward.aethereal.dev/reference/rules".to_string());
     report.findings.push(Finding {
         id: finding_id(rule, tool, &path.display().to_string(), server, evidence),
         tool: tool.to_string(),

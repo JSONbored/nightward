@@ -28,7 +28,7 @@ target/debug/nw tui --input site/public/demo/nightward-sample-scan.json
 make tui-media
 ```
 
-`make tui-media` uses the committed scrubbed sample scan, the `NIGHTWARD_TUI_VIEW` capture hook, VHS, and ffmpeg. It writes the reviewed gallery PNGs under `site/public/demo/tui/`, refreshes the legacy `site/public/demo/nightward-opentui.png` and GIF, and builds the homepage WebM loop. Keep `make demo-assets` scoped to JSON, HTML, report PNG, and Open Graph assets.
+`make tui-media` uses the committed scrubbed sample scan, the `NIGHTWARD_TUI_VIEW` and `NIGHTWARD_TUI_CAPTURE` capture hooks, VHS, and ffmpeg. It writes the reviewed gallery PNGs under `site/public/demo/tui/`, refreshes the legacy `site/public/demo/nightward-opentui.png` and GIF, and builds the homepage WebM loop. Keep `make demo-assets` scoped to JSON, HTML, report PNG, and Open Graph assets.
 
 For Raycast, set the extension `Home Override` preference to the same fixture home before `npm run dev`.
 
