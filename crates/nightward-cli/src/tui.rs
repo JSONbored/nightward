@@ -21,11 +21,36 @@ const VIEWS: [&str; 7] = [
     "Help",
 ];
 
+fn initial_view_from_env() -> usize {
+    std::env::var("NIGHTWARD_TUI_VIEW")
+        .ok()
+        .as_deref()
+        .and_then(view_index)
+        .unwrap_or(0)
+}
+
+fn view_index(value: &str) -> Option<usize> {
+    let normalized = view_slug(value);
+    if let Ok(view_number) = normalized.parse::<usize>() {
+        return if (1..=VIEWS.len()).contains(&view_number) {
+            Some(view_number - 1)
+        } else {
+            None
+        };
+    }
+    VIEWS.iter().position(|view| view_slug(view) == normalized)
+}
+
+fn view_slug(value: &str) -> String {
+    value.trim().to_ascii_lowercase().replace(['_', ' '], "-")
+}
+
 pub fn run(report: &Report) -> Result<()> {
     let (term_w, term_h) = terminal_size().unwrap_or((120, 36));
     let mut renderer = Renderer::new(u32::from(term_w), u32::from(term_h))?;
     let _raw_guard = enable_raw_mode()?;
     let mut app = TuiState::new(report);
+    app.active_view = initial_view_from_env();
     let mut parser = InputParser::new();
     let (tx, rx) = mpsc::channel::<Vec<u8>>();
 
@@ -1068,20 +1093,18 @@ impl<'a> TuiState<'a> {
                 severity_color(&self.palette, report.summary.highest_severity),
             ),
         ] {
+            let value = truncate(&value, 10);
+            let value_width = text_width(&value);
+            let value_x = area.x + left_w.saturating_sub(value_width + 2);
+            let label_width = value_x.saturating_sub(area.x + 2).saturating_sub(1) as usize;
             draw_text(
                 buffer,
                 area.x + 2,
                 row,
-                label,
+                &truncate(label, label_width),
                 Style::fg(self.palette.muted),
             );
-            draw_text(
-                buffer,
-                area.x + left_w.saturating_sub(18),
-                row,
-                &truncate(&value, 16),
-                Style::fg(color).with_bold(),
-            );
+            draw_text(buffer, value_x, row, &value, Style::fg(color).with_bold());
             row += 2;
         }
         row += 1;
@@ -1097,7 +1120,7 @@ impl<'a> TuiState<'a> {
                 buffer,
                 area.x + 2,
                 row,
-                &truncate(&format!("{category:?}").to_ascii_lowercase(), 20),
+                &truncate(signal_category_label(*category), 22),
                 Style::fg(self.palette.white),
             );
             draw_text(
@@ -1209,7 +1232,10 @@ impl<'a> TuiState<'a> {
                 buffer,
                 area.x + 2,
                 row,
-                &truncate(&group.title, left_w.saturating_sub(12) as usize),
+                &truncate(
+                    fix_group_label(&group.title),
+                    left_w.saturating_sub(12) as usize,
+                ),
                 Style::fg(severity_color(&self.palette, group.severity)).with_bold(),
             );
             draw_text(
@@ -1455,8 +1481,8 @@ impl<'a> TuiState<'a> {
         );
         let mut row = area.y + 2;
         for (key, label) in [
-            ("tab / shift-tab", "move between sections"),
-            ("1-7", "jump to a section"),
+            ("tab / shift-tab", "switch views"),
+            ("1-7", "open view"),
             ("j / down", "next finding"),
             ("k / up", "previous finding"),
             ("q / esc", "quit"),
@@ -1702,6 +1728,29 @@ fn rule_display_rank(rule: &str) -> usize {
     }
 }
 
+fn signal_category_label(category: analysis::SignalCategory) -> &'static str {
+    match category {
+        analysis::SignalCategory::SupplyChain => "supply chain",
+        analysis::SignalCategory::SecretsExposure => "secrets exposure",
+        analysis::SignalCategory::FilesystemScope => "filesystem scope",
+        analysis::SignalCategory::NetworkExposure => "network exposure",
+        analysis::SignalCategory::ExecutionRisk => "execution risk",
+        analysis::SignalCategory::MachineLocality => "machine locality",
+        analysis::SignalCategory::AppState => "app state",
+        analysis::SignalCategory::Unknown => "unknown",
+    }
+}
+
+fn fix_group_label(title: &str) -> &str {
+    match title {
+        "Narrow filesystem scope" => "filesystem scope",
+        "Narrow filesystem access" => "filesystem scope",
+        "Externalize inline secret" | "Externalize inline secrets" => "inline secrets",
+        "Pin package executor" | "Pin package executors" => "package executor",
+        _ => title,
+    }
+}
+
 fn recent_message(finding: &Finding) -> String {
     match finding.rule.as_str() {
         "mcp_unpinned_package" => {
@@ -1936,6 +1985,18 @@ mod tests {
     }
 
     #[test]
+    fn view_index_accepts_capture_names() {
+        assert_eq!(view_index("1"), Some(0));
+        assert_eq!(view_index("7"), Some(6));
+        assert_eq!(view_index("findings"), Some(1));
+        assert_eq!(view_index("Fix Plan"), Some(3));
+        assert_eq!(view_index("fix_plan"), Some(3));
+        assert_eq!(view_index("backup"), Some(5));
+        assert_eq!(view_index("0"), None);
+        assert_eq!(view_index("unknown"), None);
+    }
+
+    #[test]
     fn wraps_long_text_without_dropping_words() {
         let lines = wrap("one two three four", 8);
         assert_eq!(lines, vec!["one two", "three", "four"]);
@@ -2087,6 +2148,32 @@ mod tests {
     }
 
     #[test]
+    fn analysis_summary_keeps_labels_readable() {
+        let report = fixture_report();
+        let mut app = TuiState::new(&report);
+        app.active_view = 2;
+        let text = render_text(&app, 120, 36);
+
+        assert!(text.contains("provider warnings"));
+        assert!(!text.contains("provider warning0"));
+        assert!(text.contains("secrets exposure"));
+        assert!(text.contains("filesystem scope"));
+    }
+
+    #[test]
+    fn fix_plan_summary_uses_compact_group_labels() {
+        let report = fixture_report();
+        let mut app = TuiState::new(&report);
+        app.active_view = 3;
+        let text = render_text(&app, 120, 36);
+
+        assert!(text.contains("filesystem scope"));
+        assert!(text.contains("inline secrets"));
+        assert!(text.contains("package executor"));
+        assert!(!text.contains("Narrow filesystem…"));
+    }
+
+    #[test]
     fn full_help_keyboard_text_does_not_overwrite_panel_border() {
         let report = fixture_report();
         let mut app = TuiState::new(&report);
@@ -2097,5 +2184,17 @@ mod tests {
         for y in 10..32 {
             assert_eq!(cell_char(&buffer, 69, y), '│');
         }
+    }
+
+    #[test]
+    fn full_help_keyboard_text_uses_short_labels() {
+        let report = fixture_report();
+        let mut app = TuiState::new(&report);
+        app.active_view = 6;
+        let text = render_text(&app, 120, 36);
+
+        assert!(text.contains("switch views"));
+        assert!(text.contains("open view"));
+        assert!(!text.contains('…'));
     }
 }
