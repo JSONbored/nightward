@@ -13,9 +13,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release-gate:
+    name: Validate release ref
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate signed main release tag
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: bash scripts/validate-release-ref.sh "${REF_NAME}"
+
   build:
     name: Build ${{ matrix.os }} ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
+    needs: release-gate
     strategy:
       fail-fast: false
       matrix:
@@ -43,17 +61,6 @@ jobs:
         run: |
           rustup toolchain install 1.85.0 --profile minimal
           rustup default 1.85.0
-
-      - name: Validate release tag
-        shell: bash
-        env:
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          if [[ ! "${REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid release tag: ${REF_NAME}" >&2
-            exit 1
-          fi
 
       - name: Build binaries
         shell: bash
@@ -143,6 +150,11 @@ jobs:
           set -euo pipefail
           cd dist
           shasum -a 256 nightward_* > checksums.txt
+
+      - name: Validate signed main release tag
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: bash scripts/validate-release-ref.sh "${REF_NAME}"
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1

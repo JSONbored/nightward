@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   analysisReport,
   explainFinding,
+  explainSignal,
   exportFixPlanMarkdown,
   fixPlan,
   normalizePreferences,
@@ -226,6 +227,28 @@ test("provider doctor reflects selected providers and online preference", async 
     "--with",
     "socket",
     "--online",
+    "--json",
+  ]);
+});
+
+test("explain signal passes finding id before flags", async () => {
+  let observedArgs: string[] = [];
+  const options: RuntimeOptions = {
+    executable: "nightward",
+    allowOnlineProviders: false,
+    timeoutMs: 1000,
+    execFileImpl: (_file, args, _options, callback) => {
+      observedArgs = args;
+      callback(null, baseAnalysisJSON(), "");
+    },
+  };
+
+  await explainSignal("finding-123", options);
+
+  assert.deepEqual(observedArgs, [
+    "analyze",
+    "finding",
+    "finding-123",
     "--json",
   ]);
 });

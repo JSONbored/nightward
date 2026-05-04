@@ -69,7 +69,7 @@ allow_online_providers: false
 
 ## Policy And SARIF
 
-Analysis signals are advisory unless included explicitly:
+Analysis signals are advisory unless included explicitly. When included, signals at or above `analysis_threshold` fail policy checks and are emitted in SARIF:
 
 ```sh
 nw policy check --include-analysis --json

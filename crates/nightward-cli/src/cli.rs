@@ -61,13 +61,8 @@ fn cmd_tui(args: &[String]) -> Result<()> {
 }
 
 fn cmd_scan(args: &[String]) -> Result<()> {
-    let workspace = value_after(args, "--workspace").or_else(|| value_after(args, "-w"));
     let output = value_after(args, "--output");
-    let report = if let Some(workspace) = workspace {
-        scan_workspace(workspace)?
-    } else {
-        scan_home(home_dir_from_env())?
-    };
+    let report = scan_for_args(args)?;
     if let Some(output) = output.filter(|value| *value != "-") {
         write_report(output, &report)?;
     }
@@ -184,12 +179,7 @@ fn cmd_fix(args: &[String]) -> Result<()> {
 }
 
 fn cmd_analyze(args: &[String]) -> Result<()> {
-    let workspace = value_after(args, "--workspace").unwrap_or("");
-    let scan = if workspace.is_empty() {
-        scan_home(home_dir_from_env())?
-    } else {
-        scan_workspace(workspace)?
-    };
+    let scan = scan_for_args(args)?;
     let options = AnalysisOptions {
         mode: scan.scan_mode.clone(),
         workspace: scan.workspace.clone(),
@@ -202,13 +192,17 @@ fn cmd_analyze(args: &[String]) -> Result<()> {
             })
             .unwrap_or_default(),
         online: has(args, "--online"),
-        package: if args.first().map(String::as_str) == Some("package") {
-            args.get(1).cloned().unwrap_or_default()
+        package: if args.iter().any(|arg| arg == "package") {
+            positional_after_command(args, "package")
+                .unwrap_or_default()
+                .to_string()
         } else {
             String::new()
         },
-        finding_id: if args.first().map(String::as_str) == Some("finding") {
-            args.get(1).cloned().unwrap_or_default()
+        finding_id: if args.iter().any(|arg| arg == "finding") {
+            positional_after_command(args, "finding")
+                .unwrap_or_default()
+                .to_string()
         } else {
             String::new()
         },
@@ -280,8 +274,7 @@ fn cmd_report(args: &[String]) -> Result<()> {
             Ok(())
         }
         Some("diff") | Some("changes") => {
-            let base = value_after(args, "--base").ok_or_else(|| anyhow!("--base is required"))?;
-            let head = value_after(args, "--head").ok_or_else(|| anyhow!("--head is required"))?;
+            let (base, head) = report_diff_paths(args)?;
             let base_report = load_report(base)?;
             let head_report = load_report(head)?;
             print_json(&reportdiff::diff(
@@ -318,7 +311,7 @@ fn cmd_policy(args: &[String]) -> Result<()> {
                 .map(policy::load)
                 .transpose()?
                 .unwrap_or_default();
-            let scan = scan_home(home_dir_from_env())?;
+            let scan = scan_for_args(args)?;
             let include_analysis = config.include_analysis || has(args, "--include-analysis");
             let analysis_providers: Vec<String> = value_after(args, "--with")
                 .map(|value| {
@@ -409,6 +402,27 @@ fn selector(args: &[String]) -> Selector {
     }
 }
 
+fn scan_for_args(args: &[String]) -> Result<nightward_core::Report> {
+    if let Some(workspace) = value_after(args, "--workspace")
+        .or_else(|| value_after(args, "-w"))
+        .filter(|workspace| !workspace.is_empty())
+    {
+        scan_workspace(workspace)
+    } else {
+        scan_home(home_dir_from_env())
+    }
+}
+
+fn report_diff_paths(args: &[String]) -> Result<(&str, &str)> {
+    let base = value_after(args, "--base")
+        .or_else(|| value_after(args, "--from"))
+        .ok_or_else(|| anyhow!("--base or --from is required"))?;
+    let head = value_after(args, "--head")
+        .or_else(|| value_after(args, "--to"))
+        .ok_or_else(|| anyhow!("--head or --to is required"))?;
+    Ok((base, head))
+}
+
 fn print_json(value: &impl Serialize) -> Result<()> {
     println!("{}", serde_json::to_string_pretty(value)?);
     Ok(())
@@ -423,6 +437,44 @@ fn value_after<'a>(args: &'a [String], key: &str) -> Option<&'a str> {
 
 fn has(args: &[String], key: &str) -> bool {
     args.iter().any(|arg| arg == key)
+}
+
+fn positional_after_command<'a>(args: &'a [String], command: &str) -> Option<&'a str> {
+    let mut iter = args
+        .iter()
+        .skip_while(|arg| arg.as_str() != command)
+        .skip(1);
+    while let Some(arg) = iter.next() {
+        if arg.starts_with('-') {
+            if option_takes_value(arg) {
+                iter.next();
+            }
+            continue;
+        }
+        return Some(arg.as_str());
+    }
+    None
+}
+
+fn option_takes_value(option: &str) -> bool {
+    matches!(
+        option,
+        "--workspace"
+            | "-w"
+            | "--with"
+            | "--output"
+            | "--config"
+            | "--sarif-url"
+            | "--sarif"
+            | "--base"
+            | "--head"
+            | "--from"
+            | "--to"
+            | "--finding"
+            | "--rule"
+            | "--format"
+            | "--input"
+    )
 }
 
 fn risk_label(risk: nightward_core::RiskLevel) -> &'static str {
@@ -443,4 +495,61 @@ fn print_help() {
     println!(
         "Nightward audits AI agent state, MCP config, and dotfiles sync risk.\n\nUSAGE:\n  nightward                         Open the TUI\n  nightward tui --input scan.json   Review a saved report in the TUI\n  nightward scan --json             Scan HOME\n  nightward scan --workspace . --json\n  nightward analyze --all --with gitleaks --json\n  nightward providers doctor --with trivy --online --json\n  nightward fix plan --all --json\n  nightward report html --input scan.json --output report.html\n  nightward policy check --json\n  nightward mcp serve\n\nNightward is local-first, read-only by default, and never enables online providers without --online."
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn scan_for_args_prefers_workspace_target() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        fs::write(
+            dir.path().join(".mcp.json"),
+            r#"{"mcpServers":{"demo":{"command":"npx","args":["@modelcontextprotocol/server-filesystem"]}}}"#,
+        )
+        .expect("write fixture config");
+        let args = vec![
+            "check".to_string(),
+            "--workspace".to_string(),
+            dir.path().display().to_string(),
+        ];
+
+        let report = scan_for_args(&args).expect("workspace scan");
+
+        assert_eq!(report.scan_mode, "workspace");
+        assert_eq!(report.summary.total_items, 1);
+        assert!(report.summary.total_findings > 0);
+    }
+
+    #[test]
+    fn analyze_subject_argument_skips_flags() {
+        let args = vec![
+            "finding".to_string(),
+            "--json".to_string(),
+            "mcp_unpinned_package-123".to_string(),
+        ];
+
+        assert_eq!(
+            positional_after_command(&args, "finding"),
+            Some("mcp_unpinned_package-123")
+        );
+    }
+
+    #[test]
+    fn report_diff_accepts_from_to_aliases() {
+        let args = vec![
+            "diff".to_string(),
+            "--from".to_string(),
+            "before.json".to_string(),
+            "--to".to_string(),
+            "after.json".to_string(),
+        ];
+
+        assert_eq!(
+            report_diff_paths(&args).expect("diff paths"),
+            ("before.json", "after.json")
+        );
+    }
 }

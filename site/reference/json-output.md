@@ -39,7 +39,6 @@ Policy output includes pass/fail status, threshold, violations, ignored findings
 ## Report Diff
 
 ```sh
-nw report changes --json
 nw report diff --from previous.json --to current.json --json
 nw report history --json
 nw report latest --json
@@ -60,4 +59,4 @@ Report history records include `path`, `report_name`, `mod_time`, `findings`, `h
 nw policy badge --output -
 ```
 
-The badge artifact keeps the Shields-compatible `schemaVersion` key and adds Nightward policy fields such as `passed`, `threshold`, `total_findings`, violation counts, and an optional SARIF URL.
+The badge artifact includes `schema_version`, `status`, `message`, `color`, `passed`, `threshold`, `finding_count`, `blocking_count`, `ignored_count`, `analysis_signal_count`, `analysis_violation_count`, `provider_warnings`, and an optional SARIF URL.

@@ -175,6 +175,8 @@ ${policyExplain}
 \`\`\`yaml
 ${defaultPolicy}
 \`\`\`
+
+Finding ignores use \`id\` plus a non-empty \`reason\`. Rule ignores should use \`rule\` plus a non-empty \`reason\`; legacy \`id\` remains accepted as an alias for rule ignores.
 `,
 );
 

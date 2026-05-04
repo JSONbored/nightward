@@ -10,7 +10,7 @@ nw policy explain
 nw policy check --config .nightward.yml --strict --json
 ```
 
-Policy config supports severity thresholds, ignored finding IDs or rules with reasons, trusted commands/packages, portable path allowlists, machine-local deny paths, and SARIF naming overrides.
+Policy config supports severity thresholds, reason-required finding and rule ignores, optional analysis thresholds, provider selection, and online-provider gating.
 
 ## SARIF
 

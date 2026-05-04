@@ -16,9 +16,8 @@ Nightward remediation is plan-only in v1.
 ```sh
 nw fix plan --json
 nw fix plan --rule mcp_secret_env
-nw fix preview --rule mcp_unpinned_package --format diff
 nw fix export --format markdown
 ```
 
 > [!WARNING]
-> Nightward does not apply fixes to live agent configs. Patch previews are redacted review artifacts.
+> Nightward does not apply fixes to live agent configs. Fix exports are redacted review artifacts.

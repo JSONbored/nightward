@@ -17,12 +17,11 @@ Read-only commands stay read-only unless an explicit output path is provided.
 
 Expected write paths:
 
-- `--output` or `--output-dir` reports.
-- SARIF output files.
+- Explicit `--output` report/SARIF files.
 - Explicit redacted exports from the TUI/Raycast flows.
-- User-level schedule install/remove commands.
+- Explicit clipboard/report-folder actions from Raycast.
 
-Scheduled scans write redacted reports under `~/.local/state/nightward/reports/` and never push to Git or copy secrets.
+Schedule install/remove is plan-only in v1. It describes intended launchd/systemd/cron commands and does not install timers, push to Git, or copy secrets.
 
 ## Optional providers
 

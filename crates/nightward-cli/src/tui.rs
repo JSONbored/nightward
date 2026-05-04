@@ -748,7 +748,7 @@ impl<'a> TuiState<'a> {
         );
         for (idx, line) in [
             "inspect finding evidence",
-            "export plan-only fix preview",
+            "export plan-only fix material",
             "apply changes manually after review",
         ]
         .iter()

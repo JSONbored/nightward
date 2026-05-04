@@ -8,9 +8,9 @@
 
 Nightward finds AI-tool risks before you sync: MCP risk, local-only state, secret exposure, and reviewable fix plans, all locally.
 
-It scans common Codex, Claude, Cursor, Windsurf, VS Code, Raycast, JetBrains, Zed, Continue, Cline/Roo, Aider, OpenCode, Goose, LM Studio, Ollama/Open WebUI, Neovim, MCP config locations, and repo/workspace AI config; classifies what is portable versus local-only or secret; highlights MCP security findings; and produces redacted analysis signals, fix plans, fix previews, SARIF policy output, snapshot plans, and dry-run backup plans.
+It scans common Codex, Claude, Cursor, Windsurf, VS Code, Raycast, JetBrains, Zed, Continue, Cline/Roo, Aider, OpenCode, Goose, LM Studio, Ollama/Open WebUI, Neovim, MCP config locations, and repo/workspace AI config; classifies what is portable versus local-only or secret; highlights MCP security findings; and produces redacted analysis signals, fix plans, SARIF policy output, snapshot plans, and dry-run backup plans.
 
-Nightward does not mutate agent configs. It only writes explicit report/SARIF files when requested and user-level schedule files through explicit schedule install/remove commands.
+Nightward does not mutate agent configs. It only writes explicit report/SARIF files when requested. Schedule install/remove commands are plan-only in v1.
 
 > [!IMPORTANT]
 > Nightward is local-first by design: no telemetry, no default network calls, no cloud dashboard, and no live agent-config mutation.
@@ -20,7 +20,7 @@ Nightward does not mutate agent configs. It only writes explicit report/SARIF fi
 | Surface | What it does | Default write behavior |
 | --- | --- | --- |
 | TUI | Dashboard, inventory, findings, analysis, fix plan, backup preview | Read-only except explicit redacted export |
-| CLI | Scriptable scan, doctor, policy, SARIF, snapshot, schedule commands | Read-only unless output/schedule flags are explicit |
+| CLI | Scriptable scan, doctor, policy, SARIF, snapshot, schedule commands | Read-only unless explicit output/export paths are requested |
 | MCP server | Read-only stdio tools/resources for AI clients | No writes, no network listener, no online providers |
 | Raycast | macOS read-only companion commands | Clipboard/report-folder actions only |
 | GitHub Action | Workspace policy and SARIF checks | Writes only requested CI outputs |
@@ -45,7 +45,7 @@ flowchart LR
   classify --> tui["TUI"]
   classify --> json["redacted JSON"]
   mcp --> findings["findings + analysis signals"]
-  findings --> fix["plan-only fix previews"]
+  findings --> fix["plan-only fix exports"]
   findings --> sarif["policy SARIF"]
   classify --> backup["dry-run backup plan"]
 ```
@@ -77,8 +77,8 @@ Nightward answers the practical questions first:
 - SARIF output for GitHub code scanning.
 - Importable Trunk plugin definition for `nightward-policy` and `nightward-analyze` from pinned release tags.
 - Optional `.nightward.yml` policy config with reason-required ignores.
-- Redacted patch previews for parseable MCP config fixes.
-- Read-only snapshot plan/diff commands.
+- Redacted plan-only remediation exports for parseable MCP config findings.
+- Read-only snapshot plan commands.
 - Reusable GitHub Action for scan, policy, and SARIF modes.
 - Read-only Raycast extension for Dashboard, Findings, Analysis, Provider Doctor, Explain Finding/Signal, Fix Plan/Analysis export, and report-folder access.
 - Read-only stdio MCP server for AI clients that need local scan, finding, rule, provider, policy, and fix-plan context.
@@ -87,7 +87,7 @@ Nightward answers the practical questions first:
 - OpenSSF-oriented project hygiene: DCO, governance docs, threat model, coverage gate, pinned CI actions, release snapshot checks, signed release configuration, and security reporting policy.
 
 > [!TIP]
-> A practical first pass is `nw`, then `nw scan`, then `nw doctor fix-hints`.
+> A practical first pass is `nw`, then `nw scan --json`, then `nw doctor --json`.
 
 ## Install
 
@@ -142,7 +142,6 @@ Check local assumptions:
 
 ```sh
 nw doctor --json
-nw doctor fix-hints
 ```
 
 List and explain findings:
@@ -157,8 +156,6 @@ Generate a plan-only fix report:
 ```sh
 nw fix plan --json
 nw fix plan --rule mcp_secret_env
-nw fix preview --rule mcp_secret_env --format diff
-nw fix preview --all --format markdown
 nw fix export --format markdown
 ```
 
@@ -168,7 +165,7 @@ Run offline analysis and provider checks:
 nw analyze --json
 nw analyze --workspace . --json
 nw analyze package npm:@modelcontextprotocol/server-filesystem --json
-nw trust explain mcp_unpinned_package-abc123
+nw analyze finding mcp_unpinned_package-abc123 --json
 nw providers list --json
 nw providers doctor --with socket --json
 nw rules list --json
@@ -196,11 +193,10 @@ Generate a dry-run backup plan:
 nw plan backup
 ```
 
-Generate read-only snapshot plans and compare them:
+Generate a read-only snapshot plan:
 
 ```sh
-nw snapshot plan --target ~/nightward-snapshots --json
-nw snapshot diff --from before.json --to after.json --json
+nw snapshot plan --output ~/nightward-snapshots --json
 ```
 
 Render a local static HTML report from redacted scan JSON:
@@ -210,7 +206,6 @@ nw scan --json --output /tmp/nightward-scan.json
 nw report html --input /tmp/nightward-scan.json --output /tmp/nightward-report.html
 nw report diff --from /tmp/previous-scan.json --to /tmp/nightward-scan.json
 nw report html
-nw report changes
 nw report history
 nw report latest
 ```
@@ -344,7 +339,7 @@ Nightward can expose local, read-only context to MCP-capable AI clients:
 }
 ```
 
-The server supports scan, doctor, findings, finding explanation, fix-plan, report-change, and policy-check tools plus rules/providers/schedule/latest-report resources. It uses stdio only, does not open a network listener, does not mutate config, and does not enable online-capable providers in v1.
+The server supports scan, doctor, findings, finding explanation, fix-plan, policy-check, and rules tools plus latest-summary and rules resources. It uses stdio only, does not open a network listener, does not mutate config, and does not enable online-capable providers in v1.
 
 ## GitHub Action
 
@@ -412,19 +407,19 @@ See [docs/raycast-extension.md](docs/raycast-extension.md) for preferences, vali
 
 ## Scheduling
 
-The `nightly` preset runs:
+The plan-only `nightly` preset describes running:
 
 ```sh
-nightward scan --json --output-dir ~/.local/state/nightward/reports
+nightward scan --json
 ```
 
-Supported user-level schedule targets:
+Planned user-level schedule targets:
 
 - macOS: `launchd` user agent
 - Linux: systemd user timer
 - Other platforms: generated cron text only
 
-Scheduled scans never copy secrets, mutate dotfiles, restore files, or push to Git.
+Schedule plans never copy secrets, mutate dotfiles, restore files, or push to Git.
 
 ## Development
 
@@ -450,7 +445,7 @@ cargo run --bin nw -- analyze --all --json
 cargo run --bin nw -- providers doctor --json
 cargo run --bin nw -- rules list --json
 cargo run --bin nw -- fix plan --json
-cargo run --bin nw -- fix preview --all --format markdown
+cargo run --bin nw -- fix export --format markdown
 cargo run --bin nw -- policy sarif --output /tmp/nightward.sarif
 cargo run --bin nw -- policy sarif --workspace . --include-analysis --output -
 cargo run --bin nw -- schedule plan --json

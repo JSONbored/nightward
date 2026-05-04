@@ -776,11 +776,24 @@ fn redact_secret_field_value(value: &str) -> String {
 }
 
 pub fn redact_text(value: &str) -> String {
-    let assignment = Regex::new(r#"(?i)((?:token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)(?:\$\{[A-Za-z_][A-Za-z0-9_]*\}|[^"',\s}]+)"#)
+    let sensitive_key = r"(?:token|secret|password|passwd|api[_-]?key|auth|authorization|credential|private[_-]?key)";
+    let double_quoted = Regex::new(&format!(
+        r#"(?i)((?:"?[\w.-]*{sensitive_key}[\w.-]*"?\s*[:=]\s*"))[^"]*(")"#
+    ))
+    .expect("valid regex");
+    let single_quoted = Regex::new(&format!(
+        r#"(?i)((?:'?[\w.-]*{sensitive_key}[\w.-]*'?\s*[:=]\s*'))[^']*(')"#
+    ))
+    .expect("valid regex");
+    let assignment = Regex::new(&format!(
+        r#"(?i)([\w.-]*{sensitive_key}[\w.-]*\s*[:=]\s*)(?:\$\{{[A-Za-z_][A-Za-z0-9_]*\}}|[^\r\n,}}]+)"#
+    ))
         .expect("valid regex");
-    let provider = Regex::new(r"\b(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b")
+    let provider = Regex::new(r"(?i)\b(?:Bearer\s+[-A-Za-z0-9._~+/=]{8,}|sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b")
         .expect("valid regex");
-    let redacted = assignment.replace_all(value, "$1$2[redacted]");
+    let redacted = double_quoted.replace_all(value, "$1[redacted]$2");
+    let redacted = single_quoted.replace_all(&redacted, "$1[redacted]$2");
+    let redacted = assignment.replace_all(&redacted, "$1[redacted]");
     provider.replace_all(&redacted, "[redacted]").to_string()
 }
 
@@ -897,6 +910,24 @@ mod tests {
         let redacted = redact_text(&evidence);
 
         assert_eq!(redacted, "env.API_TOKEN=[redacted]");
+    }
+
+    #[test]
+    fn redacts_bearer_values_after_sensitive_keys() {
+        let token = ["opaque", "-secret", "-12345"].concat();
+        let redacted = redact_text(&format!("Authorization: Bearer {token}"));
+
+        assert_eq!(redacted, "Authorization: [redacted]");
+        assert!(!redacted.contains(&token));
+    }
+
+    #[test]
+    fn redacts_json_quoted_sensitive_key_values() {
+        let token = ["opaque", "-secret", "-12345"].concat();
+        let redacted = redact_text(&format!(r#"{{"Authorization":"Bearer {token}"}}"#));
+
+        assert_eq!(redacted, r#"{"Authorization":"[redacted]"}"#);
+        assert!(!redacted.contains(&token));
     }
 
     #[test]

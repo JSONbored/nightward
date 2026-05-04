@@ -86,13 +86,12 @@ export default function Command() {
     >
       <List.Section title="Review">
         <List.Item
-          title={`${titleCase(maxSeverity(data.report.findings))} Risk`}
-          subtitle={`${data.report.summary.total_findings} findings`}
+          title="Findings"
+          subtitle={`${titleCase(maxSeverity(data.report.findings))} risk`}
           icon={{
             source: Icon.Shield,
             tintColor: severityColor(maxSeverity(data.report.findings)),
           }}
-          accessories={severityAccessories(data.report)}
           detail={<DashboardDetail data={data} />}
           actions={
             <DashboardActions
@@ -104,17 +103,12 @@ export default function Command() {
         />
         <List.Item
           title="Fix Plan"
-          subtitle={fixPlanSubtitle(data.fixPlan)}
+          subtitle={`${fixPlanTotal(data.fixPlan)} items`}
           icon={{
             source: Icon.List,
             tintColor:
               data.fixPlan.summary.review > 0 ? Color.Yellow : Color.Green,
           }}
-          accessories={[
-            {
-              text: `${fixPlanTotal(data.fixPlan)} total`,
-            },
-          ]}
           detail={<FixPlanDetail plan={data.fixPlan} />}
           actions={
             <DashboardActions
@@ -126,23 +120,13 @@ export default function Command() {
         />
         <List.Item
           title="Analysis"
-          subtitle={`${data.analysis.summary.total_signals} local signals`}
+          subtitle="Offline context"
           icon={{
             source: Icon.MagnifyingGlass,
             tintColor: severityColor(
               data.analysis.summary.highest_severity || "info",
             ),
           }}
-          accessories={[
-            {
-              tag: {
-                value: data.analysis.summary.highest_severity || "info",
-                color: severityColor(
-                  data.analysis.summary.highest_severity || "info",
-                ),
-              },
-            },
-          ]}
           detail={<AnalysisDetail analysis={data.analysis} />}
           actions={
             <DashboardActions
@@ -157,19 +141,13 @@ export default function Command() {
       <List.Section title="Environment">
         <List.Item
           title="Schedule"
-          subtitle={scheduleSubtitle(data.doctor)}
+          subtitle={data.doctor.schedule.installed ? "On" : "Off"}
           icon={{
             source: Icon.Clock,
             tintColor: data.doctor.schedule.installed
               ? Color.Green
               : Color.Yellow,
           }}
-          accessories={[
-            ...(data.doctor.schedule.history &&
-            data.doctor.schedule.history.length > 1
-              ? [{ text: `${data.doctor.schedule.history.length} reports` }]
-              : []),
-          ]}
           detail={<ScheduleDetail doctor={data.doctor} />}
           actions={
             <DashboardActions
@@ -206,23 +184,11 @@ export default function Command() {
             <List.Item
               key={finding.id}
               title={findingTitle(finding)}
-              subtitle={
-                finding.server ? `server ${finding.server}` : finding.tool
-              }
               icon={{
                 source: Icon.Warning,
                 tintColor: severityColor(finding.severity),
               }}
-              accessories={[
-                {
-                  tag: {
-                    value: finding.severity,
-                    color: severityColor(finding.severity),
-                  },
-                },
-                { text: findingFixLabel(finding) },
-              ]}
-              detail={<List.Item.Detail markdown={findingMarkdown(finding)} />}
+              detail={<FindingPreviewDetail finding={finding} />}
               actions={
                 <ActionPanel>
                   <Action.CopyToClipboard
@@ -260,6 +226,42 @@ function DashboardDetail({ data }: { data: DashboardData }) {
         data.fixPlan,
         data.analysis,
       )}
+      metadata={
+        <List.Item.Detail.Metadata>
+          <List.Item.Detail.Metadata.TagList title="Posture">
+            <List.Item.Detail.Metadata.TagList.Item
+              text={maxSeverity(data.report.findings)}
+              color={severityColor(maxSeverity(data.report.findings))}
+            />
+          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Separator />
+          <List.Item.Detail.Metadata.Label
+            title="Findings"
+            text={String(data.report.summary.total_findings)}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Items"
+            text={String(data.report.summary.total_items)}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Analysis Signals"
+            text={String(data.analysis.summary.total_signals)}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Fix Plan Items"
+            text={String(fixPlanTotal(data.fixPlan))}
+          />
+          <List.Item.Detail.Metadata.Separator />
+          <List.Item.Detail.Metadata.Label
+            title="Home"
+            text={data.report.home}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Generated"
+            text={data.report.generated_at}
+          />
+        </List.Item.Detail.Metadata>
+      }
     />
   );
 }
@@ -270,15 +272,21 @@ function AnalysisDetail({ analysis }: { analysis: AnalysisReport }) {
       markdown={[
         "# Analysis",
         "",
-        `Signals: \`${analysis.summary.total_signals}\``,
-        `Highest severity: \`${analysis.summary.highest_severity || "info"}\``,
-        `Provider warnings: \`${analysis.summary.provider_warnings}\``,
-        "",
         "Offline analysis adds context to Nightward findings. It does not prove that an MCP server, package, or endpoint is safe.",
       ].join("\n")}
       metadata={
         <List.Item.Detail.Metadata>
-          <List.Item.Detail.Metadata.Label title="Mode" text={analysis.mode} />
+          <List.Item.Detail.Metadata.TagList title="Mode">
+            <List.Item.Detail.Metadata.TagList.Item
+              text={analysis.mode}
+              color={Color.Blue}
+            />
+          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Separator />
+          <List.Item.Detail.Metadata.Label
+            title="Signals"
+            text={String(analysis.summary.total_signals)}
+          />
           <List.Item.Detail.Metadata.Label
             title="Subjects"
             text={String(analysis.summary.total_subjects)}
@@ -286,6 +294,10 @@ function AnalysisDetail({ analysis }: { analysis: AnalysisReport }) {
           <List.Item.Detail.Metadata.Label
             title="Providers"
             text={`${analysis.providers.length} checked`}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Provider Warnings"
+            text={String(analysis.summary.provider_warnings)}
           />
         </List.Item.Detail.Metadata>
       }
@@ -313,6 +325,13 @@ function AdaptersDetail({ data }: { data: DashboardData }) {
       ].join("\n")}
       metadata={
         <List.Item.Detail.Metadata>
+          <List.Item.Detail.Metadata.TagList title="Adapters">
+            <List.Item.Detail.Metadata.TagList.Item
+              text={`${found.length} found`}
+              color={found.length > 0 ? Color.Green : Color.SecondaryText}
+            />
+          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Separator />
           <List.Item.Detail.Metadata.Label
             title="Found"
             text={String(found.length)}
@@ -331,17 +350,10 @@ function ScheduleDetail({ doctor }: { doctor: DoctorReport }) {
   const lines = [
     "# Scheduled Scan",
     "",
-    `Installed: \`${doctor.schedule.installed ? "yes" : "no"}\``,
-    `Platform: \`${doctor.schedule.platform}\``,
-    `Report dir: \`${doctor.schedule.report_dir}\``,
-    `Log dir: \`${doctor.schedule.log_dir}\``,
+    doctor.schedule.installed
+      ? "Scheduled scans are installed for this machine."
+      : "Scheduled scans are off for this machine.",
   ];
-  if (doctor.schedule.last_run)
-    lines.push(`Last run: \`${doctor.schedule.last_run}\``);
-  if (doctor.schedule.last_report)
-    lines.push(`Last report: \`${doctor.schedule.last_report}\``);
-  if (doctor.schedule.last_findings !== undefined)
-    lines.push(`Last findings: \`${doctor.schedule.last_findings}\``);
   if (doctor.schedule.history && doctor.schedule.history.length > 0) {
     lines.push("", "## Report History");
     for (const record of doctor.schedule.history.slice(0, 5)) {
@@ -350,17 +362,55 @@ function ScheduleDetail({ doctor }: { doctor: DoctorReport }) {
       );
     }
   }
-  return <List.Item.Detail markdown={lines.join("\n")} />;
+  return (
+    <List.Item.Detail
+      markdown={lines.join("\n")}
+      metadata={
+        <List.Item.Detail.Metadata>
+          <List.Item.Detail.Metadata.TagList title="Schedule">
+            <List.Item.Detail.Metadata.TagList.Item
+              text={doctor.schedule.installed ? "on" : "off"}
+              color={doctor.schedule.installed ? Color.Green : Color.Yellow}
+            />
+          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Separator />
+          <List.Item.Detail.Metadata.Label
+            title="Platform"
+            text={doctor.schedule.platform}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Reports"
+            text={String(doctor.schedule.history?.length ?? 0)}
+          />
+          {doctor.schedule.last_run ? (
+            <List.Item.Detail.Metadata.Label
+              title="Last Run"
+              text={doctor.schedule.last_run}
+            />
+          ) : null}
+          {doctor.schedule.last_findings !== undefined ? (
+            <List.Item.Detail.Metadata.Label
+              title="Last Findings"
+              text={String(doctor.schedule.last_findings)}
+            />
+          ) : null}
+          <List.Item.Detail.Metadata.Label
+            title="Report Dir"
+            text={doctor.schedule.report_dir}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Log Dir"
+            text={doctor.schedule.log_dir}
+          />
+        </List.Item.Detail.Metadata>
+      }
+    />
+  );
 }
 
 function FixPlanDetail({ plan }: { plan: FixPlan }) {
   const lines = [
     "# Fix Plan",
-    "",
-    `Total: \`${fixPlanTotal(plan)}\``,
-    `Safe: \`${plan.summary.safe}\``,
-    `Review: \`${plan.summary.review}\``,
-    `Blocked: \`${plan.summary.blocked}\``,
     "",
     "Nightward exports fix plans only. It does not mutate local configs from Raycast.",
   ];
@@ -374,7 +424,67 @@ function FixPlanDetail({ plan }: { plan: FixPlan }) {
       lines.push(`- \`${title}\` (${count}): ${summary}`);
     }
   }
-  return <List.Item.Detail markdown={lines.join("\n")} />;
+  return (
+    <List.Item.Detail
+      markdown={lines.join("\n")}
+      metadata={
+        <List.Item.Detail.Metadata>
+          <List.Item.Detail.Metadata.Label
+            title="Total"
+            text={String(fixPlanTotal(plan))}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Safe"
+            text={{ value: String(plan.summary.safe), color: Color.Green }}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Review"
+            text={{ value: String(plan.summary.review), color: Color.Yellow }}
+          />
+          <List.Item.Detail.Metadata.Label
+            title="Blocked"
+            text={{ value: String(plan.summary.blocked), color: Color.Red }}
+          />
+        </List.Item.Detail.Metadata>
+      }
+    />
+  );
+}
+
+function FindingPreviewDetail({
+  finding,
+}: {
+  finding: ScanReport["findings"][number];
+}) {
+  return (
+    <List.Item.Detail
+      markdown={findingMarkdown(finding)}
+      metadata={
+        <List.Item.Detail.Metadata>
+          <List.Item.Detail.Metadata.TagList title="Severity">
+            <List.Item.Detail.Metadata.TagList.Item
+              text={finding.severity}
+              color={severityColor(finding.severity)}
+            />
+          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Separator />
+          <List.Item.Detail.Metadata.Label title="Rule" text={finding.rule} />
+          <List.Item.Detail.Metadata.Label title="Tool" text={finding.tool} />
+          {finding.server ? (
+            <List.Item.Detail.Metadata.Label
+              title="Server"
+              text={finding.server}
+            />
+          ) : null}
+          <List.Item.Detail.Metadata.Label title="Path" text={finding.path} />
+          <List.Item.Detail.Metadata.Label
+            title="Fix"
+            text={findingFixLabel(finding)}
+          />
+        </List.Item.Detail.Metadata>
+      }
+    />
+  );
 }
 
 function DashboardActions({
@@ -403,34 +513,6 @@ function DashboardActions({
       ) : null}
     </ActionPanel>
   );
-}
-
-function severityAccessories(report: ScanReport): Array<{ text: string }> {
-  const critical = report.summary.findings_by_severity.critical ?? 0;
-  const high = report.summary.findings_by_severity.high ?? 0;
-  const medium = report.summary.findings_by_severity.medium ?? 0;
-  const values = [
-    critical > 0 ? { text: `${critical}C` } : undefined,
-    high > 0 ? { text: `${high}H` } : undefined,
-    medium > 0 ? { text: `${medium}M` } : undefined,
-  ];
-  return values.filter(Boolean) as Array<{ text: string }>;
-}
-
-function fixPlanSubtitle(plan: FixPlan): string {
-  const parts = [];
-  if (plan.summary.review > 0) parts.push(`${plan.summary.review} review`);
-  if (plan.summary.safe > 0) parts.push(`${plan.summary.safe} safe`);
-  if (plan.summary.blocked > 0) parts.push(`${plan.summary.blocked} blocked`);
-  return parts.join(" - ");
-}
-
-function scheduleSubtitle(doctor: DoctorReport): string {
-  if (!doctor.schedule.installed) return "off";
-  if (doctor.schedule.last_findings !== undefined) {
-    return `on - ${doctor.schedule.last_findings} latest`;
-  }
-  return "on - no report";
 }
 
 function adapterSubtitle(report: ScanReport): string {

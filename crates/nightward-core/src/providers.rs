@@ -623,6 +623,20 @@ mod tests {
     }
 
     #[test]
+    fn parses_semgrep_without_leaking_bearer_tokens() {
+        let root = Path::new("/tmp/project");
+        let token = ["opaque", "-secret", "-12345"].concat();
+        let json = format!(
+            r#"{{"results":[{{"check_id":"nightward.secret","path":"mcp.json","extra":{{"message":"Authorization: Bearer {token}"}}}}]}}"#
+        );
+        let findings = parse_semgrep(root, &json).unwrap();
+
+        assert_eq!(findings.len(), 1);
+        assert!(!findings[0].message.contains(&token));
+        assert!(!findings[0].evidence.contains(&token));
+    }
+
+    #[test]
     fn parses_osv_nested_results() {
         let root = Path::new("/tmp/project");
         let json = r#"{"results":[{"source":{"path":"package-lock.json"},"packages":[{"package":{"name":"leftpad"},"vulnerabilities":[{"id":"GHSA-demo"}]}]}]}"#;

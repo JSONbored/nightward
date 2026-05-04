@@ -1,6 +1,6 @@
 # Remediation
 
-Nightward remediation is plan-only. It recommends changes, explains risk, and can preview redacted patch hunks, but it does not mutate agent configs.
+Nightward remediation is plan-only. It recommends changes, explains risk, and can export redacted review material, but it does not mutate agent configs.
 
 ## Fix Kinds
 
@@ -11,9 +11,9 @@ Nightward remediation is plan-only. It recommends changes, explains risk, and ca
 - `manual-review`: inspect unsupported or ambiguous config shapes.
 - `ignore-with-reason`: accept advisory findings only with documented reasoning.
 
-## Preview Rules
+## Export Rules
 
-`nw fix preview` generates redacted patch previews only when Nightward can parse the config and target a specific MCP server. It does not show raw file diffs because raw config diffs can leak inline secrets.
+`nw fix export --format markdown` generates redacted review material for matching findings. It does not show raw file diffs because raw config diffs can leak inline secrets.
 
 Package pinning does not guess versions. Choose a reviewed version from the upstream registry or release notes, then edit the package token manually.
 

@@ -7,7 +7,7 @@ Nightward inspects local AI agent and devtool state, so its primary risk is acci
 - MCP server configs and executable arguments.
 - Agent/editor settings, skills, rules, and local workflow files.
 - Credentials, auth files, tokens, headers, env files, and private local paths.
-- Redacted reports, SARIF files, fix-plan exports, and scheduled scan reports.
+- Redacted reports, SARIF files, fix-plan exports, and planned scheduled scan reports.
 - Release artifacts, GitHub Actions workflows, and package metadata.
 
 ## Trust Boundaries
@@ -17,7 +17,7 @@ Nightward inspects local AI agent and devtool state, so its primary risk is acci
 - Optional providers are execution boundaries. They are discovered but not installed or run online by default. Socket is treated as online-capable because it creates a remote scan artifact from dependency manifest metadata.
 - MCP clients are agent boundaries. `nw mcp serve` exposes read-only local context through stdio, so returned tool/resource content must stay redacted and bounded.
 - GitHub Actions and Trunk integrations treat repository contents and PR input as untrusted.
-- Scheduler install/remove is an explicit write boundary and must stay user-level.
+- Scheduler install/remove is plan-only in v1; any future scheduler writes must stay explicit and user-level.
 - Release automation and npm publishing are privileged publishing boundaries.
 
 ## Threats And Controls

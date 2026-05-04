@@ -153,7 +153,7 @@ export async function explainSignal(
   options: RuntimeOptions,
 ): Promise<AnalysisReport> {
   return runNightwardJSON<AnalysisReport>(
-    ["analyze", "finding", "--json", findingId],
+    ["analyze", "finding", findingId, "--json"],
     options,
   );
 }

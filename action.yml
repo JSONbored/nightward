@@ -24,7 +24,7 @@ inputs:
     required: false
     default: ""
   workspace:
-    description: Repository/workspace path Nightward should scan instead of HOME.
+    description: Repository/workspace path Nightward should scan. Defaults to GITHUB_WORKSPACE unless home is set.
     required: false
     default: ""
   include-analysis:
@@ -82,21 +82,29 @@ runs:
 
         if [[ -n "${scan_home}" ]]; then
           export NIGHTWARD_HOME="${scan_home}"
+        elif [[ -z "${scan_workspace}" ]]; then
+          scan_workspace="${GITHUB_WORKSPACE}"
         fi
+
+        workspace_output_path() {
+          local value="${1:?output path required}"
+          bash "${GITHUB_ACTION_PATH}/scripts/validate-action-path.sh" output "${value}"
+          printf '%s/%s' "${GITHUB_WORKSPACE}" "${value}"
+        }
 
         config_args=()
         if [[ -n "${config}" ]]; then
           bash "${GITHUB_ACTION_PATH}/scripts/validate-action-path.sh" config "${config}"
           config_args+=(--config "${GITHUB_WORKSPACE}/${config}")
         fi
-        bash "${GITHUB_ACTION_PATH}/scripts/validate-action-path.sh" output "${output}"
-        output_path="${GITHUB_WORKSPACE}/${output}"
-        summary_path="${output_path}"
         if [[ "${output}" == "-" ]]; then
-          summary_path="${GITHUB_WORKSPACE}/nightward-output.json"
+          summary_path="$(workspace_output_path "nightward-output.json")"
         else
+          output_path="$(workspace_output_path "${output}")"
+          summary_path="${output_path}"
           mkdir -p "$(dirname "${output_path}")"
         fi
+        policy_path="$(workspace_output_path "nightward-policy.json")"
         workspace_args=()
         if [[ -n "${scan_workspace}" ]]; then
           workspace_args+=(--workspace "${scan_workspace}")
@@ -124,12 +132,12 @@ runs:
               args+=(--strict)
             fi
             set +e
-            cargo run --quiet --bin nw -- "${args[@]}" >"${GITHUB_WORKSPACE}/nightward-policy.json"
+            cargo run --quiet --bin nw -- "${args[@]}" >"${policy_path}"
             policy_exit=$?
             set -e
             echo "policy-exit-code=${policy_exit}" >>"${GITHUB_OUTPUT}"
             echo "output=nightward-policy.json" >>"${GITHUB_OUTPUT}"
-            echo "output-path=${GITHUB_WORKSPACE}/nightward-policy.json" >>"${GITHUB_OUTPUT}"
+            echo "output-path=${policy_path}" >>"${GITHUB_OUTPUT}"
             ;;
           sarif)
             if [[ "${output}" == "-" ]]; then

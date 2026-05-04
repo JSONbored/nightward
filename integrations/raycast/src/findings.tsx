@@ -17,7 +17,6 @@ import {
   findingKeywords,
   findingFixLabel,
   findingMarkdown,
-  findingSubtitle,
   findingTitle,
   policyIgnoreSnippet,
   redactText,
@@ -63,16 +62,23 @@ export default function Command() {
     <List
       isLoading={isLoading}
       isShowingDetail
-      searchBarPlaceholder="Search findings by rule, path, tool, server, or ID..."
+      searchBarPlaceholder="Search findings..."
       searchBarAccessory={
         <SeverityDropdown value={severity} onChange={setSeverity} />
       }
       filtering
     >
+      {sections.length === 0 ? (
+        <List.EmptyView
+          title="No findings"
+          description="Nightward did not return findings for the current filter."
+          icon={Icon.CheckCircle}
+        />
+      ) : null}
       {sections.map(([level, findings]) => (
         <List.Section
           key={level}
-          title={level.charAt(0).toUpperCase() + level.slice(1)}
+          title={`${level.charAt(0).toUpperCase() + level.slice(1)} Findings`}
           subtitle={`${findings.length}`}
         >
           {findings.map((finding) => (
@@ -121,22 +127,11 @@ function FindingItem({
   return (
     <List.Item
       title={findingTitle(finding)}
-      subtitle={findingSubtitle(finding)}
       keywords={findingKeywords(finding)}
       icon={{
         source: Icon.Warning,
         tintColor: severityColor(finding.severity as RiskLevel),
       }}
-      accessories={[
-        finding.fix_available
-          ? {
-              tag: {
-                value: findingFixLabel(finding),
-                color: finding.requires_review ? Color.Yellow : Color.Green,
-              },
-            }
-          : { text: findingFixLabel(finding) },
-      ]}
       detail={<FindingDetail finding={finding} />}
       actions={<FindingActions finding={finding} onRefresh={onRefresh} />}
     />
@@ -151,10 +146,19 @@ function FindingDetail({ finding }: { finding: Finding }) {
         <List.Item.Detail.Metadata>
           <List.Item.Detail.Metadata.Label title="ID" text={finding.id} />
           <List.Item.Detail.Metadata.Label title="Tool" text={finding.tool} />
-          <List.Item.Detail.Metadata.Label
-            title="Severity"
-            text={finding.severity}
-          />
+          <List.Item.Detail.Metadata.TagList title="Severity">
+            <List.Item.Detail.Metadata.TagList.Item
+              text={finding.severity}
+              color={severityColor(finding.severity)}
+            />
+          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.TagList title="Fix">
+            <List.Item.Detail.Metadata.TagList.Item
+              text={findingFixLabel(finding)}
+              color={finding.requires_review ? Color.Yellow : Color.Green}
+            />
+          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Separator />
           <List.Item.Detail.Metadata.Label title="Rule" text={finding.rule} />
           {finding.server ? (
             <List.Item.Detail.Metadata.Label
@@ -163,6 +167,22 @@ function FindingDetail({ finding }: { finding: Finding }) {
             />
           ) : null}
           <List.Item.Detail.Metadata.Label title="Path" text={finding.path} />
+          {finding.fix_kind ? (
+            <List.Item.Detail.Metadata.Label
+              title="Fix Kind"
+              text={finding.fix_kind}
+            />
+          ) : null}
+          {finding.confidence ? (
+            <List.Item.Detail.Metadata.Label
+              title="Confidence"
+              text={finding.confidence}
+            />
+          ) : null}
+          <List.Item.Detail.Metadata.Label
+            title="Requires Review"
+            text={finding.requires_review ? "yes" : "no"}
+          />
           {finding.docs_url ? (
             <List.Item.Detail.Metadata.Link
               title="Docs"

@@ -86,14 +86,6 @@ export function findingTitle(finding: Finding): string {
   return humanizeIdentifier(finding.rule);
 }
 
-export function findingSubtitle(finding: Finding): string {
-  const parts = [finding.tool];
-  if (finding.server) parts.push(`server ${finding.server}`);
-  const file = basename(finding.path);
-  if (file) parts.push(file);
-  return parts.join(" - ");
-}
-
 export function findingFixLabel(finding: Finding): string {
   if (!finding.fix_available) return "review";
   if (!finding.fix_kind) return "fix";
@@ -147,10 +139,6 @@ export function findingMarkdown(finding: Finding): string {
 
   if (finding.fix_available) {
     lines.push("", "## Suggested Fix");
-    lines.push(`Kind: \`${finding.fix_kind ?? "manual-review"}\``);
-    lines.push(`Confidence: \`${finding.confidence ?? "unknown"}\``);
-    lines.push(`Risk: \`${finding.risk ?? "unknown"}\``);
-    lines.push(`Requires review: \`${String(finding.requires_review)}\``);
     if (finding.fix_summary) lines.push("", redactText(finding.fix_summary));
     if (finding.fix_steps && finding.fix_steps.length > 0) {
       lines.push("");
@@ -190,13 +178,6 @@ export function signalMarkdown(signal: AnalysisSignal): string {
     "",
     "## Recommended Action",
     redactText(signal.recommended_action),
-    "",
-    "## Metadata",
-    `- Provider: \`${signal.provider}\``,
-    `- Category: \`${signal.category}\``,
-    `- Severity: \`${signal.severity}\``,
-    `- Confidence: \`${signal.confidence}\``,
-    signal.path ? `- Path: ${markdownCode(signal.path)}` : "",
     signal.why_this_matters ? "" : "",
     signal.why_this_matters ? "## Why This Matters" : "",
     signal.why_this_matters ? redactText(signal.why_this_matters) : "",
@@ -210,24 +191,12 @@ export function signalTitle(signal: AnalysisSignal): string {
 }
 
 export function signalSubtitle(signal: AnalysisSignal): string {
-  const parts = [signal.provider, signal.category.replace(/-/g, " ")];
-  if (signal.path) parts.push(basename(signal.path));
-  return parts.join(" - ");
+  return signal.provider;
 }
 
 export function analysisMarkdown(report: AnalysisReport): string {
   const lines = [
     "# Nightward Analysis",
-    "",
-    `Generated: \`${report.generated_at}\``,
-    `Mode: \`${report.mode}\``,
-    report.workspace ? `Workspace: \`${report.workspace}\`` : "",
-    "",
-    "## Summary",
-    `Signals: \`${report.summary.total_signals}\``,
-    `Subjects: \`${report.summary.total_subjects}\``,
-    `Highest severity: \`${report.summary.highest_severity || "info"}\``,
-    `Provider warnings: \`${report.summary.provider_warnings}\``,
     "",
     "Nightward analysis is offline by default and does not claim a package or server is safe.",
   ].filter(Boolean);

@@ -6,7 +6,7 @@ Nightward’s roadmap is intentionally conservative. The next releases should ma
 
 - Local inventory and MCP security review.
 - Redacted JSON, SARIF, policy output, and TUI workflows.
-- Plan-only remediation and fix previews.
+- Plan-only remediation and fix exports.
 - GitHub Action, Trunk plugin definition, Raycast extension, and npm launcher.
 - Signed v0.1.x releases with npm provenance and release-checksum verification.
 - Explicit provider execution for local providers and online-gated provider runs.
