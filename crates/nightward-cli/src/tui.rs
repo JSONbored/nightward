@@ -1,5 +1,7 @@
 use anyhow::Result;
-use nightward_core::{max_risk, Finding, Report, RiskLevel};
+use nightward_core::analysis::{self, Options as AnalysisOptions};
+use nightward_core::fixplan::{self, Selector};
+use nightward_core::{backupplan, max_risk, Classification, Finding, Report, RiskLevel};
 use opentui::buffer::{BoxOptions, BoxStyle, ClipRect, TitleAlign};
 use opentui::input::{Event, InputParser, KeyCode};
 use opentui::terminal::{enable_raw_mode, terminal_size};
@@ -87,6 +89,9 @@ struct TuiState<'a> {
     report: &'a Report,
     active_view: usize,
     selected_finding: usize,
+    severity_filter: Option<RiskLevel>,
+    search_query: String,
+    search_mode: bool,
     frame: u64,
     palette: Palette,
 }
@@ -97,6 +102,9 @@ impl<'a> TuiState<'a> {
             report,
             active_view: 0,
             selected_finding: 0,
+            severity_filter: None,
+            search_query: String::new(),
+            search_mode: false,
             frame: 0,
             palette: Palette::new(),
         }
@@ -110,47 +118,105 @@ impl<'a> TuiState<'a> {
         let Event::Key(key) = event else {
             return true;
         };
-        if key.is_ctrl_c() || matches!(key.code, KeyCode::Char('q') | KeyCode::Esc) {
+        if key.is_ctrl_c() {
+            return false;
+        }
+        if self.search_mode {
+            match key.code {
+                KeyCode::Esc | KeyCode::Enter => self.search_mode = false,
+                KeyCode::Backspace => {
+                    self.search_query.pop();
+                    self.clamp_selected_finding();
+                }
+                KeyCode::Char(ch) if !key.ctrl() => {
+                    self.search_query.push(ch);
+                    self.selected_finding = 0;
+                }
+                _ => {}
+            }
+            return true;
+        }
+        if matches!(key.code, KeyCode::Char('q') | KeyCode::Esc) {
             return false;
         }
         match key.code {
-            KeyCode::Tab => self.active_view = (self.active_view + 1) % VIEWS.len(),
-            KeyCode::BackTab => {
-                self.active_view = self.active_view.checked_sub(1).unwrap_or(VIEWS.len() - 1);
-            }
+            KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => self.next_view(),
+            KeyCode::BackTab | KeyCode::Left | KeyCode::Char('h') => self.previous_view(),
             KeyCode::Char(ch @ '1'..='7') => {
                 self.active_view = usize::from(ch as u8 - b'1');
             }
             KeyCode::Down | KeyCode::Char('j') => self.select_next_finding(),
             KeyCode::Up | KeyCode::Char('k') => self.select_previous_finding(),
+            KeyCode::Char('/') => self.search_mode = true,
+            KeyCode::Char('s') => self.cycle_severity_filter(),
+            KeyCode::Char('x') => self.clear_filters(),
             _ => {}
         }
         true
     }
 
+    fn next_view(&mut self) {
+        self.active_view = (self.active_view + 1) % VIEWS.len();
+    }
+
+    fn previous_view(&mut self) {
+        self.active_view = self.active_view.checked_sub(1).unwrap_or(VIEWS.len() - 1);
+    }
+
     fn select_next_finding(&mut self) {
-        if self.report.findings.is_empty() {
+        let count = self.display_findings().len();
+        if count == 0 {
             self.selected_finding = 0;
             return;
         }
-        self.selected_finding = (self.selected_finding + 1) % self.report.findings.len();
+        self.selected_finding = (self.selected_finding + 1) % count;
     }
 
     fn select_previous_finding(&mut self) {
-        if self.report.findings.is_empty() {
+        let count = self.display_findings().len();
+        if count == 0 {
             self.selected_finding = 0;
             return;
         }
-        self.selected_finding = self
-            .selected_finding
-            .checked_sub(1)
-            .unwrap_or(self.report.findings.len() - 1);
+        self.selected_finding = self.selected_finding.checked_sub(1).unwrap_or(count - 1);
+    }
+
+    fn clamp_selected_finding(&mut self) {
+        let count = self.display_findings().len();
+        if count == 0 {
+            self.selected_finding = 0;
+        } else if self.selected_finding >= count {
+            self.selected_finding = count - 1;
+        }
+    }
+
+    fn cycle_severity_filter(&mut self) {
+        self.severity_filter = match self.severity_filter {
+            None => Some(RiskLevel::Critical),
+            Some(RiskLevel::Critical) => Some(RiskLevel::High),
+            Some(RiskLevel::High) => Some(RiskLevel::Medium),
+            Some(RiskLevel::Medium) => Some(RiskLevel::Low),
+            Some(RiskLevel::Low) => Some(RiskLevel::Info),
+            Some(RiskLevel::Info) => None,
+        };
+        self.selected_finding = 0;
+    }
+
+    fn clear_filters(&mut self) {
+        self.severity_filter = None;
+        self.search_query.clear();
+        self.search_mode = false;
+        self.selected_finding = 0;
     }
 
     fn render(&self, buffer: &mut OptimizedBuffer, width: u32, height: u32) {
         buffer.clear(self.palette.bg);
-        if width < 72 || height < 22 {
+        if width < 72 || height < 18 {
             self.render_tiny(buffer, width, height);
+            return;
+        }
+        if width < 96 || height < 26 {
+            self.render_compact(buffer, width, height);
             return;
         }
 
@@ -212,6 +278,56 @@ impl<'a> TuiState<'a> {
                 Style::fg(self.palette.muted),
             );
         }
+    }
+
+    fn render_compact(&self, buffer: &mut OptimizedBuffer, width: u32, height: u32) {
+        buffer.clear(self.palette.bg);
+        draw_text(
+            buffer,
+            1,
+            1,
+            "NIGHTWARD",
+            Style::fg(self.palette.cyan).with_bold(),
+        );
+        draw_text(
+            buffer,
+            12,
+            1,
+            "AI config risk console",
+            Style::fg(self.palette.muted),
+        );
+        let risk = max_risk(&self.report.findings);
+        draw_text(
+            buffer,
+            width.saturating_sub(20),
+            1,
+            &status_label(risk, self.report.summary.total_findings),
+            Style::fg(severity_color(&self.palette, risk)).with_bold(),
+        );
+        draw_text(
+            buffer,
+            1,
+            3,
+            &format!(
+                "{}  severity {}  search {}",
+                VIEWS[self.active_view],
+                severity_filter_label(self.severity_filter),
+                search_label(&self.search_query, self.search_mode)
+            ),
+            Style::fg(view_nav_color(&self.palette, self.active_view)).with_bold(),
+        );
+        draw_hline(buffer, 1, 4, width.saturating_sub(2), self.palette.line);
+
+        let nav = "1 Overview  2 Findings  3 Analysis  4 Fix Plan  5 Inventory  6 Backup  7 Help";
+        draw_text(
+            buffer,
+            1,
+            height.saturating_sub(2),
+            &truncate(nav, width.saturating_sub(2) as usize),
+            Style::fg(self.palette.muted),
+        );
+        let body = Area::new(1, 6, width.saturating_sub(2), height.saturating_sub(10));
+        self.render_content(buffer, body);
     }
 
     fn render_header(&self, buffer: &mut OptimizedBuffer, area: Area) {
@@ -406,14 +522,17 @@ impl<'a> TuiState<'a> {
             buffer,
             x,
             posture_y + 1,
-            "severity  all",
+            &format!("severity  {}", severity_filter_label(self.severity_filter)),
             Style::fg(self.palette.white),
         );
         draw_text(
             buffer,
             x,
             posture_y + 2,
-            "search    none",
+            &format!(
+                "search    {}",
+                truncate(&search_label(&self.search_query, self.search_mode), 12)
+            ),
             Style::fg(self.palette.white),
         );
         draw_text(
@@ -450,7 +569,7 @@ impl<'a> TuiState<'a> {
         match self.active_view {
             0 => self.render_overview(buffer, area),
             1 => {
-                let list_w = (area.w * 48 / 100).clamp(34, area.w.saturating_sub(36));
+                let list_w = responsive_width(area.w, 48, 34, 36);
                 self.render_findings(buffer, Area::new(area.x, area.y, list_w, area.h));
                 self.render_detail(
                     buffer,
@@ -462,12 +581,16 @@ impl<'a> TuiState<'a> {
                     ),
                 );
             }
-            _ => self.render_placeholder(buffer, area, VIEWS[self.active_view]),
+            2 => self.render_analysis(buffer, area),
+            3 => self.render_fix_plan(buffer, area),
+            4 => self.render_inventory(buffer, area),
+            5 => self.render_backup(buffer, area),
+            _ => self.render_help(buffer, area),
         }
     }
 
     fn render_overview(&self, buffer: &mut OptimizedBuffer, area: Area) {
-        let left_w = (area.w * 39 / 100).clamp(30, area.w.saturating_sub(42));
+        let left_w = responsive_width(area.w, 39, 30, 42);
         let right_x = area.x + left_w + 2;
         let right_w = area.w.saturating_sub(left_w + 2);
         self.render_risk_posture(
@@ -482,6 +605,7 @@ impl<'a> TuiState<'a> {
 
     fn render_risk_posture(&self, buffer: &mut OptimizedBuffer, area: Area) {
         let risk = max_risk(&self.report.findings);
+        let bottom = area.y + area.h.saturating_sub(1);
         plain_box(
             buffer,
             area,
@@ -507,7 +631,8 @@ impl<'a> TuiState<'a> {
         ] {
             let count = count_severity(self.report, severity);
             let label = risk_word(severity);
-            let bar = ascii_bar(count, total, 20);
+            let bar_width = area.w.saturating_sub(18).clamp(4, 20) as usize;
+            let bar = ascii_bar(count, total, bar_width);
             draw_text(
                 buffer,
                 area.x + 2,
@@ -518,6 +643,9 @@ impl<'a> TuiState<'a> {
             row += 1;
         }
         row += 1;
+        if row + 3 >= bottom {
+            return;
+        }
         draw_text(
             buffer,
             area.x + 2,
@@ -540,6 +668,9 @@ impl<'a> TuiState<'a> {
             row += 1;
         }
         row += 1;
+        if row + 4 >= bottom {
+            return;
+        }
         draw_text(
             buffer,
             area.x + 2,
@@ -553,6 +684,9 @@ impl<'a> TuiState<'a> {
             "redacted outputs",
             "offline unless requested",
         ] {
+            if row >= bottom {
+                break;
+            }
             draw_text(buffer, area.x + 2, row, line, Style::fg(self.palette.white));
             row += 1;
         }
@@ -569,12 +703,13 @@ impl<'a> TuiState<'a> {
             Style::fg(self.palette.white).with_bold(),
         );
         row += 3;
-        let max_rows = area.h.saturating_sub(13) as usize / 3;
-        for finding in self
-            .display_findings()
-            .into_iter()
-            .take(max_rows.clamp(3, 5))
-        {
+        let show_flow = area.h >= 18;
+        let max_rows = if show_flow {
+            (area.h.saturating_sub(13) as usize / 3).clamp(1, 5)
+        } else {
+            (area.h.saturating_sub(5) as usize / 3).clamp(1, 2)
+        };
+        for finding in self.display_findings().into_iter().take(max_rows) {
             let color = severity_color(&self.palette, finding.severity);
             draw_text(
                 buffer,
@@ -599,6 +734,9 @@ impl<'a> TuiState<'a> {
                 Style::fg(self.palette.muted),
             );
             row += 2;
+        }
+        if !show_flow {
+            return;
         }
         let flow_y = area.y + area.h.saturating_sub(8);
         draw_text(
@@ -719,7 +857,8 @@ impl<'a> TuiState<'a> {
         let mut row = area.y + 2;
         let inner_w = area.w.saturating_sub(4) as usize;
 
-        if let Some(finding) = self.report.findings.get(self.selected_finding) {
+        let visible_findings = self.display_findings();
+        if let Some(finding) = visible_findings.get(self.selected_finding) {
             let severity = severity_color(&self.palette, finding.severity);
             draw_chip(
                 buffer,
@@ -814,6 +953,19 @@ impl<'a> TuiState<'a> {
 
     fn display_findings(&self) -> Vec<&Finding> {
         let mut findings = self.report.findings.iter().collect::<Vec<_>>();
+        if let Some(severity) = self.severity_filter {
+            findings.retain(|finding| finding.severity == severity);
+        }
+        let query = self.search_query.trim().to_ascii_lowercase();
+        if !query.is_empty() {
+            findings.retain(|finding| {
+                finding.rule.to_ascii_lowercase().contains(&query)
+                    || finding.server.to_ascii_lowercase().contains(&query)
+                    || finding.path.to_ascii_lowercase().contains(&query)
+                    || finding.message.to_ascii_lowercase().contains(&query)
+                    || finding.id.to_ascii_lowercase().contains(&query)
+            });
+        }
         findings.sort_by(|a, b| {
             b.severity
                 .rank()
@@ -825,34 +977,493 @@ impl<'a> TuiState<'a> {
         findings
     }
 
-    fn render_placeholder(&self, buffer: &mut OptimizedBuffer, area: Area, title: &str) {
-        plain_box(
+    fn render_analysis(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        let report = analysis::run(
+            self.report,
+            AnalysisOptions {
+                mode: self.report.scan_mode.clone(),
+                workspace: self.report.workspace.clone(),
+                with: Vec::new(),
+                online: false,
+                package: String::new(),
+                finding_id: String::new(),
+            },
+        );
+        let left_w = responsive_width(area.w, 42, 32, 42);
+        let right_x = area.x + left_w + 2;
+        let right_w = area.w.saturating_sub(left_w + 2);
+
+        draw_panel(
             buffer,
-            area,
-            view_color(&self.palette, self.active_view),
+            Area::new(area.x, area.y, left_w, area.h),
+            "Analysis Summary",
+            self.palette.magenta,
             self.palette.panel,
         );
+        let mut row = area.y + 2;
+        for (label, value, color) in [
+            (
+                "signals",
+                report.summary.total_signals.to_string(),
+                self.palette.magenta,
+            ),
+            (
+                "subjects",
+                report.summary.total_subjects.to_string(),
+                self.palette.blue,
+            ),
+            (
+                "provider warnings",
+                report.summary.provider_warnings.to_string(),
+                self.palette.amber,
+            ),
+            (
+                "highest",
+                risk_word(report.summary.highest_severity).to_string(),
+                severity_color(&self.palette, report.summary.highest_severity),
+            ),
+        ] {
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                label,
+                Style::fg(self.palette.muted),
+            );
+            draw_text(
+                buffer,
+                area.x + left_w.saturating_sub(18),
+                row,
+                &truncate(&value, 16),
+                Style::fg(color).with_bold(),
+            );
+            row += 2;
+        }
+        row += 1;
+        section_label(buffer, area.x + 2, row, "categories", self.palette.cyan);
+        row += 2;
+        for (category, count) in report
+            .summary
+            .signals_by_category
+            .iter()
+            .take(area.h.saturating_sub(15) as usize)
+        {
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                &truncate(&format!("{category:?}").to_ascii_lowercase(), 20),
+                Style::fg(self.palette.white),
+            );
+            draw_text(
+                buffer,
+                area.x + left_w.saturating_sub(6),
+                row,
+                &count.to_string(),
+                Style::fg(self.palette.cyan).with_bold(),
+            );
+            row += 1;
+        }
+
+        draw_panel(
+            buffer,
+            Area::new(right_x, area.y, right_w, area.h),
+            "Signals",
+            self.palette.blue,
+            self.palette.surface,
+        );
+        let mut row = area.y + 2;
+        for signal in report
+            .signals
+            .iter()
+            .take(area.h.saturating_sub(5) as usize / 4)
+        {
+            let color = severity_color(&self.palette, signal.severity);
+            draw_text(
+                buffer,
+                right_x + 2,
+                row,
+                severity_badge(signal.severity),
+                Style::fg(color).with_bold(),
+            );
+            draw_text(
+                buffer,
+                right_x + 12,
+                row,
+                &truncate(&signal.rule, right_w.saturating_sub(16) as usize),
+                Style::fg(color).with_bold(),
+            );
+            row += 1;
+            for line in wrap(&signal.message, right_w.saturating_sub(4) as usize)
+                .into_iter()
+                .take(2)
+            {
+                draw_text(
+                    buffer,
+                    right_x + 2,
+                    row,
+                    &line,
+                    Style::fg(self.palette.muted),
+                );
+                row += 1;
+            }
+            row += 1;
+        }
+    }
+
+    fn render_fix_plan(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        let plan = fixplan::plan(
+            self.report,
+            Selector {
+                all: true,
+                ..Selector::default()
+            },
+        );
+        let left_w = responsive_width(area.w, 36, 30, 42);
+        let right_x = area.x + left_w + 2;
+        let right_w = area.w.saturating_sub(left_w + 2);
+
+        draw_panel(
+            buffer,
+            Area::new(area.x, area.y, left_w, area.h),
+            "Plan Summary",
+            self.palette.amber,
+            self.palette.panel,
+        );
+        let mut row = area.y + 2;
+        for (label, value, color) in [
+            ("safe", plan.summary.safe, self.palette.green),
+            ("review", plan.summary.review, self.palette.amber),
+            ("blocked", plan.summary.blocked, self.palette.red),
+        ] {
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                label,
+                Style::fg(self.palette.muted),
+            );
+            draw_text(
+                buffer,
+                area.x + left_w.saturating_sub(6),
+                row,
+                &value.to_string(),
+                Style::fg(color).with_bold(),
+            );
+            row += 2;
+        }
+        row += 1;
+        section_label(buffer, area.x + 2, row, "groups", self.palette.cyan);
+        row += 2;
+        for group in plan
+            .groups
+            .iter()
+            .take(area.h.saturating_sub(13) as usize / 2)
+        {
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                &truncate(&group.title, left_w.saturating_sub(12) as usize),
+                Style::fg(severity_color(&self.palette, group.severity)).with_bold(),
+            );
+            draw_text(
+                buffer,
+                area.x + left_w.saturating_sub(6),
+                row,
+                &group.finding_count.to_string(),
+                Style::fg(self.palette.white),
+            );
+            row += 2;
+        }
+
+        draw_panel(
+            buffer,
+            Area::new(right_x, area.y, right_w, area.h),
+            "Plan-Only Actions",
+            self.palette.amber,
+            self.palette.surface,
+        );
+        let mut row = area.y + 2;
+        for action in plan
+            .actions
+            .iter()
+            .take(area.h.saturating_sub(5) as usize / 6)
+        {
+            let color = severity_color(&self.palette, action.severity);
+            draw_text(
+                buffer,
+                right_x + 2,
+                row,
+                &action.title,
+                Style::fg(color).with_bold(),
+            );
+            draw_text(
+                buffer,
+                right_x + right_w.saturating_sub(12),
+                row,
+                risk_word(action.severity),
+                Style::fg(color),
+            );
+            row += 1;
+            draw_text(
+                buffer,
+                right_x + 2,
+                row,
+                &truncate(&action.finding_id, right_w.saturating_sub(4) as usize),
+                Style::fg(self.palette.muted),
+            );
+            row += 1;
+            for line in action.steps.iter().take(2) {
+                draw_text(
+                    buffer,
+                    right_x + 2,
+                    row,
+                    &truncate(line, right_w.saturating_sub(4) as usize),
+                    Style::fg(self.palette.white),
+                );
+                row += 1;
+            }
+            row += 1;
+        }
+    }
+
+    fn render_inventory(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        let left_w = responsive_width(area.w, 38, 30, 42);
+        let right_x = area.x + left_w + 2;
+        let right_w = area.w.saturating_sub(left_w + 2);
+
+        draw_panel(
+            buffer,
+            Area::new(area.x, area.y, left_w, area.h),
+            "Inventory",
+            self.palette.blue,
+            self.palette.panel,
+        );
+        let mut row = area.y + 2;
+        for (classification, count) in self
+            .report
+            .summary
+            .items_by_classification
+            .iter()
+            .take(area.h.saturating_sub(5) as usize)
+        {
+            let color = classification_color(&self.palette, *classification);
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                &truncate(&format!("{classification:?}").to_ascii_lowercase(), 22),
+                Style::fg(color).with_bold(),
+            );
+            draw_text(
+                buffer,
+                area.x + left_w.saturating_sub(6),
+                row,
+                &count.to_string(),
+                Style::fg(self.palette.white),
+            );
+            row += 2;
+        }
+
+        draw_panel(
+            buffer,
+            Area::new(right_x, area.y, right_w, area.h),
+            "Items",
+            self.palette.blue,
+            self.palette.surface,
+        );
+        let mut row = area.y + 2;
+        for item in self
+            .report
+            .items
+            .iter()
+            .take(area.h.saturating_sub(4) as usize / 3)
+        {
+            let color = severity_color(&self.palette, item.risk);
+            draw_text(
+                buffer,
+                right_x + 2,
+                row,
+                &truncate(&item.tool, 12),
+                Style::fg(color).with_bold(),
+            );
+            draw_text(
+                buffer,
+                right_x + 16,
+                row,
+                &truncate(&item.kind, 18),
+                Style::fg(self.palette.white),
+            );
+            row += 1;
+            draw_text(
+                buffer,
+                right_x + 2,
+                row,
+                &truncate(&item.path, right_w.saturating_sub(4) as usize),
+                Style::fg(self.palette.muted),
+            );
+            row += 2;
+        }
+    }
+
+    fn render_backup(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        let plan = backupplan::plan(&self.report.home);
+        let left_w = responsive_width(area.w, 45, 32, 40);
+        let right_x = area.x + left_w + 2;
+        let right_w = area.w.saturating_sub(left_w + 2);
+
+        draw_panel(
+            buffer,
+            Area::new(area.x, area.y, left_w, area.h),
+            "Portable Candidates",
+            self.palette.green,
+            self.palette.panel,
+        );
+        let mut row = area.y + 2;
         draw_text(
             buffer,
             area.x + 2,
-            area.y + 2,
-            title,
-            Style::fg(self.palette.white).with_bold(),
+            row,
+            "include",
+            Style::fg(self.palette.cyan).with_bold(),
         );
+        row += 2;
+        for item in plan
+            .include
+            .iter()
+            .take(area.h.saturating_sub(8) as usize / 2)
+        {
+            draw_text(buffer, area.x + 2, row, "＋", Style::fg(self.palette.green));
+            draw_text(
+                buffer,
+                area.x + 5,
+                row,
+                &truncate(item, left_w.saturating_sub(7) as usize),
+                Style::fg(self.palette.white),
+            );
+            row += 2;
+        }
+
+        draw_panel(
+            buffer,
+            Area::new(right_x, area.y, right_w, area.h),
+            "Never Sync",
+            self.palette.red,
+            self.palette.surface,
+        );
+        let mut row = area.y + 2;
         draw_text(
             buffer,
-            area.x + 2,
-            area.y + 4,
-            "This Rust/OpenTUI comparison branch keeps the visual shell stable while deeper panes are rebuilt.",
-            Style::fg(self.palette.muted),
+            right_x + 2,
+            row,
+            "exclude",
+            Style::fg(self.palette.red).with_bold(),
         );
-        draw_text(
+        row += 2;
+        for item in plan
+            .exclude
+            .iter()
+            .take(area.h.saturating_sub(11) as usize / 2)
+        {
+            draw_text(buffer, right_x + 2, row, "−", Style::fg(self.palette.red));
+            draw_text(
+                buffer,
+                right_x + 5,
+                row,
+                &truncate(item, right_w.saturating_sub(7) as usize),
+                Style::fg(self.palette.white),
+            );
+            row += 2;
+        }
+        row += 1;
+        section_label(buffer, right_x + 2, row, "notes", self.palette.cyan);
+        row += 2;
+        for note in plan.notes.iter().take(3) {
+            for line in wrap(note, right_w.saturating_sub(4) as usize)
+                .into_iter()
+                .take(2)
+            {
+                draw_text(
+                    buffer,
+                    right_x + 2,
+                    row,
+                    &line,
+                    Style::fg(self.palette.muted),
+                );
+                row += 1;
+            }
+        }
+    }
+
+    fn render_help(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        let left_w = responsive_width(area.w, 45, 32, 40);
+        let right_x = area.x + left_w + 2;
+        let right_w = area.w.saturating_sub(left_w + 2);
+
+        draw_panel(
             buffer,
-            area.x + 2,
-            area.y + 6,
-            "Use the CLI JSON commands for complete data during review.",
-            Style::fg(self.palette.muted),
+            Area::new(area.x, area.y, left_w, area.h),
+            "Keyboard",
+            self.palette.cyan,
+            self.palette.panel,
         );
+        let mut row = area.y + 2;
+        for (key, label) in [
+            ("tab / shift-tab", "move between sections"),
+            ("1-7", "jump to a section"),
+            ("j / down", "next finding"),
+            ("k / up", "previous finding"),
+            ("q / esc", "quit"),
+        ] {
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                key,
+                Style::fg(self.palette.cyan).with_bold(),
+            );
+            draw_text(
+                buffer,
+                area.x + 20,
+                row,
+                label,
+                Style::fg(self.palette.white),
+            );
+            row += 2;
+        }
+
+        draw_panel(
+            buffer,
+            Area::new(right_x, area.y, right_w, area.h),
+            "Safety Model",
+            self.palette.green,
+            self.palette.surface,
+        );
+        let mut row = area.y + 2;
+        for line in [
+            "No live config mutation from the TUI.",
+            "Fixes are plan-only review material.",
+            "Evidence is redacted before display.",
+            "Online providers require explicit CLI flags.",
+            "Use report diff/history for follow-up review.",
+        ] {
+            draw_text(buffer, right_x + 2, row, "•", Style::fg(self.palette.green));
+            for wrapped in wrap(line, right_w.saturating_sub(7) as usize)
+                .into_iter()
+                .take(2)
+            {
+                draw_text(
+                    buffer,
+                    right_x + 5,
+                    row,
+                    &wrapped,
+                    Style::fg(self.palette.white),
+                );
+                row += 1;
+            }
+            row += 1;
+        }
     }
 }
 
@@ -1004,7 +1615,17 @@ fn draw_text(buffer: &mut OptimizedBuffer, x: u32, y: u32, text: &str, style: St
     buffer.draw_text(x, y, text, style);
 }
 
-fn view_color(palette: &Palette, idx: usize) -> Rgba {
+fn classification_color(palette: &Palette, classification: Classification) -> Rgba {
+    match classification {
+        Classification::Portable => palette.green,
+        Classification::MachineLocal => palette.amber,
+        Classification::SecretAuth => palette.red,
+        Classification::RuntimeCache | Classification::AppOwned => palette.magenta,
+        Classification::Unknown => palette.muted,
+    }
+}
+
+fn view_nav_color(palette: &Palette, idx: usize) -> Rgba {
     match idx {
         0 => palette.cyan,
         1 => palette.red,
@@ -1012,7 +1633,7 @@ fn view_color(palette: &Palette, idx: usize) -> Rgba {
         3 => palette.amber,
         4 => palette.blue,
         5 => palette.green,
-        _ => palette.muted,
+        _ => palette.white,
     }
 }
 
@@ -1123,6 +1744,23 @@ fn status_label(risk: RiskLevel, total: usize) -> String {
     }
 }
 
+fn severity_filter_label(filter: Option<RiskLevel>) -> &'static str {
+    match filter {
+        Some(risk) => risk_word(risk),
+        None => "all",
+    }
+}
+
+fn search_label(query: &str, active: bool) -> String {
+    if active {
+        format!("/{query}")
+    } else if query.is_empty() {
+        "none".to_string()
+    } else {
+        query.to_string()
+    }
+}
+
 fn count_severity(report: &Report, risk: RiskLevel) -> usize {
     report
         .summary
@@ -1130,6 +1768,14 @@ fn count_severity(report: &Report, risk: RiskLevel) -> usize {
         .get(&risk)
         .copied()
         .unwrap_or_default()
+}
+
+fn responsive_width(total: u32, percent: u32, minimum: u32, reserve: u32) -> u32 {
+    let maximum = total.saturating_sub(reserve);
+    if maximum <= minimum {
+        return maximum.max(1);
+    }
+    (total.saturating_mul(percent) / 100).clamp(minimum, maximum)
 }
 
 fn truncate(text: &str, max: usize) -> String {
@@ -1181,6 +1827,47 @@ fn color(hex: &str) -> Rgba {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use nightward_core::inventory::load_report;
+    use opentui::{CellContent, KeyEvent};
+    use std::path::PathBuf;
+
+    fn fixture_report() -> Report {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../site/public/demo/nightward-sample-scan.json");
+        load_report(path).expect("fixture scan report")
+    }
+
+    fn render_text(app: &TuiState<'_>, width: u32, height: u32) -> String {
+        let mut buffer = OptimizedBuffer::new(width, height);
+        app.render(&mut buffer, width, height);
+        let mut out = String::new();
+        for y in 0..height {
+            for x in 0..width {
+                let ch = buffer
+                    .get(x, y)
+                    .and_then(|cell| match cell.content {
+                        CellContent::Char(ch) => Some(ch),
+                        CellContent::Empty | CellContent::Continuation => Some(' '),
+                        CellContent::Grapheme(_) => None,
+                    })
+                    .unwrap_or(' ');
+                out.push(ch);
+            }
+            out.push('\n');
+        }
+        out
+    }
+
+    fn cell_char(buffer: &OptimizedBuffer, x: u32, y: u32) -> char {
+        buffer
+            .get(x, y)
+            .and_then(|cell| match cell.content {
+                CellContent::Char(ch) => Some(ch),
+                CellContent::Empty | CellContent::Continuation => Some(' '),
+                CellContent::Grapheme(_) => None,
+            })
+            .unwrap_or(' ')
+    }
 
     #[test]
     fn severity_labels_are_short() {
@@ -1192,5 +1879,98 @@ mod tests {
     fn wraps_long_text_without_dropping_words() {
         let lines = wrap("one two three four", 8);
         assert_eq!(lines, vec!["one two", "three", "four"]);
+    }
+
+    #[test]
+    fn renders_all_views_with_real_content_at_common_sizes() {
+        let report = fixture_report();
+        for (width, height) in [(80, 24), (120, 36), (144, 45)] {
+            for (view, view_name) in VIEWS.iter().enumerate() {
+                let mut app = TuiState::new(&report);
+                app.active_view = view;
+                let text = render_text(&app, width, height);
+                assert!(
+                    text.contains(view_name),
+                    "view {} should render its title at {width}x{height}",
+                    view_name
+                );
+                assert!(
+                    !text
+                        .lines()
+                        .skip((height / 2) as usize)
+                        .collect::<String>()
+                        .trim()
+                        .is_empty(),
+                    "lower half should not be blank for {} at {width}x{height}",
+                    view_name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn keyboard_navigation_switches_views_and_findings() {
+        let report = fixture_report();
+        let mut app = TuiState::new(&report);
+
+        assert!(app.handle_event(&Event::Key(KeyEvent::char('2'))));
+        assert_eq!(app.active_view, 1);
+        let first = app.selected_finding;
+        assert!(app.handle_event(&Event::Key(KeyEvent::key(KeyCode::Down))));
+        assert_ne!(app.selected_finding, first);
+        assert!(app.handle_event(&Event::Key(KeyEvent::key(KeyCode::Up))));
+        assert_eq!(app.selected_finding, first);
+        assert!(app.handle_event(&Event::Key(KeyEvent::key(KeyCode::Tab))));
+        assert_eq!(app.active_view, 2);
+        assert!(app.handle_event(&Event::Key(KeyEvent::key(KeyCode::Left))));
+        assert_eq!(app.active_view, 1);
+        assert!(app.handle_event(&Event::Key(KeyEvent::key(KeyCode::Right))));
+        assert_eq!(app.active_view, 2);
+        assert!(!app.handle_event(&Event::Key(KeyEvent::char('q'))));
+    }
+
+    #[test]
+    fn keyboard_filters_findings_and_keeps_detail_aligned() {
+        let report = fixture_report();
+        let mut app = TuiState::new(&report);
+        app.active_view = 1;
+
+        assert_eq!(app.display_findings().len(), report.findings.len());
+        assert!(app.handle_event(&Event::Key(KeyEvent::char('s'))));
+        assert_eq!(app.severity_filter, Some(RiskLevel::Critical));
+        assert!(app.display_findings().len() <= report.findings.len());
+        assert!(app.handle_event(&Event::Key(KeyEvent::char('s'))));
+        assert_eq!(app.severity_filter, Some(RiskLevel::High));
+        assert_eq!(app.display_findings().len(), 1);
+
+        assert!(app.handle_event(&Event::Key(KeyEvent::char('/'))));
+        for ch in "package".chars() {
+            assert!(app.handle_event(&Event::Key(KeyEvent::char(ch))));
+        }
+        assert!(app.handle_event(&Event::Key(KeyEvent::key(KeyCode::Enter))));
+        let filtered = app.display_findings();
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].rule, "mcp_unpinned_package");
+
+        let text = render_text(&app, 120, 36);
+        assert!(text.contains("mcp_unpinned_package"));
+        assert!(!text.contains("mcp_secret_env"));
+
+        assert!(app.handle_event(&Event::Key(KeyEvent::char('x'))));
+        assert_eq!(app.severity_filter, None);
+        assert!(app.search_query.is_empty());
+        assert_eq!(app.display_findings().len(), report.findings.len());
+    }
+
+    #[test]
+    fn compact_risk_bars_do_not_overwrite_panel_borders() {
+        let report = fixture_report();
+        let app = TuiState::new(&report);
+        let mut buffer = OptimizedBuffer::new(80, 24);
+        app.render(&mut buffer, 80, 24);
+
+        for y in 12..=16 {
+            assert_eq!(cell_char(&buffer, 30, y), '│');
+        }
     }
 }

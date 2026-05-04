@@ -776,7 +776,7 @@ fn redact_secret_field_value(value: &str) -> String {
 }
 
 pub fn redact_text(value: &str) -> String {
-    let assignment = Regex::new(r#"(?i)((?:token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)[^"',\s}]+"#)
+    let assignment = Regex::new(r#"(?i)((?:token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)(?:\$\{[A-Za-z_][A-Za-z0-9_]*\}|[^"',\s}]+)"#)
         .expect("valid regex");
     let provider = Regex::new(r"\b(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b")
         .expect("valid regex");
@@ -887,6 +887,16 @@ mod tests {
             .expect("secret header finding");
         assert!(finding.evidence.contains("[REDACTED]"));
         assert!(!finding.evidence.contains(&header_value));
+    }
+
+    #[test]
+    fn redacts_env_reference_assignments_without_trailing_braces() {
+        let key = ["API_", "TOKEN"].concat();
+        let evidence = format!("env.{key}=${{{key}}}");
+
+        let redacted = redact_text(&evidence);
+
+        assert_eq!(redacted, "env.API_TOKEN=[redacted]");
     }
 
     #[test]

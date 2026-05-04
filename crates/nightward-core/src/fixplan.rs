@@ -15,6 +15,7 @@ pub struct Plan {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Summary {
+    pub total: usize,
     pub safe: usize,
     pub review: usize,
     pub blocked: usize,
@@ -55,7 +56,10 @@ pub fn plan(scan: &ScanReport, selector: Selector) -> Plan {
         actions.push(action);
     }
     let groups = group_actions(&actions);
-    let mut summary = Summary::default();
+    let mut summary = Summary {
+        total: actions.len(),
+        ..Summary::default()
+    };
     for action in &actions {
         if action.safe_to_apply {
             summary.safe += 1;
@@ -82,8 +86,8 @@ pub fn markdown(plan: &Plan) -> String {
         "Nightward fix plans are review material only. They do not mutate config.".to_string(),
         String::new(),
         format!(
-            "- Safe: `{}`\n- Review: `{}`\n- Blocked: `{}`",
-            plan.summary.safe, plan.summary.review, plan.summary.blocked
+            "- Total: `{}`\n- Safe: `{}`\n- Review: `{}`\n- Blocked: `{}`",
+            plan.summary.total, plan.summary.safe, plan.summary.review, plan.summary.blocked
         ),
     ];
     for group in &plan.groups {

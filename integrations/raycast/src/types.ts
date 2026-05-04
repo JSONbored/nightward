@@ -200,27 +200,41 @@ export type FixPlan = {
   schema_version?: number;
   generated_at: string;
   summary: {
-    total: number;
+    total?: number;
     safe: number;
     review: number;
     blocked: number;
   };
   groups?: Array<{
     key: string;
-    label: string;
-    rule: string;
+    label?: string;
+    title?: string;
+    rule?: string;
     fix_kind?: FixKind;
     package?: string;
     severity: RiskLevel;
-    status: "safe" | "review" | "blocked";
-    count: number;
-    finding_ids: string[];
+    status?: "safe" | "review" | "blocked";
+    count?: number;
+    finding_count?: number;
+    finding_ids?: string[];
     paths?: string[];
     servers?: string[];
-    summary: string;
+    summary?: string;
     steps?: string[];
+    actions?: string[];
   }>;
-  fixes: Array<{
+  actions?: Array<{
+    id: string;
+    finding_id: string;
+    rule: string;
+    severity: RiskLevel;
+    safe_to_apply: boolean;
+    requires_review: boolean;
+    title: string;
+    steps?: string[];
+    preview?: string;
+  }>;
+  fixes?: Array<{
     finding_id: string;
     tool: string;
     path: string;

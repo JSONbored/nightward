@@ -39,4 +39,4 @@ Manual smoke testing requires the Raycast CLI:
 npm run dev
 ```
 
-Store submission should use `npm run store-check:strict` only after fixture-only metadata screenshots have been captured into `metadata/`.
+Store submission should use `npm run store-check:strict` after fixture-only metadata screenshots have been captured into `metadata/` and before copying the package into a synced `raycast/extensions` fork.

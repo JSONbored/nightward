@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   analysisMarkdown,
   findingMarkdown,
+  fixPlanTotal,
   menuBarStatus,
   menuBarStatusMarkdown,
   maxSeverity,
@@ -18,6 +19,7 @@ import type {
   AnalysisSignal,
   DoctorReport,
   Finding,
+  FixPlan,
   ScanReport,
 } from "../src/types";
 
@@ -46,6 +48,13 @@ test("redacts obvious secret assignments and long token-like values", () => {
   assert.doesNotMatch(output, /abcdefghijklmnopqrstuvwxyz123456/);
   assert.doesNotMatch(output, /eyJhbGci/);
   assert.doesNotMatch(output, /providerTokenValue/);
+});
+
+test("redacts env reference assignments without trailing braces", () => {
+  const keyName = "API_" + "TOKEN";
+  const output = redactText(`env.${keyName}=${"${"}${keyName}}`);
+
+  assert.equal(output, "env.API_TOKEN=[redacted]");
 });
 
 test("finding markdown keeps guidance while avoiding secret values", () => {
@@ -251,6 +260,22 @@ test("report history delta handles missing and equal histories", () => {
     "no change",
   );
   assert.equal(reportHistoryDelta([{ findings: 1 }, { findings: 4 }]), "-3 findings");
+});
+
+test("fix plan totals support rust and legacy shapes", () => {
+  const rustPlan: FixPlan = {
+    generated_at: "2026-05-01T00:00:00Z",
+    summary: { safe: 1, review: 2, blocked: 3 },
+    actions: [],
+  };
+  const explicitPlan: FixPlan = {
+    generated_at: "2026-05-01T00:00:00Z",
+    summary: { total: 9, safe: 1, review: 2, blocked: 3 },
+    actions: [],
+  };
+
+  assert.equal(fixPlanTotal(rustPlan), 6);
+  assert.equal(fixPlanTotal(explicitPlan), 9);
 });
 
 function baseFinding(

@@ -38,7 +38,7 @@ Provider Doctor can select `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-sc
 
 ## Store Submission
 
-The extension is close to store-ready, but submission still needs manual evidence:
+The extension now has fixture-only metadata screenshots for Dashboard, Findings, and Provider Doctor. Before a store PR, rerun the package checks from the extension directory:
 
 ```sh
 cd integrations/raycast
@@ -49,13 +49,13 @@ npm run build
 npm run store-check:strict
 ```
 
-Raycast’s public publishing flow runs from an extension directory with `npm run build` for validation and `npm run publish` to open a PR against [`raycast/extensions`](https://github.com/raycast/extensions). Their [store preparation guide](https://developers.raycast.com/basics/prepare-an-extension-for-store) also expects npm lockfiles, local lint/build validation, clear metadata, and store screenshots. Nightward should not run `npm run publish` until the fixture screenshot set and PR metadata are ready.
+Raycast’s public publishing flow runs from an extension directory with `npm run build` for validation and `npm run publish` to open a PR against [`raycast/extensions`](https://github.com/raycast/extensions). Their [store preparation guide](https://developers.raycast.com/basics/prepare-an-extension-for-store) expects npm lockfiles, local lint/build validation, clear metadata, and 2000x1250 PNG screenshots. Nightward should not run `npm run publish` until the `raycast/extensions` fork is synced and a maintainer is ready to open the draft submission PR.
 
 Before a draft PR:
 
 1. Sync the `raycast/extensions` fork.
 2. Copy the self-contained package into `extensions/nightward`.
-3. Capture at least three fixture-only metadata screenshots from `ray develop`.
+3. Re-capture fixture-only metadata screenshots from `ray develop` if the UI changed.
 4. Confirm icon, README, CHANGELOG, categories, command descriptions, and preferences match the store package.
 5. Run `npm run store-check:strict`, `npm run lint`, `npm run build`, and `npm test`.
 6. Open a draft PR and link Nightward’s GitHub repo, docs, and fixture evidence.
