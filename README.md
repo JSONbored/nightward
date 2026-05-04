@@ -15,6 +15,12 @@ Nightward does not mutate agent configs. It only writes explicit report/SARIF fi
 > [!IMPORTANT]
 > Nightward is local-first by design: no telemetry, no default network calls, no cloud dashboard, and no live agent-config mutation.
 
+## TUI Preview
+
+[![Scrubbed Nightward OpenTUI walkthrough showing overview, findings, analysis, fix plan, inventory, backup, and help screens](site/public/demo/nightward-opentui.gif)](site/guide/tui.md)
+
+The README uses a GIF so the preview renders directly on GitHub. The docs homepage uses the lighter [WebM loop](site/public/demo/tui/nightward-opentui.webm), and the [TUI guide](site/guide/tui.md) keeps the full seven-screen gallery.
+
 ## At A Glance
 
 | Surface | What it does | Default write behavior |
