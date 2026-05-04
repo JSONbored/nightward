@@ -176,6 +176,101 @@
   background: #071014;
 }
 
+.nw-tui-media {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.52fr) minmax(360px, 1fr);
+  align-items: center;
+  gap: 28px;
+  margin: 34px 0 42px;
+}
+
+.nw-tui-media__copy h2 {
+  margin: 6px 0 10px;
+  border: 0;
+  padding: 0;
+  color: var(--vp-c-text-1);
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.nw-tui-media__copy p {
+  margin: 0;
+  color: var(--vp-c-text-2);
+}
+
+.nw-tui-media__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px !important;
+}
+
+.nw-tui-media__links a {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 999px;
+  padding: 7px 12px;
+  color: var(--vp-c-text-1);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.nw-tui-media__links a:hover {
+  border-color: rgba(94, 234, 212, 0.44);
+  color: var(--vp-c-brand-1);
+}
+
+.nw-tui-media__frame {
+  display: block;
+  overflow: hidden;
+  border: 1px solid rgba(94, 234, 212, 0.24);
+  border-radius: 8px;
+  background: #05080b;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.nw-tui-media__video,
+.nw-tui-media__fallback,
+.nw-tui-gallery img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.nw-tui-media__fallback {
+  display: none;
+}
+
+.nw-tui-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+  margin: 22px 0 30px;
+}
+
+.nw-tui-gallery figure {
+  margin: 0;
+}
+
+.nw-tui-gallery img {
+  border: 1px solid rgba(94, 234, 212, 0.22);
+  border-radius: 8px;
+  background: #05080b;
+}
+
+.nw-tui-gallery figcaption {
+  margin-top: 8px;
+  color: var(--vp-c-text-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.nw-tui-gallery figcaption strong {
+  color: var(--vp-c-text-1);
+}
+
 .nw-release-pill {
   display: inline-flex;
   align-items: center;
@@ -232,7 +327,59 @@
     padding: 18px;
   }
 
+  .VPHomeHero .main,
+  .VPHomeHero .heading {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .VPHomeHero .name,
+  .VPHomeHero .text {
+    overflow-wrap: break-word;
+    letter-spacing: 0;
+  }
+
+  .VPHomeHero .text {
+    font-size: 36px;
+    line-height: 1.14;
+  }
+
+  .VPHomeHero .actions {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .VPHomeHero .action {
+    flex: 0 1 auto;
+  }
+
+  .nw-tui-media {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
   .nw-release-pill:not(.nw-release-pill--footer) {
     display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .VPHomeHero .name {
+    font-size: 34px;
+  }
+
+  .VPHomeHero .text {
+    font-size: 31px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nw-tui-media__video {
+    display: none;
+  }
+
+  .nw-tui-media__fallback {
+    display: block;
   }
 }

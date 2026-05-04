@@ -20,6 +20,8 @@ const VIEWS: [&str; 7] = [
     "Backup",
     "Help",
 ];
+const REPO_LABEL: &str = "github.com/JSONbored/nightward";
+const STAR_CTA: &str = "star if useful";
 
 fn initial_view_from_env() -> usize {
     std::env::var("NIGHTWARD_TUI_VIEW")
@@ -43,6 +45,10 @@ fn view_index(value: &str) -> Option<usize> {
 
 fn view_slug(value: &str) -> String {
     value.trim().to_ascii_lowercase().replace(['_', ' '], "-")
+}
+
+fn version() -> &'static str {
+    option_env!("NIGHTWARD_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
 }
 
 pub fn run(report: &Report) -> Result<()> {
@@ -254,20 +260,10 @@ impl<'a> TuiState<'a> {
             buffer,
             Area::new(main_x, 8, main_w, height.saturating_sub(11)),
         );
-        if self.active_view == 0 {
-            draw_hline(
-                buffer,
-                main_x,
-                height.saturating_sub(3),
-                main_w,
-                self.palette.line,
-            );
-        } else {
-            self.render_footer(
-                buffer,
-                Area::new(main_x, height.saturating_sub(3), main_w, 2),
-            );
-        }
+        self.render_footer(
+            buffer,
+            Area::new(main_x, height.saturating_sub(3), main_w, 2),
+        );
     }
 
     fn render_tiny(&self, buffer: &mut OptimizedBuffer, width: u32, height: u32) {
@@ -422,6 +418,25 @@ impl<'a> TuiState<'a> {
     fn render_footer(&self, buffer: &mut OptimizedBuffer, area: Area) {
         draw_hline(buffer, area.x, area.y, area.w, self.palette.line);
         let y = area.y + 1;
+        let metadata = format!("v{} · {REPO_LABEL} · {STAR_CTA}", version());
+        let metadata_w = text_width(&metadata);
+        let metadata_x = if area.w > metadata_w + 2 {
+            Some(area.x + area.w.saturating_sub(metadata_w))
+        } else {
+            None
+        };
+        let hint_limit = metadata_x
+            .map(|x| x.saturating_sub(area.x).saturating_sub(2))
+            .unwrap_or(area.w);
+        self.render_footer_hints(buffer, area.x, y, hint_limit);
+        if let Some(x) = metadata_x {
+            draw_text(buffer, x, y, &metadata, Style::fg(self.palette.muted));
+        }
+    }
+
+    fn render_footer_hints(&self, buffer: &mut OptimizedBuffer, mut x: u32, y: u32, limit: u32) {
+        let compact = limit < 48;
+        let max_x = x + limit;
         let hints = [
             ("tab/1-7", "navigate"),
             ("/", "search"),
@@ -429,12 +444,24 @@ impl<'a> TuiState<'a> {
             ("x", "clear"),
             ("q", "quit"),
         ];
-        let mut x = area.x;
         for (key, label) in hints {
+            let segment_w = text_width(key)
+                + if compact {
+                    2
+                } else {
+                    text_width(label).saturating_add(4)
+                };
+            if x + segment_w > max_x {
+                break;
+            }
             draw_text(buffer, x, y, key, Style::fg(self.palette.cyan).with_bold());
             x += text_width(key) + 1;
-            draw_text(buffer, x, y, label, Style::fg(self.palette.muted));
-            x += text_width(label) + 3;
+            if compact {
+                x += 1;
+            } else {
+                draw_text(buffer, x, y, label, Style::fg(self.palette.muted));
+                x += text_width(label) + 3;
+            }
         }
     }
 
@@ -449,22 +476,34 @@ impl<'a> TuiState<'a> {
         );
         let x = area.x + 1;
         let mut row = area.y + 2;
+        plain_box(
+            buffer,
+            Area::new(x, row, 5, 3),
+            self.palette.cyan,
+            self.palette.sidebar,
+        );
         draw_text(
             buffer,
-            x,
+            x + 2,
+            row + 1,
+            "NW",
+            Style::fg(self.palette.cyan).with_bold(),
+        );
+        draw_text(
+            buffer,
+            x + 7,
             row,
             "NIGHTWARD",
             Style::fg(self.palette.cyan).with_bold(),
         );
-        row += 1;
         draw_text(
             buffer,
-            x,
-            row,
-            "AI config risk console",
+            x + 7,
+            row + 1,
+            "AI risk console",
             Style::fg(self.palette.muted),
         );
-        row += 2;
+        row += 4;
 
         let risk = max_risk(&self.report.findings);
         plain_box(
@@ -2107,6 +2146,54 @@ mod tests {
         assert!(!lines[22].contains("folders"));
         assert!(!lines[22].contains("local-only"));
         assert!(!lines[23].contains("leak"));
+    }
+
+    #[test]
+    fn overview_footer_renders_version_and_repo_cta() {
+        let report = fixture_report();
+        let app = TuiState::new(&report);
+        let text = render_text(&app, 120, 36);
+
+        assert!(text.contains("tab/1-7"));
+        assert!(text.contains(&format!("v{}", version())));
+        assert!(text.contains(REPO_LABEL));
+        assert!(text.contains(STAR_CTA));
+    }
+
+    #[test]
+    fn full_footer_metadata_stays_on_the_footer_row() {
+        let report = fixture_report();
+        let mut app = TuiState::new(&report);
+        app.active_view = 2;
+        let text = render_text(&app, 144, 45);
+        let lines = text.lines().collect::<Vec<_>>();
+
+        assert!(lines[43].contains("navigate"));
+        assert!(lines[43].contains(REPO_LABEL));
+        assert!(!lines[42].contains(REPO_LABEL));
+        assert!(!lines[44].contains(REPO_LABEL));
+    }
+
+    #[test]
+    fn compact_layout_keeps_navigation_instead_of_footer_metadata() {
+        let report = fixture_report();
+        let app = TuiState::new(&report);
+        let text = render_text(&app, 80, 24);
+
+        assert!(text.contains("1 Overview  2 Findings"));
+        assert!(!text.contains(REPO_LABEL));
+        assert!(!text.contains(STAR_CTA));
+    }
+
+    #[test]
+    fn sidebar_renders_terminal_mark_and_short_header() {
+        let report = fixture_report();
+        let app = TuiState::new(&report);
+        let text = render_text(&app, 120, 36);
+
+        assert!(text.contains("NW"));
+        assert!(text.contains("NIGHTWARD"));
+        assert!(text.contains("AI risk console"));
     }
 
     #[test]

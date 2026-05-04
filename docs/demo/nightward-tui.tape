@@ -1,17 +1,19 @@
 Output site/public/demo/nightward-opentui.gif
 
 Set Shell "zsh"
-Set FontSize 18
-Set Width 1440
-Set Height 900
+Set FontSize 16
+Set Width 1320
+Set Height 760
 Set Padding 18
 Set BorderRadius 10
 Set WindowBar Colorful
-Set TypingSpeed 18ms
+Set TypingSpeed 10ms
 Set PlaybackSpeed 1.0
-Set Framerate 20
+Set Framerate 12
 Set Theme "TokyoNight"
 
+Type "stty rows 36 cols 120"
+Enter
 Type "target/debug/nw tui --input site/public/demo/nightward-sample-scan.json"
 Enter
 Sleep 1800ms
@@ -40,3 +42,5 @@ Type "1"
 Sleep 300ms
 Type "x"
 Sleep 1200ms
+Type "q"
+Sleep 200ms

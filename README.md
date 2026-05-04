@@ -34,8 +34,8 @@ The sample below is generated from the committed fixture home at [testdata/homes
 
 - [Scrubbed sample scan JSON](site/public/demo/nightward-sample-scan.json)
 - [Static HTML report](site/public/demo/nightward-sample-report.html)
-- [OpenTUI screenshot](site/public/demo/nightward-opentui.png) and [walkthrough GIF](site/public/demo/nightward-opentui.gif)
-- Regenerate the JSON, HTML report, and report screenshot with `make demo-assets` using Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`. Regenerate TUI media with `vhs docs/demo/nightward-tui.tape` and review every frame before committing.
+- [OpenTUI gallery](site/guide/tui.md), [walkthrough GIF](site/public/demo/nightward-opentui.gif), and [homepage WebM loop](site/public/demo/tui/nightward-opentui.webm)
+- Regenerate the JSON, HTML report, and report screenshot with `make demo-assets` using Chrome, Chromium, Brave, or `NIGHTWARD_CHROME=/path/to/browser`. Regenerate fixture-only TUI media with `make tui-media` and review every frame before committing.
 
 ```mermaid
 flowchart LR
@@ -320,9 +320,7 @@ Keyboard shortcuts:
 - `x`: clear filters
 - `q` or `esc`: quit
 
-Fixture-only OpenTUI demo:
-
-![Nightward OpenTUI fixture dashboard](site/public/demo/nightward-opentui.png)
+Fixture-only OpenTUI demo: [TUI gallery](site/guide/tui.md), [dashboard PNG](site/public/demo/tui/overview.png), [walkthrough GIF](site/public/demo/nightward-opentui.gif), and [homepage WebM loop](site/public/demo/tui/nightward-opentui.webm).
 
 ## MCP Server
 

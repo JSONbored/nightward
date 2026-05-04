@@ -13,7 +13,7 @@ CARGO_AUDIT_VERSION ?= 0.22.1
 CARGO_DENY_VERSION ?= 0.19.4
 CARGO_LLVM_COV_VERSION ?= 0.8.5
 
-.PHONY: doctor install-dev-tools test test-fast test-security test-ux test-release test-local test-prepush test-release-install fmt clippy cargo-test cargo-nextest cargo-doc cargo-audit cargo-deny cargo-llvm-cov coverage-check test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test gitleaks raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-store-check raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify docs-reference docs-reference-check docs-freshness docs-qa site-install site-audit site-build site-verify demo-assets release-snapshot verify build install-local clean-reports
+.PHONY: doctor install-dev-tools test test-fast test-security test-ux test-release test-local test-prepush test-release-install fmt clippy cargo-test cargo-nextest cargo-doc cargo-audit cargo-deny cargo-llvm-cov coverage-check test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test gitleaks raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-store-check raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify docs-reference docs-reference-check docs-freshness docs-qa site-install site-audit site-build site-verify demo-assets tui-media release-snapshot verify build install-local clean-reports
 
 doctor:
 	bash scripts/dev-doctor.sh
@@ -152,6 +152,9 @@ site-verify: docs-qa site-install site-audit site-build
 
 demo-assets:
 	node scripts/generate-demo-assets.mjs
+
+tui-media:
+	node scripts/generate-tui-media.mjs
 
 release-snapshot: build
 	bash scripts/release-snapshot-rust.sh

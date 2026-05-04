@@ -163,7 +163,7 @@ The launcher must remain dependency-light, avoid `postinstall`, and verify downl
 Most repository checks are centralized behind `make verify` and the suite aliases above. The remaining loose commands are intentionally not part of the default gate because they require a browser, a published release, or manual UI evidence:
 
 - `make demo-assets` regenerates fixture-only sample JSON, HTML, report screenshot, and social preview assets. It requires Chrome, Chromium, Brave, or `NIGHTWARD_CHROME`.
-- Fixture-only TUI media should be regenerated from the embedded Rust TUI after visual gates pass. Use `nw tui --input site/public/demo/nightward-sample-scan.json` so screenshots render from scrubbed report JSON instead of live HOME data.
+- `make tui-media` regenerates fixture-only TUI PNGs, the walkthrough GIF, and the homepage WebM loop from the embedded Rust TUI. It requires `vhs` and `ffmpeg`, uses `site/public/demo/nightward-sample-scan.json`, and must not be run against live HOME data.
 - `make test-release-install VERSION=<version>` verifies a published GitHub/npm release after artifacts exist.
 - `npm run dev` under `integrations/raycast` is the local Raycast UI smoke path and should be paired with fixture-only evidence in `docs/screenshots.md`.
 
