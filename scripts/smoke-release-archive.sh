@@ -29,9 +29,10 @@ cosign verify-blob \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.txt
 sha256sum -c checksums.txt --ignore-missing
-tar -xzf "${asset}"
+mkdir -p extracted
+tar -xzf "${asset}" -C extracted
 
-cd "nightward_${version}_linux_amd64"
+cd extracted
 ./nightward --version | grep -Fx "${version}"
 ./nw --version | grep -Fx "${version}"
 

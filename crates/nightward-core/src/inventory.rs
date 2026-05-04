@@ -286,6 +286,7 @@ fn inspect_config(report: &mut Report, tool: &str, path: &Path) {
                 FixKind::ManualReview,
                 None,
             );
+            return;
         }
         if meta.len() > MAX_CONFIG_BYTES {
             push_finding(
@@ -972,5 +973,27 @@ args = ["./tools/notes-mcp.js"]
             .any(|finding| finding.rule == "mcp_server_review"
                 && finding.severity == RiskLevel::Info
                 && finding.server == "notes"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_workspace_configs_are_not_followed() {
+        use std::os::unix::fs::symlink;
+
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target.json");
+        fs::write(
+            &target,
+            r#"{"mcpServers":{"demo":{"command":"npx","args":["@modelcontextprotocol/server-filesystem"]}}}"#,
+        )
+        .unwrap();
+        symlink(&target, dir.path().join(".mcp.json")).unwrap();
+
+        let report = scan_workspace(dir.path()).unwrap();
+        let rules: BTreeSet<_> = report.findings.iter().map(|f| f.rule.as_str()).collect();
+
+        assert!(rules.contains("config_symlink"));
+        assert!(!rules.contains("mcp_unpinned_package"));
+        assert!(!rules.contains("mcp_server_review"));
     }
 }

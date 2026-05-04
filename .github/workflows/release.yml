@@ -41,12 +41,23 @@ jobs:
           - runner: ubuntu-latest
             os: linux
             target: amd64
+            rust_target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            os: linux
+            target: arm64
+            rust_target: aarch64-unknown-linux-gnu
+          - runner: macos-15-intel
+            os: darwin
+            target: amd64
+            rust_target: x86_64-apple-darwin
           - runner: macos-latest
             os: darwin
             target: arm64
+            rust_target: aarch64-apple-darwin
           - runner: windows-latest
             os: windows
             target: amd64
+            rust_target: x86_64-pc-windows-msvc
     permissions:
       contents: read
     steps:
@@ -61,12 +72,17 @@ jobs:
         run: |
           rustup toolchain install 1.85.0 --profile minimal
           rustup default 1.85.0
+          rustup target add "${{ matrix.rust_target }}"
 
       - name: Build binaries
         shell: bash
         env:
-          NIGHTWARD_VERSION: ${{ github.ref_name }}
-        run: cargo build --release --bins
+          REF_NAME: ${{ github.ref_name }}
+          RUST_TARGET: ${{ matrix.rust_target }}
+        run: |
+          set -euo pipefail
+          version="${REF_NAME#v}"
+          NIGHTWARD_VERSION="${version}" cargo build --release --bins --target "${RUST_TARGET}"
 
       - name: Package Unix archive
         if: ${{ matrix.os != 'windows' }}
@@ -75,14 +91,16 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           OS_NAME: ${{ matrix.os }}
           ARCH_NAME: ${{ matrix.target }}
+          RUST_TARGET: ${{ matrix.rust_target }}
         run: |
           set -euo pipefail
           version="${REF_NAME#v}"
           name="nightward_${version}_${OS_NAME}_${ARCH_NAME}"
+          build_dir="target/${RUST_TARGET}/release"
           mkdir -p "dist/${name}"
-          cp target/release/nightward target/release/nw "dist/${name}/"
+          cp "${build_dir}/nightward" "${build_dir}/nw" "dist/${name}/"
           chmod 0755 "dist/${name}/nightward" "dist/${name}/nw"
-          tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+          (cd "dist/${name}" && tar -czf "../${name}.tar.gz" nightward nw)
           cat > "dist/${name}.sbom.json" <<JSON
           {
             "schema_version": 1,
@@ -100,12 +118,14 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           OS_NAME: ${{ matrix.os }}
           ARCH_NAME: ${{ matrix.target }}
+          RUST_TARGET: ${{ matrix.rust_target }}
         run: |
           $version = $env:REF_NAME.TrimStart("v")
           $name = "nightward_${version}_${env:OS_NAME}_${env:ARCH_NAME}"
+          $buildDir = "target/$env:RUST_TARGET/release"
           New-Item -ItemType Directory -Force -Path "dist/$name"
-          Copy-Item "target/release/nightward.exe" "dist/$name/nightward.exe"
-          Copy-Item "target/release/nw.exe" "dist/$name/nw.exe"
+          Copy-Item "$buildDir/nightward.exe" "dist/$name/nightward.exe"
+          Copy-Item "$buildDir/nw.exe" "dist/$name/nw.exe"
           Compress-Archive -Path "dist/$name/*" -DestinationPath "dist/$name.zip" -Force
           @"
           {
