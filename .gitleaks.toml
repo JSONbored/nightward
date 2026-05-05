@@ -1,0 +1,9 @@
+title = "Nightward gitleaks config"
+
+[[allowlists]]
+description = "Synthetic provider parser fixtures with fake redacted values"
+paths = [
+  '''^testdata/providers/gitleaks\.json$''',
+  '''^testdata/providers/trufflehog\.jsonl$''',
+  '''^testdata/providers/trivy\.json$''',
+]

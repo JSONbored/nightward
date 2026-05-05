@@ -60,6 +60,21 @@ test("redacts env reference assignments without trailing braces", () => {
   assert.equal(output, "env.API_TOKEN=[redacted]");
 });
 
+test("redacts basic auth and sensitive flag values", () => {
+  const basic = "dXNlcjpwYXNz";
+  const apiKey = "sk-" + "live-validation-123456789";
+  const output = redactText(
+    `Authorization: Basic ${basic} --api-key ${apiKey} --profile dev`,
+  );
+
+  assert.equal(
+    output,
+    "Authorization: [redacted] --api-key [redacted] --profile dev",
+  );
+  assert.doesNotMatch(output, /dXNlcjpwYXNz/);
+  assert.doesNotMatch(output, /live-validation/);
+});
+
 test("finding markdown keeps guidance while avoiding secret values", () => {
   const keyName = "API_" + "KEY";
   const token = "sk-" + "1234567890abcdef";

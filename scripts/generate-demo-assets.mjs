@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { execFileSync, spawn } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir, userInfo } from "node:os";
@@ -146,11 +147,30 @@ function deterministicReport(rawReport) {
   report.hostname = publicHost;
   report.home = publicHome;
   for (const item of report.items || []) {
+    item.id = stableId(["item", item.tool || "", item.path || ""]);
     if (item.mod_time) {
       item.mod_time = generatedAt;
     }
   }
+  for (const finding of report.findings || []) {
+    finding.id = `${finding.rule}-${stableId([
+      finding.rule || "",
+      finding.tool || "",
+      finding.path || "",
+      finding.server || "",
+      finding.evidence || "",
+    ])}`;
+  }
   return report;
+}
+
+function stableId(parts) {
+  const hash = createHash("sha256");
+  for (const part of parts) {
+    hash.update(String(part));
+    hash.update("\0");
+  }
+  return hash.digest("hex").slice(0, 12);
 }
 
 function findChrome() {

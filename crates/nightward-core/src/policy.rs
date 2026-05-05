@@ -453,6 +453,21 @@ mod tests {
     }
 
     #[test]
+    fn default_policy_blocks_high_provider_execution_failures() {
+        let scan = ScanReport::empty("home".to_string(), String::new(), "home".to_string());
+        let mut analysis = analysis_report_with_signal(RiskLevel::High);
+        analysis.summary.provider_warnings = 1;
+        analysis.signals[0].provider = "gitleaks".to_string();
+        analysis.signals[0].rule = "gitleaks/provider_execution_failed".to_string();
+        let config = PolicyConfig::default();
+
+        let report = check(&scan, &config, Some(&analysis));
+
+        assert!(!report.passed);
+        assert_eq!(report.analysis_violation_count, 1);
+    }
+
+    #[test]
     fn check_ignores_rules_by_rule_key() {
         let mut scan = ScanReport::empty("home".to_string(), String::new(), "home".to_string());
         scan.findings

@@ -324,7 +324,7 @@ fn append_provider_signals(out: &mut Report, scan: &ScanReport, options: &Option
                         path: root.display().to_string(),
                         message: format!("{provider} provider execution failed."),
                         evidence: redact_text(&error.to_string()),
-                        severity: RiskLevel::Low,
+                        severity: RiskLevel::High,
                         category: SignalCategory::Unknown,
                     },
                 );

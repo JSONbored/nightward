@@ -14,6 +14,11 @@ if "${repo_root}/scripts/verify-npm-release.sh" "v0.1.0" >/dev/null 2>&1; then
   echo "expected verify-npm-release.sh to reject v-prefixed npm version" >&2
   exit 1
 fi
+grep -q "npm install --global --prefix" "${repo_root}/scripts/verify-npm-release.sh"
+if grep -q "ln -s" "${repo_root}/scripts/verify-npm-release.sh"; then
+  echo "expected verify-npm-release.sh to use npm-created bin links" >&2
+  exit 1
+fi
 
 if "${repo_root}/scripts/validate-release-ref.sh" "latest" >/dev/null 2>&1; then
   echo "expected validate-release-ref.sh to reject non-semver tag" >&2

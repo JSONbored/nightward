@@ -1,15 +1,19 @@
 use crate::rules;
 use crate::{AdapterStatus, Classification, Finding, FixKind, Item, PatchHint, Report, RiskLevel};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::Read;
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 const MAX_CONFIG_BYTES: u64 = 2 * 1024 * 1024;
+const MAX_REPORT_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
 struct Adapter {
@@ -163,9 +167,48 @@ pub fn scan_workspace(workspace: impl AsRef<Path>) -> Result<Report> {
 }
 
 pub fn load_report(path: impl AsRef<Path>) -> Result<Report> {
-    let text = fs::read_to_string(path.as_ref())
+    let text = read_bounded_regular_file(path.as_ref(), MAX_REPORT_BYTES)
         .with_context(|| format!("read {}", path.as_ref().display()))?;
     serde_json::from_str(&text).context("parse Nightward report JSON")
+}
+
+pub fn load_report_summary(path: impl AsRef<Path>) -> Result<usize> {
+    let text = read_bounded_regular_file(path.as_ref(), MAX_REPORT_BYTES)
+        .with_context(|| format!("read {}", path.as_ref().display()))?;
+    let value: Value = serde_json::from_str(&text).context("parse Nightward report JSON")?;
+    Ok(value
+        .get("summary")
+        .and_then(|summary| summary.get("total_findings"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0) as usize)
+}
+
+fn read_bounded_regular_file(path: &Path, max_bytes: u64) -> Result<String> {
+    let meta = fs::symlink_metadata(path).with_context(|| format!("stat {}", path.display()))?;
+    if !meta.file_type().is_file() {
+        return Err(anyhow!("{} is not a regular file", path.display()));
+    }
+    if meta.file_type().is_symlink() {
+        return Err(anyhow!("{} is a symlink", path.display()));
+    }
+    if meta.len() > max_bytes {
+        return Err(anyhow!(
+            "{} exceeds {} byte report size cap",
+            path.display(),
+            max_bytes
+        ));
+    }
+    let mut file = fs::File::open(path)?;
+    let mut bytes = Vec::with_capacity(meta.len() as usize);
+    file.by_ref().take(max_bytes + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > max_bytes {
+        return Err(anyhow!(
+            "{} exceeds {} byte report size cap",
+            path.display(),
+            max_bytes
+        ));
+    }
+    String::from_utf8(bytes).context("report is not valid UTF-8")
 }
 
 pub fn write_report(path: impl AsRef<Path>, report: &Report) -> Result<()> {
@@ -432,6 +475,16 @@ fn inspect_server(report: &mut Report, tool: &str, path: &Path, server: &str, co
     }
 
     if let Some(package) = unpinned_package(&command, &args) {
+        let patch_hint = package.map(|package| PatchHint {
+            kind: Some(FixKind::PinPackage),
+            package,
+            env_key: String::new(),
+            header_key: String::new(),
+            inline_secret: false,
+            direct_command: String::new(),
+            direct_args: Vec::new(),
+            replacement: String::new(),
+        });
         push_finding(
             report,
             tool,
@@ -446,16 +499,7 @@ fn inspect_server(report: &mut Report, tool: &str, path: &Path, server: &str, co
             &evidence,
             "Replace unversioned or @latest package references with a reviewed explicit version.",
             FixKind::PinPackage,
-            Some(PatchHint {
-                kind: Some(FixKind::PinPackage),
-                package,
-                env_key: String::new(),
-                header_key: String::new(),
-                inline_secret: false,
-                direct_command: String::new(),
-                direct_args: Vec::new(),
-                replacement: String::new(),
-            }),
+            patch_hint,
         );
     }
 
@@ -711,7 +755,7 @@ fn object_entries(config: &Value, keys: &[&str]) -> Vec<(String, String)> {
     out
 }
 
-fn unpinned_package(command: &str, args: &[String]) -> Option<String> {
+fn unpinned_package(command: &str, args: &[String]) -> Option<Option<String>> {
     let command_base = command.rsplit('/').next().unwrap_or(command);
     if !matches!(
         command_base,
@@ -726,9 +770,31 @@ fn unpinned_package(command: &str, args: &[String]) -> Option<String> {
         if package_has_version_pin(arg) {
             return None;
         }
-        return Some(arg.clone());
+        return Some(safe_package_label(arg));
     }
-    Some(command.to_string())
+    Some(safe_package_label(command_base))
+}
+
+fn safe_package_label(value: &str) -> Option<String> {
+    let package = value.trim();
+    if package.is_empty()
+        || package.len() > 128
+        || package.contains('=')
+        || package.contains("://")
+        || package.contains('?')
+        || package.contains('#')
+        || package.starts_with('$')
+        || secret_key(package)
+        || secret_value(package)
+        || looks_opaque_provider_token(package)
+    {
+        return None;
+    }
+    let package_re = Regex::new(
+        r"^(?:@[A-Za-z0-9._~-]+/[A-Za-z0-9._~-]+|[A-Za-z0-9._~-]+)(?:/[A-Za-z0-9._~-]+)?$",
+    )
+    .expect("valid regex");
+    package_re.is_match(package).then(|| package.to_string())
 }
 
 fn package_has_version_pin(package: &str) -> bool {
@@ -757,9 +823,10 @@ fn secret_key(key: &str) -> bool {
 }
 
 fn secret_value(value: &str) -> bool {
-    Regex::new(r"\b(sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,})\b")
+    Regex::new(r"\b(sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b")
         .expect("valid regex")
         .is_match(value)
+        || looks_opaque_provider_token(value)
 }
 
 fn env_reference(value: &str) -> bool {
@@ -790,20 +857,129 @@ pub fn redact_text(value: &str) -> String {
         r#"(?i)([\w.-]*{sensitive_key}[\w.-]*\s*[:=]\s*)(?:\$\{{[A-Za-z_][A-Za-z0-9_]*\}}|[^\s\r\n,}}]+(?:\s+[^\s\r\n,}}]+)?)"#
     ))
         .expect("valid regex");
-    let provider = Regex::new(r"(?i)\b(?:Bearer\s+[-A-Za-z0-9._~+/=]{8,}|sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b")
+    let sensitive_flag = Regex::new(&format!(
+        r#"(?i)(--?[\w.-]*{sensitive_key}[\w.-]*)(?:=|\s+)(?:\$\{{[A-Za-z_][A-Za-z0-9_]*\}}|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s\r\n,}}]+)"#
+    ))
+    .expect("valid regex");
+    let provider = Regex::new(r"(?i)\b(?:(?:Basic|Bearer)\s+[-A-Za-z0-9._~+/=]{8,}|sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b")
         .expect("valid regex");
     let redacted = double_quoted.replace_all(value, "$1[redacted]$2");
     let redacted = single_quoted.replace_all(&redacted, "$1[redacted]$2");
     let redacted = provider.replace_all(&redacted, "[redacted]");
-    assignment
+    let redacted = sensitive_flag.replace_all(&redacted, "$1 [redacted]");
+    let redacted = assignment
         .replace_all(&redacted, "$1[redacted]")
-        .to_string()
+        .to_string();
+    redacted
+        .split_inclusive(char::is_whitespace)
+        .map(redact_opaque_token_part)
+        .collect()
 }
 
 fn local_endpoint(value: &str) -> bool {
-    Regex::new(r"(?i)\b(localhost|127\.0\.0\.1|0\.0\.0\.0|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)\b")
-        .expect("valid regex")
-        .is_match(value)
+    value
+        .split(|ch: char| ch.is_whitespace() || matches!(ch, '"' | '\'' | ',' | ';'))
+        .any(token_references_local_endpoint)
+}
+
+fn token_references_local_endpoint(token: &str) -> bool {
+    let token = token.trim_matches(|ch: char| matches!(ch, '"' | '\'' | '`' | ',' | ';'));
+    if token.is_empty() {
+        return false;
+    }
+    let host = host_candidate(token);
+    is_local_host(&host)
+}
+
+fn host_candidate(token: &str) -> String {
+    let mut candidate = token;
+    if let Some(index) = candidate.find("://") {
+        candidate = &candidate[index + 3..];
+    } else if let Some(index) = candidate.rfind('=') {
+        candidate = &candidate[index + 1..];
+    }
+    if let Some(index) = candidate.rfind('@') {
+        candidate = &candidate[index + 1..];
+    }
+    if let Some(stripped) = candidate.strip_prefix('[') {
+        return stripped.split(']').next().unwrap_or_default().to_string();
+    }
+    candidate
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or_default()
+        .split(':')
+        .next()
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn is_local_host(host: &str) -> bool {
+    let host = host
+        .trim_matches(|ch| matches!(ch, '[' | ']' | '"' | '\'' | '`' | ',' | ';'))
+        .trim_end_matches('.')
+        .to_ascii_lowercase()
+        .replace("%25", "%");
+    let host_without_zone = host.split('%').next().unwrap_or(&host);
+    if host_without_zone == "localhost"
+        || host_without_zone == "0.0.0.0"
+        || host_without_zone.ends_with(".localhost")
+        || host_without_zone.ends_with(".local")
+    {
+        return true;
+    }
+    let Ok(ip) = IpAddr::from_str(host_without_zone) else {
+        return false;
+    };
+    match ip {
+        IpAddr::V4(ip) => ip.is_loopback() || ip.is_private() || ip.is_unspecified(),
+        IpAddr::V6(ip) => {
+            ip.is_loopback()
+                || ip.is_unspecified()
+                || ip.is_unicast_link_local()
+                || (ip.segments()[0] & 0xfe00) == 0xfc00
+        }
+    }
+}
+
+fn redact_opaque_token_part(part: &str) -> String {
+    let trailing_ws_len = part
+        .chars()
+        .rev()
+        .take_while(|ch| ch.is_whitespace())
+        .map(char::len_utf8)
+        .sum::<usize>();
+    let (token, whitespace) = part.split_at(part.len().saturating_sub(trailing_ws_len));
+    if looks_opaque_provider_token(token) {
+        format!("[redacted]{whitespace}")
+    } else if let Some((key, value)) = token.split_once('=') {
+        if looks_opaque_provider_token(value) {
+            format!("{key}=[redacted]{whitespace}")
+        } else {
+            part.to_string()
+        }
+    } else {
+        part.to_string()
+    }
+}
+
+fn looks_opaque_provider_token(value: &str) -> bool {
+    let trimmed = value.trim_matches(|ch: char| {
+        matches!(
+            ch,
+            '"' | '\'' | '`' | ',' | '.' | ':' | ';' | ')' | '(' | '[' | ']'
+        )
+    });
+    trimmed.len() >= 36
+        && !trimmed.contains('/')
+        && !trimmed.contains('\\')
+        && !trimmed.contains('@')
+        && !trimmed.contains('.')
+        && trimmed
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+        && trimmed.chars().any(|ch| ch.is_ascii_digit())
+        && trimmed.chars().any(|ch| ch.is_ascii_alphabetic())
 }
 
 fn broad_filesystem(args: &[String]) -> bool {
@@ -940,6 +1116,79 @@ mod tests {
 
         assert_eq!(redacted, r#"{"Authorization":"[redacted]"}"#);
         assert!(!redacted.contains(&token));
+    }
+
+    #[test]
+    fn redacts_sensitive_flag_values_in_space_delimited_args() {
+        let token = ["sk-", "live", "-validation-123456789"].concat();
+        let redacted = redact_text(&format!("--api-key {token} --profile dev"));
+
+        assert_eq!(redacted, "--api-key [redacted] --profile dev");
+        assert!(!redacted.contains(&token));
+    }
+
+    #[test]
+    fn redacts_sensitive_flag_values_in_equals_args() {
+        let token = ["ghp_", "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"].concat();
+        let redacted = redact_text(&format!("--authorization={token} --profile dev"));
+
+        assert_eq!(redacted, "--authorization [redacted] --profile dev");
+        assert!(!redacted.contains(&token));
+    }
+
+    #[test]
+    fn redacts_opaque_provider_tokens_without_hiding_local_paths() {
+        let token = ["provider", "Token", "Value1234567890abcdefABCDEF"].concat();
+        let path = "/Users/example/Library/Application Support/Claude/claude_desktop_config.json";
+        let redacted = redact_text(&format!("opaque={token} path={path}"));
+
+        assert!(!redacted.contains(&token));
+        assert!(redacted.contains(path));
+    }
+
+    #[test]
+    fn unpinned_package_does_not_surface_secret_like_package_specs() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            dir.path().join(".mcp.json"),
+            r#"{"mcpServers":{"demo":{"command":"npx","args":["--package","api_key=super-secret-token-12345"]}}}"#,
+        )
+        .unwrap();
+
+        let report = scan_workspace(dir.path()).unwrap();
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.rule == "mcp_unpinned_package")
+            .expect("unpinned package finding");
+
+        assert!(finding.patch_hint.is_none());
+        assert!(!finding.evidence.contains("super-secret-token-12345"));
+        assert!(!finding.fix_summary.contains("super-secret-token-12345"));
+        assert!(finding
+            .fix_steps
+            .iter()
+            .all(|step| !step.contains("super-secret-token-12345")));
+    }
+
+    #[test]
+    fn local_endpoint_detects_root_dot_and_scoped_ipv6_urls() {
+        assert!(local_endpoint("url=http://localhost.:8787/mcp"));
+        assert!(local_endpoint("url=http://user:pass@localhost.:8787/mcp"));
+        assert!(local_endpoint("url=http://[fe80::1%25en0]:8787/mcp"));
+        assert!(local_endpoint("url=http://[::1]:8787/mcp"));
+    }
+
+    #[test]
+    fn load_report_rejects_oversized_regular_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("huge.json");
+        let file = fs::File::create(&path).unwrap();
+        file.set_len(MAX_REPORT_BYTES + 1).unwrap();
+
+        let error = load_report(&path).expect_err("oversized report should fail");
+
+        assert!(format!("{error:#}").contains("report size cap"));
     }
 
     #[test]

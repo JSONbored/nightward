@@ -1,3 +1,4 @@
+use crate::inventory::redact_text;
 use crate::{Finding, FixKind, Report as ScanReport, RiskLevel};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -154,11 +155,15 @@ fn action_from_finding(finding: &Finding) -> Action {
         steps: if finding.fix_steps.is_empty() {
             vec![
                 "Inspect the redacted finding evidence.".to_string(),
-                finding.recommended_action.clone(),
+                redact_text(&finding.recommended_action),
                 "Re-run Nightward and compare the next report.".to_string(),
             ]
         } else {
-            finding.fix_steps.clone()
+            finding
+                .fix_steps
+                .iter()
+                .map(|step| redact_text(step))
+                .collect()
         },
         preview,
     }
@@ -166,10 +171,10 @@ fn action_from_finding(finding: &Finding) -> Action {
 
 fn preview_for(finding: &Finding) -> String {
     let Some(hint) = &finding.patch_hint else {
-        return format!(
+        return redact_text(&format!(
             "# plan-only review\n# {}\n# {}",
             finding.path, finding.recommended_action
-        );
+        ));
     };
     match hint.kind {
         Some(FixKind::ExternalizeSecret) => {
@@ -178,19 +183,22 @@ fn preview_for(finding: &Finding) -> String {
             } else {
                 &hint.env_key
             };
-            format!(
+            redact_text(&format!(
                 "- inline secret value in {}\n+ external reference to ${}\n# review required before editing",
                 finding.path, key
-            )
+            ))
         }
-        Some(FixKind::PinPackage) => format!(
+        Some(FixKind::PinPackage) if !hint.package.is_empty() => redact_text(&format!(
             "- {}\n+ {}@<reviewed-version>\n# choose and review an explicit version",
             hint.package, hint.package
-        ),
+        )),
+        Some(FixKind::PinPackage) => {
+            "# choose and review an explicit package version manually".to_string()
+        }
         Some(FixKind::NarrowFilesystem) => {
             "- broad filesystem path\n+ <specific-reviewed-path>".to_string()
         }
-        _ => format!("# review required for {}", finding.path),
+        _ => redact_text(&format!("# review required for {}", finding.path)),
     }
 }
 

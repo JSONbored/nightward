@@ -8,6 +8,7 @@ use std::env;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::thread;
 use std::time::Duration;
 use wait_timeout::ChildExt;
 
@@ -161,30 +162,26 @@ pub fn run_provider(name: &str, root: &Path) -> Result<Vec<ProviderFinding>> {
         .stderr(Stdio::piped())
         .spawn()
         .with_context(|| format!("spawn provider {name}"))?;
+    let stdout_handle = child
+        .stdout
+        .take()
+        .map(|stream| thread::spawn(move || read_stream_capped(stream, stdout_cap)));
+    let stderr_handle = child
+        .stderr
+        .take()
+        .map(|stream| thread::spawn(move || read_stream_capped(stream, stderr_cap)));
     let status = match child.wait_timeout(timeout)? {
         Some(status) => status,
         None => {
             let _ = child.kill();
             let _ = child.wait();
+            let _ = join_stream(stdout_handle);
+            let _ = join_stream(stderr_handle);
             return Err(anyhow!("provider timed out after {:?}", timeout));
         }
     };
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    if let Some(mut stream) = child.stdout.take() {
-        let _ = stream
-            .by_ref()
-            .take(stdout_cap as u64 + 1)
-            .read_to_end(&mut stdout);
-    }
-    if let Some(mut stream) = child.stderr.take() {
-        let _ = stream
-            .by_ref()
-            .take(stderr_cap as u64 + 1)
-            .read_to_end(&mut stderr);
-    }
-    let (stdout, stdout_truncated) = capped_string(stdout, stdout_cap);
-    let (stderr, _) = capped_string(stderr, stderr_cap);
+    let (stdout, stdout_truncated) = join_stream(stdout_handle);
+    let (stderr, _) = join_stream(stderr_handle);
     if stdout_truncated {
         return Err(anyhow!("provider stdout exceeded {stdout_cap} byte cap"));
     }
@@ -192,6 +189,34 @@ pub fn run_provider(name: &str, root: &Path) -> Result<Vec<ProviderFinding>> {
         return Err(anyhow!("{}: {}", status, first_line(&stderr)));
     }
     parse_provider_output(name, root, &stdout)
+}
+
+fn read_stream_capped(mut stream: impl Read, cap: usize) -> (String, bool) {
+    let mut out = Vec::with_capacity(cap.min(64 * 1024));
+    let mut truncated = false;
+    let mut buf = [0_u8; 8192];
+    loop {
+        let Ok(read) = stream.read(&mut buf) else {
+            break;
+        };
+        if read == 0 {
+            break;
+        }
+        let remaining = cap.saturating_sub(out.len());
+        if remaining > 0 {
+            out.extend_from_slice(&buf[..read.min(remaining)]);
+        }
+        if read > remaining {
+            truncated = true;
+        }
+    }
+    (redact_text(&String::from_utf8_lossy(&out)), truncated)
+}
+
+fn join_stream(handle: Option<thread::JoinHandle<(String, bool)>>) -> (String, bool) {
+    handle
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default()
 }
 
 pub fn parse_provider_output(
@@ -617,15 +642,6 @@ fn provider_stderr_cap() -> usize {
         .ok()
         .and_then(|value| value.parse::<usize>().ok())
         .unwrap_or(DEFAULT_STDERR_CAP)
-}
-
-fn capped_string(bytes: Vec<u8>, cap: usize) -> (String, bool) {
-    let truncated = bytes.len() > cap;
-    let mut value = String::from_utf8_lossy(&bytes[..bytes.len().min(cap)]).to_string();
-    if truncated {
-        value.push_str("\n[provider output truncated]");
-    }
-    (redact_text(&value), truncated)
 }
 
 fn first_line(value: &str) -> String {

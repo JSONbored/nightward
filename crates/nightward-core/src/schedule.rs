@@ -1,3 +1,4 @@
+use crate::inventory::load_report_summary;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use std::fs;
@@ -76,22 +77,21 @@ fn history(dir: &Path) -> Vec<ReportHistoryEntry> {
         if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
             continue;
         }
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if !file_type.is_file() || file_type.is_symlink() {
+            continue;
+        }
         let Ok(meta) = entry.metadata() else {
             continue;
         };
         let Ok(modified) = meta.modified() else {
             continue;
         };
-        let findings = fs::read_to_string(&path)
-            .ok()
-            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
-            .and_then(|value| {
-                value
-                    .get("summary")
-                    .and_then(|summary| summary.get("total_findings"))
-                    .and_then(serde_json::Value::as_u64)
-            })
-            .unwrap_or(0) as usize;
+        let Ok(findings) = load_report_summary(&path) else {
+            continue;
+        };
         out.push(ReportHistoryEntry {
             report_name: entry.file_name().to_string_lossy().to_string(),
             path: path.display().to_string(),
@@ -100,4 +100,51 @@ fn history(dir: &Path) -> Vec<ReportHistoryEntry> {
         });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn history_skips_oversized_reports_before_counting_findings() {
+        let home = tempfile::tempdir().expect("temp home");
+        let dir = report_dir(home.path());
+        fs::create_dir_all(&dir).expect("report dir");
+        fs::write(
+            dir.join("small.json"),
+            r#"{"summary":{"total_findings":3}}"#,
+        )
+        .expect("small report");
+        let huge = fs::File::create(dir.join("huge.json")).expect("huge report");
+        huge.set_len(17 * 1024 * 1024).expect("set len");
+
+        let status = status(home.path());
+
+        assert_eq!(status.history.len(), 1);
+        assert_eq!(status.history[0].report_name, "small.json");
+        assert_eq!(status.history[0].findings, 3);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn history_skips_json_fifos() {
+        use std::os::unix::fs::FileTypeExt;
+        use std::process::Command;
+
+        let home = tempfile::tempdir().expect("temp home");
+        let dir = report_dir(home.path());
+        fs::create_dir_all(&dir).expect("report dir");
+        let fifo = dir.join("pipe.json");
+        let mkfifo_status = Command::new("mkfifo").arg(&fifo).status().expect("mkfifo");
+        assert!(mkfifo_status.success());
+        assert!(fs::symlink_metadata(&fifo)
+            .expect("fifo metadata")
+            .file_type()
+            .is_fifo());
+
+        let status = status(home.path());
+
+        assert!(status.history.is_empty());
+    }
 }

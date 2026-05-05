@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { createWriteStream, existsSync, realpathSync } from "node:fs";
-import { chmod, mkdir, readFile, rm } from "node:fs/promises";
+import { chmod, copyFile, lstat, mkdir, readFile, rm } from "node:fs/promises";
 import { get } from "node:https";
 import { homedir, platform as osPlatform, tmpdir } from "node:os";
 import path from "node:path";
@@ -62,6 +62,27 @@ export async function verifyArchiveChecksum(file, expected) {
   }
 }
 
+async function verifiedArchive(archive, url, expected) {
+  if (existsSync(archive)) {
+    try {
+      await verifyArchiveChecksum(archive, expected);
+      return archive;
+    } catch {
+      await rm(archive, { force: true });
+    }
+  }
+  await download(url, archive);
+  await verifyArchiveChecksum(archive, expected);
+  return archive;
+}
+
+async function assertRegularBinary(binary) {
+  const info = await lstat(binary);
+  if (!info.isFile() || info.isSymbolicLink()) {
+    throw new Error(`cached binary is not a regular file: ${binary}`);
+  }
+}
+
 export function cacheRoot() {
   if (process.env.NIGHTWARD_NPM_CACHE) {
     return process.env.NIGHTWARD_NPM_CACHE;
@@ -91,6 +112,11 @@ export function cachedBinaryPath(command = commandName(), version = releaseVersi
 }
 
 async function download(url, destination, redirects = 0) {
+  if (url.startsWith("file://")) {
+    await mkdir(path.dirname(destination), { recursive: true });
+    await copyFile(fileURLToPath(url), destination);
+    return;
+  }
   if (redirects > 5) {
     throw new Error(`too many redirects while downloading ${url}`);
   }
@@ -162,10 +188,6 @@ export async function ensureBinary(command = commandName()) {
 
   const target = targetFor();
   const binary = cachedBinaryPath(command, version, target);
-  if (existsSync(binary)) {
-    return binary;
-  }
-
   const asset = assetName(version, target);
   const baseURL = releaseBaseURL(version);
   const archive = path.join(cacheRoot(), version, `${target.os}-${target.arch}`, asset);
@@ -176,9 +198,10 @@ export async function ensureBinary(command = commandName()) {
     throw new Error(`checksums.txt does not include ${asset}`);
   }
 
-  await download(`${baseURL}/${asset}`, archive);
-  await verifyArchiveChecksum(archive, expected);
+  await verifiedArchive(archive, `${baseURL}/${asset}`, expected);
+  await rm(binary, { force: true });
   await extractArchive(archive, installDir, target);
+  await assertRegularBinary(binary);
   await chmod(binary, 0o755);
   return binary;
 }
