@@ -31,6 +31,12 @@ grep -q "macos-15-intel" "${repo_root}/.github/workflows/release.yml"
 grep -q "aarch64-unknown-linux-gnu" "${repo_root}/.github/workflows/release.yml"
 grep -q "x86_64-apple-darwin" "${repo_root}/.github/workflows/release.yml"
 grep -q 'NIGHTWARD_VERSION="${version}"' "${repo_root}/.github/workflows/release.yml"
+grep -q "dist/nightward_\\*.tar.gz" "${repo_root}/.github/workflows/release.yml"
+grep -q "dist/nightward_\\*.zip" "${repo_root}/.github/workflows/release.yml"
+if grep -q "path: dist/nightward_\\*" "${repo_root}/.github/workflows/release.yml"; then
+  echo "expected release upload to exclude staging directories" >&2
+  exit 1
+fi
 
 mkdir -p "${tmp}/target/release"
 printf '#!/usr/bin/env bash\nprintf "0.1.0\\n"\n' >"${tmp}/target/release/nightward"
