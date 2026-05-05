@@ -33,6 +33,10 @@ grep -q "x86_64-apple-darwin" "${repo_root}/.github/workflows/release.yml"
 grep -q 'NIGHTWARD_VERSION="${version}"' "${repo_root}/.github/workflows/release.yml"
 grep -q "dist/nightward_\\*.tar.gz" "${repo_root}/.github/workflows/release.yml"
 grep -q "dist/nightward_\\*.zip" "${repo_root}/.github/workflows/release.yml"
+if [[ "$(grep -c "sigstore/cosign-installer" "${repo_root}/.github/workflows/release.yml")" -lt 2 ]]; then
+  echo "expected release publish and smoke jobs to install cosign" >&2
+  exit 1
+fi
 if grep -q "path: dist/nightward_\\*" "${repo_root}/.github/workflows/release.yml"; then
   echo "expected release upload to exclude staging directories" >&2
   exit 1
