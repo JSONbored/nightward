@@ -787,7 +787,7 @@ pub fn redact_text(value: &str) -> String {
     ))
     .expect("valid regex");
     let assignment = Regex::new(&format!(
-        r#"(?i)([\w.-]*{sensitive_key}[\w.-]*\s*[:=]\s*)(?:\$\{{[A-Za-z_][A-Za-z0-9_]*\}}|[^\s\r\n,}}]+)"#
+        r#"(?i)([\w.-]*{sensitive_key}[\w.-]*\s*[:=]\s*)(?:\$\{{[A-Za-z_][A-Za-z0-9_]*\}}|[^\s\r\n,}}]+(?:\s+[^\s\r\n,}}]+)?)"#
     ))
         .expect("valid regex");
     let provider = Regex::new(r"(?i)\b(?:Bearer\s+[-A-Za-z0-9._~+/=]{8,}|sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b")
@@ -913,6 +913,15 @@ mod tests {
         let redacted = redact_text(&evidence);
 
         assert_eq!(redacted, "env.API_TOKEN=[redacted]");
+    }
+
+    #[test]
+    fn redacts_basic_auth_values_after_sensitive_keys() {
+        let token = ["dXNlcjpw", "YXNz"].concat();
+        let redacted = redact_text(&format!("Authorization: Basic {token}"));
+
+        assert_eq!(redacted, "Authorization: [redacted]");
+        assert!(!redacted.contains(&token));
     }
 
     #[test]
