@@ -48,6 +48,18 @@ pub fn run() -> Result<()> {
 }
 
 fn cmd_tui(args: &[String]) -> Result<()> {
+    if has_report_diff_paths(args) {
+        let (base, head) = report_diff_paths(args)?;
+        let base_report = load_report(base)?;
+        let head_report = load_report(head)?;
+        let diff = reportdiff::diff(
+            base.to_string(),
+            &base_report,
+            head.to_string(),
+            &head_report,
+        );
+        return tui::run_compare(&diff);
+    }
     let input = value_after(args, "--input");
     let workspace = value_after(args, "--workspace").or_else(|| value_after(args, "-w"));
     let report = if let Some(input) = input {
@@ -245,7 +257,22 @@ fn cmd_report(args: &[String]) -> Result<()> {
         Some("html") => {
             let input = value_after(args, "--input").unwrap_or("");
             let output = value_after(args, "--output").unwrap_or("nightward-report.html");
-            let scan = if input.is_empty() {
+            let diff = if has_report_diff_paths(args) {
+                let (base, head) = report_diff_paths(args)?;
+                let base_report = load_report(base)?;
+                let head_report = load_report(head)?;
+                Some(reportdiff::diff(
+                    base.to_string(),
+                    &base_report,
+                    head.to_string(),
+                    &head_report,
+                ))
+            } else {
+                None
+            };
+            let scan = if let Some(diff) = diff.as_ref() {
+                load_report(&diff.head)?
+            } else if input.is_empty() {
                 scan_home(home_dir_from_env())?
             } else {
                 load_report(input)?
@@ -268,7 +295,7 @@ fn cmd_report(args: &[String]) -> Result<()> {
                     ..Selector::default()
                 },
             );
-            let html = reporthtml::render(&scan, Some(&analysis), None, Some(&plan));
+            let html = reporthtml::render(&scan, Some(&analysis), None, Some(&plan), diff.as_ref());
             reporthtml::write(output, &html)?;
             println!("{output}");
             Ok(())
@@ -423,6 +450,11 @@ fn report_diff_paths(args: &[String]) -> Result<(&str, &str)> {
     Ok((base, head))
 }
 
+fn has_report_diff_paths(args: &[String]) -> bool {
+    (value_after(args, "--base").is_some() || value_after(args, "--from").is_some())
+        && (value_after(args, "--head").is_some() || value_after(args, "--to").is_some())
+}
+
 fn print_json(value: &impl Serialize) -> Result<()> {
     println!("{}", serde_json::to_string_pretty(value)?);
     Ok(())
@@ -493,7 +525,7 @@ fn version() -> &'static str {
 
 fn print_help() {
     println!(
-        "Nightward audits AI agent state, MCP config, and dotfiles sync risk.\n\nUSAGE:\n  nightward                         Open the TUI\n  nightward tui --input scan.json   Review a saved report in the TUI\n  nightward scan --json             Scan HOME\n  nightward scan --workspace . --json\n  nightward analyze --all --with gitleaks --json\n  nightward providers doctor --with trivy --online --json\n  nightward fix plan --all --json\n  nightward report html --input scan.json --output report.html\n  nightward policy check --json\n  nightward mcp serve\n\nNightward is local-first, read-only by default, and never enables online providers without --online."
+        "Nightward audits AI agent state, MCP config, and dotfiles sync risk.\n\nUSAGE:\n  nightward                         Open the TUI\n  nightward tui --input scan.json   Review a saved report in the TUI\n  nightward tui --from old.json --to new.json\n  nightward scan --json             Scan HOME\n  nightward scan --workspace . --json\n  nightward analyze --all --with gitleaks --json\n  nightward providers doctor --with trivy --online --json\n  nightward fix plan --all --json\n  nightward report html --input scan.json --output report.html\n  nightward report html --from old.json --to new.json --output report.html\n  nightward policy check --json\n  nightward mcp serve\n\nNightward is local-first, read-only by default, and never enables online providers without --online."
     );
 }
 

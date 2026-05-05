@@ -48,7 +48,7 @@ The release pipeline uses external tools for signing release checksums and SBOM 
 
 - SLSA provenance/attestations for future release workflows.
 - Reproducible-build comparison using pinned Rust toolchains, deterministic Cargo lockfiles, release archive checksums, and rebuild verification.
-- Wider fuzz/property tests for MCP parsing, redaction, symlink traversal, huge files, malformed configs, and permission-denied paths.
+- Broader fuzz/property duration beyond the current `cargo fuzz` smoke targets for MCP parsing, redaction, symlink traversal, huge files, malformed configs, and permission-denied paths.
 - More maintainer depth and documented two-person review coverage once the project has additional maintainers.
 - Package-manager ecosystem coverage beyond npm and GitHub Releases.
 

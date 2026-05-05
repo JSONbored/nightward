@@ -1,0 +1,11 @@
+{
+  "results": [
+    {
+      "check_id": "nightward.shell-wrapper",
+      "path": "mcp.json",
+      "extra": {
+        "message": "Authorization: Bearer opaque-secret-12345"
+      }
+    }
+  ]
+}

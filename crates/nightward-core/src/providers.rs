@@ -4,15 +4,16 @@ use crate::RiskLevel;
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::env;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 use wait_timeout::ChildExt;
 
-const STDOUT_CAP: usize = 2 * 1024 * 1024;
-const STDERR_CAP: usize = 64 * 1024;
-const PROVIDER_TIMEOUT: Duration = Duration::from_secs(20);
+const DEFAULT_STDOUT_CAP: usize = 2 * 1024 * 1024;
+const DEFAULT_STDERR_CAP: usize = 64 * 1024;
+const DEFAULT_PROVIDER_TIMEOUT: Duration = Duration::from_secs(20);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Provider {
@@ -76,7 +77,12 @@ pub fn statuses(selected: &[String], online: bool) -> Vec<ProviderStatus> {
             let enabled =
                 provider.default || selected.contains("all") || selected.contains(&provider.name);
             let available = provider.kind == "built-in" || which::which(&provider.name).is_ok();
-            let (status, detail) = if provider.online && enabled && !online {
+            let (status, detail) = if !enabled {
+                (
+                    "skipped".to_string(),
+                    "provider not selected for this analysis run".to_string(),
+                )
+            } else if provider.online && !online {
                 (
                     "blocked".to_string(),
                     "online-capable provider requires --online or allow_online_providers"
@@ -144,6 +150,9 @@ pub fn run_selected(
 
 pub fn run_provider(name: &str, root: &Path) -> Result<Vec<ProviderFinding>> {
     let args = provider_args(name, root)?;
+    let timeout = provider_timeout();
+    let stdout_cap = provider_stdout_cap();
+    let stderr_cap = provider_stderr_cap();
     let mut child = Command::new(name)
         .args(&args)
         .current_dir(root)
@@ -152,12 +161,12 @@ pub fn run_provider(name: &str, root: &Path) -> Result<Vec<ProviderFinding>> {
         .stderr(Stdio::piped())
         .spawn()
         .with_context(|| format!("spawn provider {name}"))?;
-    let status = match child.wait_timeout(PROVIDER_TIMEOUT)? {
+    let status = match child.wait_timeout(timeout)? {
         Some(status) => status,
         None => {
             let _ = child.kill();
             let _ = child.wait();
-            return Err(anyhow!("provider timed out after {:?}", PROVIDER_TIMEOUT));
+            return Err(anyhow!("provider timed out after {:?}", timeout));
         }
     };
     let mut stdout = Vec::new();
@@ -165,17 +174,20 @@ pub fn run_provider(name: &str, root: &Path) -> Result<Vec<ProviderFinding>> {
     if let Some(mut stream) = child.stdout.take() {
         let _ = stream
             .by_ref()
-            .take(STDOUT_CAP as u64 + 1)
+            .take(stdout_cap as u64 + 1)
             .read_to_end(&mut stdout);
     }
     if let Some(mut stream) = child.stderr.take() {
         let _ = stream
             .by_ref()
-            .take(STDERR_CAP as u64 + 1)
+            .take(stderr_cap as u64 + 1)
             .read_to_end(&mut stderr);
     }
-    let stdout = capped_string(stdout, STDOUT_CAP);
-    let stderr = capped_string(stderr, STDERR_CAP);
+    let (stdout, stdout_truncated) = capped_string(stdout, stdout_cap);
+    let (stderr, _) = capped_string(stderr, stderr_cap);
+    if stdout_truncated {
+        return Err(anyhow!("provider stdout exceeded {stdout_cap} byte cap"));
+    }
     if !status.success() && stdout.trim().is_empty() {
         return Err(anyhow!("{}: {}", status, first_line(&stderr)));
     }
@@ -585,13 +597,35 @@ fn normalize_provider_path(root: &Path, path: &str) -> String {
     }
 }
 
-fn capped_string(bytes: Vec<u8>, cap: usize) -> String {
+fn provider_timeout() -> Duration {
+    env::var("NIGHTWARD_PROVIDER_TIMEOUT_MS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .map(Duration::from_millis)
+        .unwrap_or(DEFAULT_PROVIDER_TIMEOUT)
+}
+
+fn provider_stdout_cap() -> usize {
+    env::var("NIGHTWARD_PROVIDER_STDOUT_CAP")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(DEFAULT_STDOUT_CAP)
+}
+
+fn provider_stderr_cap() -> usize {
+    env::var("NIGHTWARD_PROVIDER_STDERR_CAP")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(DEFAULT_STDERR_CAP)
+}
+
+fn capped_string(bytes: Vec<u8>, cap: usize) -> (String, bool) {
     let truncated = bytes.len() > cap;
     let mut value = String::from_utf8_lossy(&bytes[..bytes.len().min(cap)]).to_string();
     if truncated {
         value.push_str("\n[provider output truncated]");
     }
-    redact_text(&value)
+    (redact_text(&value), truncated)
 }
 
 fn first_line(value: &str) -> String {

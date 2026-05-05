@@ -1,0 +1,27 @@
+{
+  "Results": [
+    {
+      "Target": "package-lock.json",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2026-0001",
+          "PkgName": "demo",
+          "Severity": "HIGH"
+        }
+      ],
+      "Secrets": [
+        {
+          "RuleID": "secret-key",
+          "Match": "API_KEY=sk-1234567890abcdef"
+        }
+      ],
+      "Misconfigurations": [
+        {
+          "ID": "AVD-DS-0001",
+          "Title": "Dockerfile uses root",
+          "Severity": "MEDIUM"
+        }
+      ]
+    }
+  ]
+}

@@ -15,7 +15,7 @@ nw providers doctor --with gitleaks,trufflehog,semgrep
 nw analyze --workspace . --with gitleaks,trufflehog,semgrep --json
 ```
 
-Nightward does not install tools. It discovers them on `PATH`, runs bounded commands, parses supported JSON shapes, and redacts provider-derived evidence before emitting JSON, SARIF, TUI, Raycast, MCP, policy, or badge output.
+Nightward does not install tools. It discovers them on `PATH`, marks unselected optional providers as `skipped`, runs bounded commands only when selected, parses supported JSON shapes, and redacts provider-derived evidence before emitting JSON, SARIF, TUI, Raycast, MCP, policy, badge, or HTML output. Timeout and output-cap failures are provider warnings, not clean results.
 
 ## Online-Capable Providers
 

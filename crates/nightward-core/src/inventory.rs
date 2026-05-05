@@ -787,15 +787,17 @@ pub fn redact_text(value: &str) -> String {
     ))
     .expect("valid regex");
     let assignment = Regex::new(&format!(
-        r#"(?i)([\w.-]*{sensitive_key}[\w.-]*\s*[:=]\s*)(?:\$\{{[A-Za-z_][A-Za-z0-9_]*\}}|[^\r\n,}}]+)"#
+        r#"(?i)([\w.-]*{sensitive_key}[\w.-]*\s*[:=]\s*)(?:\$\{{[A-Za-z_][A-Za-z0-9_]*\}}|[^\s\r\n,}}]+)"#
     ))
         .expect("valid regex");
     let provider = Regex::new(r"(?i)\b(?:Bearer\s+[-A-Za-z0-9._~+/=]{8,}|sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b")
         .expect("valid regex");
     let redacted = double_quoted.replace_all(value, "$1[redacted]$2");
     let redacted = single_quoted.replace_all(&redacted, "$1[redacted]$2");
-    let redacted = assignment.replace_all(&redacted, "$1[redacted]");
-    provider.replace_all(&redacted, "[redacted]").to_string()
+    let redacted = provider.replace_all(&redacted, "[redacted]");
+    assignment
+        .replace_all(&redacted, "$1[redacted]")
+        .to_string()
 }
 
 fn local_endpoint(value: &str) -> bool {
@@ -950,6 +952,71 @@ args = ["package", "http://127.0.0.1:3000"]
             .findings
             .iter()
             .any(|finding| finding.rule == "mcp_local_endpoint"));
+    }
+
+    #[test]
+    fn parses_yaml_mcp_servers() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = dir.path().join(".config/goose");
+        fs::create_dir_all(&config).unwrap();
+        fs::write(
+            config.join("config.yaml"),
+            r#"mcpServers:
+  remote:
+    url: "http://localhost:7777/mcp"
+    headers:
+      Authorization: "Bearer fixture-token-value"
+"#,
+        )
+        .unwrap();
+
+        let report = scan_home(dir.path()).unwrap();
+        let rules: BTreeSet<_> = report.findings.iter().map(|f| f.rule.as_str()).collect();
+        assert!(rules.contains("mcp_local_endpoint"));
+        assert!(rules.contains("mcp_secret_header"));
+    }
+
+    #[test]
+    fn malformed_workspace_config_emits_parse_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join(".mcp.json"), b"{not-json").unwrap();
+
+        let report = scan_workspace(dir.path()).unwrap();
+
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| finding.rule == "config_parse_failed"));
+    }
+
+    #[test]
+    fn huge_workspace_config_is_not_read_inline() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = dir.path().join(".mcp.json");
+        let file = fs::File::create(&config).unwrap();
+        file.set_len(MAX_CONFIG_BYTES + 1).unwrap();
+
+        let report = scan_workspace(dir.path()).unwrap();
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.rule == "config_too_large")
+            .expect("large config finding");
+
+        assert!(finding.evidence.contains("size_bytes="));
+    }
+
+    #[test]
+    fn redacts_url_query_and_header_secrets_but_keeps_local_paths() {
+        let token = ["opaque", "-secret", "-12345"].concat();
+        let path = "/Users/example/Library/Application Support/Claude/claude_desktop_config.json";
+        let redacted = redact_text(&format!(
+            "url=https://example.test/mcp?token={token} Authorization: Bearer {token} path={path}"
+        ));
+
+        assert!(!redacted.contains(&token));
+        assert!(redacted.contains("token=[redacted]"));
+        assert!(redacted.contains(path));
     }
 
     #[test]

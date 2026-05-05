@@ -3,6 +3,7 @@ members = [
   "crates/nightward-core",
   "crates/nightward-cli",
 ]
+exclude = ["fuzz"]
 resolver = "2"
 
 [workspace.package]

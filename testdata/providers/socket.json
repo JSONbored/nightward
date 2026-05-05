@@ -1,0 +1,9 @@
+{
+  "issues": [
+    {
+      "type": "suspicious-package",
+      "manifest": "package.json",
+      "message": "Dependency risk includes token sk-1234567890abcdef"
+    }
+  ]
+}

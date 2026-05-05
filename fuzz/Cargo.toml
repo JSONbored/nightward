@@ -1,0 +1,31 @@
+[package]
+name = "nightward-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+nightward-core = { path = "../crates/nightward-core" }
+tempfile = "3"
+
+[[bin]]
+name = "mcp_config_formats"
+path = "fuzz_targets/mcp_config_formats.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "redaction_urls_headers"
+path = "fuzz_targets/redaction_urls_headers.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "filesystem_boundaries"
+path = "fuzz_targets/filesystem_boundaries.rs"
+test = false
+doc = false

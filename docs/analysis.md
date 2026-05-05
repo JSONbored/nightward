@@ -39,6 +39,8 @@ nw providers doctor --json
 nw providers doctor --with socket --json
 ```
 
+Unselected optional providers report `skipped`; selected online-capable providers report `blocked` until the online gate is present.
+
 Online-capable providers remain blocked unless explicitly allowed:
 
 ```sh
@@ -53,7 +55,7 @@ nw analyze --workspace . --with gitleaks --json
 nw analyze --workspace . --with gitleaks,trufflehog,semgrep --json
 ```
 
-Provider runs use timeouts and bounded output capture. Nightward records redacted finding metadata, not raw secret values. Online-capable providers such as `trivy`, `osv-scanner`, and `socket` stay blocked unless the user also opts into online-capable behavior. Socket support is deliberately limited to scan creation and returned JSON parsing in v1; Nightward does not fetch or normalize remote Socket reports after creating the scan.
+Provider runs use timeouts and bounded output capture. Oversized stdout fails closed as a provider warning instead of being partially parsed. Nightward records redacted finding metadata, not raw secret values. Online-capable providers such as `trivy`, `osv-scanner`, and `socket` stay blocked unless the user also opts into online-capable behavior. Socket support is deliberately limited to scan creation and returned JSON parsing in v1; Nightward does not fetch or normalize remote Socket reports after creating the scan.
 
 `semgrep` execution is local-config only. Nightward looks for `semgrep.yml`, `semgrep.yaml`, `.semgrep.yml`, `.semgrep.yaml`, or `.semgrep/config.yml` in the scanned workspace instead of using automatic rule discovery.
 

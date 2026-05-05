@@ -145,13 +145,15 @@ function ProviderItem({
                 <List.Item.Detail.Metadata.TagList.Item
                   text={selectionLabel}
                   color={
-                    !provider.available
-                      ? Color.Red
-                      : blockedByPreference
-                        ? Color.Yellow
-                        : selected || provider.default
-                          ? Color.Blue
-                          : providerColor(provider)
+                    provider.status === "skipped"
+                      ? Color.SecondaryText
+                      : !provider.available
+                        ? Color.Red
+                        : blockedByPreference
+                          ? Color.Yellow
+                          : selected || provider.default
+                            ? Color.Blue
+                            : providerColor(provider)
                   }
                 />
               </List.Item.Detail.Metadata.TagList>
@@ -297,6 +299,7 @@ function providerSubtitle(
     return "missing selected";
   }
   if (selected) return "selected";
+  if (provider.status === "skipped") return "skipped";
   if (provider.available) return provider.status;
   return "missing";
 }
@@ -404,6 +407,7 @@ async function clearProviders(onSelectedChange: (providers: string[]) => void) {
 function providerIcon(provider: ProviderStatus): Icon {
   if (provider.status === "ready") return Icon.CheckCircle;
   if (provider.status === "blocked") return Icon.Lock;
+  if (provider.status === "skipped") return Icon.Circle;
   if (provider.available) return Icon.Circle;
   return Icon.XMarkCircle;
 }
@@ -411,6 +415,7 @@ function providerIcon(provider: ProviderStatus): Icon {
 function providerColor(provider: ProviderStatus): Color {
   if (provider.status === "ready") return Color.Green;
   if (provider.status === "blocked") return Color.Yellow;
+  if (provider.status === "skipped") return Color.SecondaryText;
   if (provider.available) return Color.Blue;
   return Color.Red;
 }

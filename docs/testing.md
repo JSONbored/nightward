@@ -59,6 +59,7 @@ make gitleaks
 make cargo-audit
 make cargo-deny
 make coverage-check
+make fuzz-smoke
 make test-junit
 make trunk-flaky-validate
 make trunk-check
@@ -86,6 +87,8 @@ make verify
 - Badge artifact tests must cover pass/fail shape, policy summary fields, optional SARIF URL, and no-write stdout mode.
 - Golden-style tests should stay stable for JSON/SARIF shape, not timestamps or host-specific paths. Scan-summary goldens must keep item buckets separate from finding buckets.
 - MCP fixture tests should cover command servers, URL-shaped servers, sensitive headers, local endpoints, and unsupported shapes.
+- Parser fuzz harnesses live under `fuzz/` and cover MCP JSON/TOML/YAML parsing, URL/header redaction, symlink traversal, huge-file handling, and malformed config cases. Run a bounded local fuzz check with `make fuzz-smoke`; run a single target directly with `cargo fuzz run mcp_config_formats -- -runs=1024`.
+- Provider contract tests use `testdata/providers/*` fixtures for `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, and `socket`.
 - Scheduler tests verify generated launchd, systemd user timer, and cron text without installing schedules.
 - TUI tests cover fixed terminal rendering behavior, redaction boundaries, and embedded OpenTUI layout helpers.
 - Scheduler tests cover report history ordering, finding counts, non-report filtering, and symlink skipping without installing timers.

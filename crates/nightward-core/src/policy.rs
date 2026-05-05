@@ -430,6 +430,29 @@ mod tests {
     }
 
     #[test]
+    fn sarif_preserves_provider_warning_analysis_violations() {
+        let scan = ScanReport::empty("home".to_string(), String::new(), "home".to_string());
+        let mut analysis = analysis_report_with_signal(RiskLevel::Low);
+        analysis.summary.provider_warnings = 1;
+        analysis.signals[0].provider = "gitleaks".to_string();
+        analysis.signals[0].rule = "gitleaks/provider_execution_failed".to_string();
+        analysis.signals[0].category = SignalCategory::Unknown;
+        analysis.signals[0].message = "gitleaks provider execution failed.".to_string();
+        let config = PolicyConfig {
+            analysis_threshold: RiskLevel::Low,
+            ..PolicyConfig::default()
+        };
+
+        let report = check(&scan, &config, Some(&analysis));
+        let sarif = sarif(&scan, Some(&report));
+        let sarif_text = serde_json::to_string(&sarif).expect("sarif json");
+
+        assert_eq!(report.analysis.as_ref().unwrap().provider_warnings, 1);
+        assert!(sarif_text.contains("gitleaks/provider_execution_failed"));
+        assert!(sarif_text.contains("\"provider\":\"gitleaks\""));
+    }
+
+    #[test]
     fn check_ignores_rules_by_rule_key() {
         let mut scan = ScanReport::empty("home".to_string(), String::new(), "home".to_string());
         scan.findings

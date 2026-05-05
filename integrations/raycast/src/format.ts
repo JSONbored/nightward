@@ -3,6 +3,7 @@ import type {
   AnalysisReport,
   AnalysisSignal,
   Classification,
+  DiffReport,
   DoctorReport,
   Finding,
   FixPlan,
@@ -11,9 +12,9 @@ import type {
 } from "./types";
 
 const secretAssignmentPattern =
-  /((?:token|secret|password|passwd|api[_-]?key|auth|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)(?:\$\{[A-Za-z_][A-Za-z0-9_]*\}|[^"',\s}]+)/gi;
+  /((?:token|secret|password|passwd|api[_-]?key|auth|authorization|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)(?:\$\{[A-Za-z_][A-Za-z0-9_]*\}|[^"',\s}]+)/gi;
 const providerTokenPattern =
-  /\b(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b/g;
+  /\b(?:Bearer\s+[-A-Za-z0-9._~+/=]{8,}|sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b/g;
 
 const riskRank: Record<RiskLevel, number> = {
   info: 0,
@@ -26,8 +27,8 @@ const riskRank: Record<RiskLevel, number> = {
 export function redactText(value: string | undefined): string {
   if (!value) return "";
   const redacted = value
-    .replace(secretAssignmentPattern, "$1$2[redacted]")
-    .replace(providerTokenPattern, "[redacted]");
+    .replace(providerTokenPattern, "[redacted]")
+    .replace(secretAssignmentPattern, "$1$2[redacted]");
   return redacted
     .split(/(\s+)/)
     .map((part) => (looksOpaqueProviderToken(part) ? "[redacted]" : part))
@@ -279,6 +280,44 @@ export function dashboardMarkdown(
   return lines.join("\n");
 }
 
+export function reportDiffMarkdown(diff: DiffReport): string {
+  const lines = [
+    "# Report Compare",
+    "",
+    `Base: \`${diff.base}\``,
+    `Head: \`${diff.head}\``,
+    "",
+    "| Added | Removed | Changed | Max Added |",
+    "| ---: | ---: | ---: | --- |",
+    `| ${diff.summary.added} | ${diff.summary.removed} | ${diff.summary.changed} | \`${diff.summary.max_added_severity}\` |`,
+  ];
+  appendFindingBucket(lines, "Added Findings", diff.added);
+  appendFindingBucket(lines, "Removed Findings", diff.removed);
+  if (diff.changed.length > 0) {
+    lines.push("", "## Changed Findings");
+    for (const change of diff.changed.slice(0, 10)) {
+      lines.push(
+        `- \`${change.before.severity}\` -> \`${change.after.severity}\` ${change.after.rule}: ${redactText(change.after.message)}`,
+      );
+    }
+  } else {
+    lines.push("", "## Changed Findings", "No severity or message changes.");
+  }
+  return lines.join("\n");
+}
+
+export function reportDiffSubtitle(diff: DiffReport): string {
+  const parts = [
+    `+${diff.summary.added}`,
+    `-${diff.summary.removed}`,
+    `~${diff.summary.changed}`,
+  ];
+  if (diff.summary.max_added_severity !== "info" || diff.summary.added > 0) {
+    parts.push(diff.summary.max_added_severity);
+  }
+  return parts.join(" ");
+}
+
 function nextActionForReport(report: ScanReport): string {
   const critical = report.summary.findings_by_severity.critical ?? 0;
   const high = report.summary.findings_by_severity.high ?? 0;
@@ -417,6 +456,23 @@ export function reportHistoryDelta(
   const delta = history[0].findings - history[1].findings;
   if (delta === 0) return "no change";
   return delta > 0 ? `+${delta} findings` : `${delta} findings`;
+}
+
+function appendFindingBucket(
+  lines: string[],
+  title: string,
+  findings: Finding[],
+) {
+  lines.push("", `## ${title}`);
+  if (findings.length === 0) {
+    lines.push("None.");
+    return;
+  }
+  for (const finding of sortedFindings(findings).slice(0, 10)) {
+    lines.push(
+      `- \`${finding.severity}\` ${finding.rule}: ${redactText(finding.message)}`,
+    );
+  }
 }
 
 export function basename(path: string): string {

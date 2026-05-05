@@ -85,6 +85,28 @@ export type ScanReport = {
   adapters: AdapterStatus[];
 };
 
+export type ChangedFinding = {
+  id: string;
+  before: Finding;
+  after: Finding;
+};
+
+export type DiffReport = {
+  schema_version?: number;
+  generated_at: string;
+  base: string;
+  head: string;
+  summary: {
+    added: number;
+    removed: number;
+    changed: number;
+    max_added_severity: RiskLevel;
+  };
+  added: Finding[];
+  removed: Finding[];
+  changed: ChangedFinding[];
+};
+
 export type SignalCategory =
   | "supply-chain"
   | "secrets-exposure"

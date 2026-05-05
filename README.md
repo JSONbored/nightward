@@ -213,6 +213,8 @@ Render a local static HTML report from redacted scan JSON:
 nw scan --json --output /tmp/nightward-scan.json
 nw report html --input /tmp/nightward-scan.json --output /tmp/nightward-report.html
 nw report diff --from /tmp/previous-scan.json --to /tmp/nightward-scan.json
+nw report html --from /tmp/previous-scan.json --to /tmp/nightward-scan.json --output /tmp/nightward-report.html
+nw tui --from /tmp/previous-scan.json --to /tmp/nightward-scan.json
 nw report html
 nw report history
 nw report latest
@@ -289,7 +291,7 @@ Secret values are never emitted in scan JSON, findings output, fix-plan JSON, Ma
 
 Default analysis is offline and built in. Optional providers are discovered by `providers doctor`; Nightward does not install them or call online services unless a user explicitly selects providers and opts into network-capable behavior. Explicit local providers are `gitleaks`, `trufflehog`, and `semgrep`. Online-capable providers are `trivy`, `osv-scanner`, and `socket`, and they require both `--with` and `--online`. Socket support creates a remote Socket scan artifact from dependency manifest metadata; Nightward does not fetch or normalize remote Socket reports in v1.
 
-Provider runs use timeouts, bounded output capture, and redacted metadata only. Semgrep execution requires a repo-local config file so Nightward does not use automatic rule discovery by default.
+Provider runs use explicit skip/block/ready states, timeouts, bounded output capture, and redacted metadata only. Oversized provider stdout fails closed as a provider warning instead of being partially parsed. Semgrep execution requires a repo-local config file so Nightward does not use automatic rule discovery by default.
 
 Policy config can enable analysis and selected provider execution with `include_analysis`, `analysis_threshold`, `analysis_providers`, and `allow_online_providers`; online-capable providers still require explicit policy opt-in.
 
@@ -434,6 +436,7 @@ make test
 make test-race
 make test-junit
 make coverage-check
+make fuzz-smoke
 make trunk-flaky-validate
 make trunk-check
 make ci-scripts-test
@@ -465,6 +468,7 @@ make gitleaks
 make cargo-audit
 make cargo-deny
 make coverage-check
+make fuzz-smoke
 make release-snapshot
 ```
 

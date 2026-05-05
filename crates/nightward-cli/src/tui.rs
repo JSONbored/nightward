@@ -1,6 +1,7 @@
 use anyhow::Result;
 use nightward_core::analysis::{self, Options as AnalysisOptions};
 use nightward_core::fixplan::{self, Selector};
+use nightward_core::reportdiff::DiffReport;
 use nightward_core::{backupplan, max_risk, Classification, Finding, Report, RiskLevel};
 use opentui::buffer::{BoxOptions, BoxStyle, ClipRect, TitleAlign};
 use opentui::input::{Event, InputParser, KeyCode};
@@ -121,6 +122,74 @@ pub fn run(report: &Report) -> Result<()> {
     Ok(())
 }
 
+pub fn run_compare(diff: &DiffReport) -> Result<()> {
+    let (term_w, term_h) = terminal_size().unwrap_or((120, 36));
+    let mut renderer = Renderer::new(u32::from(term_w), u32::from(term_h))?;
+    let _raw_guard = enable_raw_mode()?;
+    let app = CompareState::new(diff);
+    let mut parser = InputParser::new();
+    let (tx, rx) = mpsc::channel::<Vec<u8>>();
+
+    let _input_thread = std::thread::spawn(move || {
+        let mut stdin = io::stdin();
+        let mut buf = [0u8; 64];
+        loop {
+            match stdin.read(&mut buf) {
+                Ok(0) => {}
+                Ok(n) => {
+                    if tx.send(buf[..n].to_vec()).is_err() {
+                        break;
+                    }
+                }
+                Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {}
+                Err(_) => break,
+            }
+        }
+    });
+
+    loop {
+        let (width, height) = renderer.size();
+        app.render(renderer.buffer(), width, height);
+        renderer.present()?;
+
+        if std::env::var("NIGHTWARD_TUI_CAPTURE").as_deref() == Ok("1") {
+            let hold_ms = std::env::var("NIGHTWARD_TUI_CAPTURE_HOLD_MS")
+                .ok()
+                .and_then(|value| value.parse::<u64>().ok())
+                .unwrap_or(1200);
+            std::thread::sleep(Duration::from_millis(hold_ms));
+            break;
+        }
+
+        let mut keep_running = true;
+        for chunk in rx.try_iter() {
+            let mut offset = 0;
+            while offset < chunk.len() {
+                let Ok((event, used)) = parser.parse(&chunk[offset..]) else {
+                    break;
+                };
+                offset += used;
+                if let Event::Resize(resize) = &event {
+                    renderer.resize(u32::from(resize.width), u32::from(resize.height))?;
+                }
+                if !app.handle_event(&event) {
+                    keep_running = false;
+                    break;
+                }
+            }
+            if !keep_running {
+                break;
+            }
+        }
+        if !keep_running {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(33));
+    }
+
+    Ok(())
+}
+
 struct TuiState<'a> {
     report: &'a Report,
     active_view: usize,
@@ -130,6 +199,288 @@ struct TuiState<'a> {
     search_mode: bool,
     frame: u64,
     palette: Palette,
+}
+
+struct CompareState<'a> {
+    diff: &'a DiffReport,
+    palette: Palette,
+}
+
+impl<'a> CompareState<'a> {
+    fn new(diff: &'a DiffReport) -> Self {
+        Self {
+            diff,
+            palette: Palette::new(),
+        }
+    }
+
+    fn handle_event(&self, event: &Event) -> bool {
+        let Event::Key(key) = event else {
+            return true;
+        };
+        !key.is_ctrl_c() && !matches!(key.code, KeyCode::Char('q') | KeyCode::Esc)
+    }
+
+    fn render(&self, buffer: &mut OptimizedBuffer, width: u32, height: u32) {
+        buffer.clear(self.palette.bg);
+        if width < 72 || height < 18 {
+            draw_text(
+                buffer,
+                2,
+                1,
+                "Nightward Compare",
+                Style::fg(self.palette.cyan).with_bold(),
+            );
+            draw_text(
+                buffer,
+                2,
+                3,
+                &format!(
+                    "+{} -{} ~{}",
+                    self.diff.summary.added, self.diff.summary.removed, self.diff.summary.changed
+                ),
+                Style::fg(severity_color(
+                    &self.palette,
+                    self.diff.summary.max_added_severity,
+                ))
+                .with_bold(),
+            );
+            return;
+        }
+
+        let main = Area::new(2, 1, width.saturating_sub(4), height.saturating_sub(3));
+        self.render_header(buffer, Area::new(main.x, main.y, main.w, 7));
+        self.render_columns(
+            buffer,
+            Area::new(main.x, main.y + 8, main.w, main.h.saturating_sub(10)),
+        );
+        draw_hline(
+            buffer,
+            main.x,
+            height.saturating_sub(2),
+            main.w,
+            self.palette.line,
+        );
+        draw_text(
+            buffer,
+            main.x,
+            height.saturating_sub(1),
+            "q quit",
+            Style::fg(self.palette.muted),
+        );
+    }
+
+    fn render_header(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        draw_text(
+            buffer,
+            area.x,
+            area.y,
+            "Report History Compare",
+            Style::fg(self.palette.white).with_bold(),
+        );
+        draw_text(
+            buffer,
+            area.x,
+            area.y + 1,
+            &truncate(
+                &format!("{} -> {}", self.diff.base, self.diff.head),
+                area.w as usize,
+            ),
+            Style::fg(self.palette.muted),
+        );
+        let card_w = area.w.saturating_sub(3) / 4;
+        for (idx, (label, value, color)) in [
+            (
+                "added",
+                self.diff.summary.added.to_string(),
+                severity_color(&self.palette, self.diff.summary.max_added_severity),
+            ),
+            (
+                "removed",
+                self.diff.summary.removed.to_string(),
+                self.palette.green,
+            ),
+            (
+                "changed",
+                self.diff.summary.changed.to_string(),
+                self.palette.amber,
+            ),
+            (
+                "max added",
+                risk_word(self.diff.summary.max_added_severity).to_string(),
+                severity_color(&self.palette, self.diff.summary.max_added_severity),
+            ),
+        ]
+        .iter()
+        .enumerate()
+        {
+            let x = area.x + u32::try_from(idx).unwrap_or(0) * (card_w + 1);
+            old_stat_card(
+                buffer,
+                Area::new(x, area.y + 3, card_w, 4),
+                label,
+                value,
+                *color,
+                &self.palette,
+            );
+        }
+    }
+
+    fn render_columns(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        let gap = 2;
+        let col_w = area.w.saturating_sub(gap * 2) / 3;
+        let added = Area::new(area.x, area.y, col_w, area.h);
+        let changed = Area::new(area.x + col_w + gap, area.y, col_w, area.h);
+        let removed = Area::new(area.x + (col_w + gap) * 2, area.y, col_w, area.h);
+        self.render_finding_column(
+            buffer,
+            added,
+            "Added Findings",
+            self.palette.red,
+            self.diff.added.iter().collect(),
+        );
+        self.render_changed_column(buffer, changed);
+        self.render_finding_column(
+            buffer,
+            removed,
+            "Removed Findings",
+            self.palette.green,
+            self.diff.removed.iter().collect(),
+        );
+    }
+
+    fn render_finding_column(
+        &self,
+        buffer: &mut OptimizedBuffer,
+        area: Area,
+        title: &str,
+        border: Rgba,
+        findings: Vec<&Finding>,
+    ) {
+        draw_panel(buffer, area, title, border, self.palette.panel);
+        let mut row = area.y + 2;
+        if findings.is_empty() {
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                "No findings in this bucket.",
+                Style::fg(self.palette.muted),
+            );
+            return;
+        }
+        for finding in findings
+            .into_iter()
+            .take(area.h.saturating_sub(4) as usize / 4)
+        {
+            let color = severity_color(&self.palette, finding.severity);
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                severity_badge(finding.severity),
+                Style::fg(color).with_bold(),
+            );
+            draw_text(
+                buffer,
+                area.x + 12,
+                row,
+                &truncate(&finding.rule, area.w.saturating_sub(15) as usize),
+                Style::fg(color).with_bold(),
+            );
+            row += 1;
+            for line in wrap(&finding.message, area.w.saturating_sub(4) as usize)
+                .into_iter()
+                .take(2)
+            {
+                draw_text(
+                    buffer,
+                    area.x + 2,
+                    row,
+                    &line,
+                    Style::fg(self.palette.white),
+                );
+                row += 1;
+            }
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                &truncate(&finding.path, area.w.saturating_sub(4) as usize),
+                Style::fg(self.palette.muted),
+            );
+            row += 2;
+            if row >= area.y + area.h.saturating_sub(1) {
+                break;
+            }
+        }
+    }
+
+    fn render_changed_column(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        draw_panel(
+            buffer,
+            area,
+            "Changed Findings",
+            self.palette.amber,
+            self.palette.surface,
+        );
+        let mut row = area.y + 2;
+        if self.diff.changed.is_empty() {
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                "No severity or message changes.",
+                Style::fg(self.palette.muted),
+            );
+            return;
+        }
+        for change in self
+            .diff
+            .changed
+            .iter()
+            .take(area.h.saturating_sub(4) as usize / 5)
+        {
+            let color = severity_color(&self.palette, change.after.severity);
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                &truncate(&change.after.rule, area.w.saturating_sub(4) as usize),
+                Style::fg(color).with_bold(),
+            );
+            row += 1;
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                &format!(
+                    "{} -> {}",
+                    risk_word(change.before.severity),
+                    risk_word(change.after.severity)
+                ),
+                Style::fg(self.palette.amber),
+            );
+            row += 1;
+            for line in wrap(&change.after.message, area.w.saturating_sub(4) as usize)
+                .into_iter()
+                .take(2)
+            {
+                draw_text(
+                    buffer,
+                    area.x + 2,
+                    row,
+                    &line,
+                    Style::fg(self.palette.white),
+                );
+                row += 1;
+            }
+            row += 1;
+            if row >= area.y + area.h.saturating_sub(1) {
+                break;
+            }
+        }
+    }
 }
 
 impl<'a> TuiState<'a> {
@@ -2011,6 +2362,27 @@ mod tests {
         out
     }
 
+    fn render_compare_text(app: &CompareState<'_>, width: u32, height: u32) -> String {
+        let mut buffer = OptimizedBuffer::new(width, height);
+        app.render(&mut buffer, width, height);
+        let mut out = String::new();
+        for y in 0..height {
+            for x in 0..width {
+                let ch = buffer
+                    .get(x, y)
+                    .and_then(|cell| match cell.content {
+                        CellContent::Char(ch) => Some(ch),
+                        CellContent::Empty | CellContent::Continuation => Some(' '),
+                        CellContent::Grapheme(_) => None,
+                    })
+                    .unwrap_or(' ');
+                out.push(ch);
+            }
+            out.push('\n');
+        }
+        out
+    }
+
     fn cell_char(buffer: &OptimizedBuffer, x: u32, y: u32) -> char {
         buffer
             .get(x, y)
@@ -2163,6 +2535,39 @@ mod tests {
         assert!(text.contains(&format!("v{}", version())));
         assert!(text.contains(REPO_LABEL));
         assert!(text.contains(STAR_CTA));
+    }
+
+    #[test]
+    fn compare_view_renders_added_changed_and_removed_buckets() {
+        let mut base = fixture_report();
+        let mut head = base.clone();
+        let removed = head.findings.pop().expect("removed finding");
+        let mut changed = head.findings[0].clone();
+        changed.message = "Changed message for report history review.".to_string();
+        head.findings[0] = changed;
+        let mut added = removed.clone();
+        added.id = "new-finding-for-compare".to_string();
+        added.rule = "mcp_new_compare_rule".to_string();
+        added.message = "New finding from latest scheduled report.".to_string();
+        added.severity = RiskLevel::Critical;
+        head.findings.push(added);
+        base.recompute_summary();
+        head.recompute_summary();
+        let diff = nightward_core::reportdiff::diff(
+            "old.json".to_string(),
+            &base,
+            "new.json".to_string(),
+            &head,
+        );
+        let app = CompareState::new(&diff);
+        let text = render_compare_text(&app, 120, 36);
+
+        assert!(text.contains("Report History Compare"));
+        assert!(text.contains("Added Findings"));
+        assert!(text.contains("Changed Findings"));
+        assert!(text.contains("Removed Findings"));
+        assert!(text.contains("mcp_new_compare_rule"));
+        assert!(text.contains("Changed message"));
     }
 
     #[test]

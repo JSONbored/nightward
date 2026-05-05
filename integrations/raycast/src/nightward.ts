@@ -9,6 +9,7 @@ import {
 import type {
   AnalysisReport,
   DoctorReport,
+  DiffReport,
   Finding,
   FixPlan,
   ProviderStatus,
@@ -146,6 +147,17 @@ export async function providersDoctor(
   }
   args.push("--json");
   return runNightwardJSON<ProviderStatus[]>(args, options);
+}
+
+export async function reportDiff(
+  options: RuntimeOptions,
+  base: string,
+  head: string,
+): Promise<DiffReport> {
+  return runNightwardJSON<DiffReport>(
+    ["report", "diff", "--from", base, "--to", head],
+    options,
+  );
 }
 
 export async function explainSignal(

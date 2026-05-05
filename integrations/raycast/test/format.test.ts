@@ -9,6 +9,8 @@ import {
   maxSeverity,
   policyIgnoreSnippet,
   redactText,
+  reportDiffMarkdown,
+  reportDiffSubtitle,
   reportHistoryDelta,
   signalMarkdown,
   sortedFindings,
@@ -18,6 +20,7 @@ import type {
   AnalysisReport,
   AnalysisSignal,
   DoctorReport,
+  DiffReport,
   Finding,
   FixPlan,
   ScanReport,
@@ -318,6 +321,40 @@ test("report history delta handles missing and equal histories", () => {
     "no change",
   );
   assert.equal(reportHistoryDelta([{ findings: 1 }, { findings: 4 }]), "-3 findings");
+});
+
+test("report diff markdown summarizes added removed and changed findings", () => {
+  const diff: DiffReport = {
+    generated_at: "2026-05-01T00:00:00Z",
+    base: "/tmp/old.json",
+    head: "/tmp/new.json",
+    summary: {
+      added: 1,
+      removed: 1,
+      changed: 1,
+      max_added_severity: "critical",
+    },
+    added: [baseFinding("added", "critical", "Codex")],
+    removed: [baseFinding("removed", "medium", "Claude")],
+    changed: [
+      {
+        id: "changed",
+        before: baseFinding("changed", "low", "Cursor"),
+        after: {
+          ...baseFinding("changed", "high", "Cursor"),
+          message: "Authorization: Bearer opaque-secret-12345",
+        },
+      },
+    ],
+  };
+
+  const markdown = reportDiffMarkdown(diff);
+
+  assert.equal(reportDiffSubtitle(diff), "+1 -1 ~1 critical");
+  assert.match(markdown, /Added Findings/);
+  assert.match(markdown, /Removed Findings/);
+  assert.match(markdown, /Changed Findings/);
+  assert.doesNotMatch(markdown, /opaque-secret-12345/);
 });
 
 test("fix plan totals support rust and legacy shapes", () => {

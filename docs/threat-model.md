@@ -14,7 +14,7 @@ Nightward inspects local AI agent and devtool state, so its primary risk is acci
 
 - Local filesystem input is untrusted. Config files may be malformed, hostile, huge, symlinked, or privacy-sensitive.
 - CLI/TUI/Raycast output is a disclosure boundary. Secret values must not cross it.
-- Optional providers are execution boundaries. They are discovered but not installed or run online by default. Socket is treated as online-capable because it creates a remote scan artifact from dependency manifest metadata.
+- Optional providers are execution boundaries. They are discovered but not installed automatically, unselected providers are skipped, online-capable providers are blocked until explicitly allowed, and provider timeout/output-cap failures are surfaced as warnings instead of clean results. Socket is treated as online-capable because it creates a remote scan artifact from dependency manifest metadata.
 - MCP clients are agent boundaries. `nw mcp serve` exposes read-only local context through stdio, so returned tool/resource content must stay redacted and bounded.
 - GitHub Actions and Trunk integrations treat repository contents and PR input as untrusted.
 - Scheduler install/remove is plan-only in v1; any future scheduler writes must stay explicit and user-level.
@@ -27,7 +27,7 @@ Nightward inspects local AI agent and devtool state, so its primary risk is acci
 - Unsafe portability: classify secret-auth, app-owned, runtime-cache, machine-local, and unknown state conservatively.
 - MCP execution ambiguity: flag shell wrappers, broad filesystem access, unpinned package execution, local endpoints, sensitive headers/env, token paths, and unknown shapes.
 - Supply-chain compromise: pin GitHub Actions by full SHA, use Renovate, run Gitleaks/OSV/CodeQL/Clippy/Trunk, keep release artifacts signed, and keep the npm package as a no-postinstall launcher that verifies archive checksums.
-- Malformed config denial-of-service: keep parser/fuzz tests for MCP JSON/TOML/YAML and add size/symlink hardening as the scanner expands.
+- Malformed config denial-of-service: keep parser/fuzz coverage for MCP JSON/TOML/YAML, URL/header redaction, symlink traversal, huge-file handling, and malformed configs.
 - Agent overreach through MCP: do not expose write tools, schedule install/remove, HTTP listeners, live config mutation, or online provider execution through the MCP server in v1.
 
 ## Non-Goals

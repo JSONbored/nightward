@@ -1,6 +1,7 @@
 use crate::analysis::Report as AnalysisReport;
 use crate::fixplan::Plan;
 use crate::policy::PolicyReport;
+use crate::reportdiff::DiffReport;
 use crate::Report as ScanReport;
 use anyhow::Result;
 use html_escape::encode_text;
@@ -12,6 +13,7 @@ pub fn render(
     analysis: Option<&AnalysisReport>,
     policy: Option<&PolicyReport>,
     plan: Option<&Plan>,
+    diff: Option<&DiffReport>,
 ) -> String {
     let mut out = String::new();
     out.push_str("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Nightward Report</title><style>");
@@ -32,7 +34,16 @@ pub fn render(
     if let Some(policy) = policy {
         kpi(&mut out, "Policy Blocks", policy.blocking_count);
     }
+    if let Some(diff) = diff {
+        kpi(&mut out, "Added", diff.summary.added);
+    }
     out.push_str("</div></section>");
+    if let Some(diff) = diff {
+        render_diff(&mut out, diff);
+    }
+    if let Some(analysis) = analysis {
+        render_analysis(&mut out, analysis);
+    }
     out.push_str("<section class=\"grid\">");
     for finding in &scan.findings {
         out.push_str(&format!("<article class=\"panel finding {}\"><p class=\"label\">{:?} / {}</p><h2>{}</h2><p>{}</p>", format!("{:?}", finding.severity).to_ascii_lowercase(), finding.severity, encode_text(&finding.rule), encode_text(&finding.message), encode_text(&finding.recommended_action)));
@@ -73,4 +84,82 @@ fn kpi(out: &mut String, label: &str, value: usize) {
         "<div class=\"kpi\"><div class=\"label\">{}</div><div class=\"value\">{}</div></div>",
         label, value
     ));
+}
+
+fn render_diff(out: &mut String, diff: &DiffReport) {
+    out.push_str("<section class=\"panel\"><p class=\"label\">Report history comparison</p>");
+    out.push_str(&format!(
+        "<h2>{} to {}</h2><p class=\"muted\">Added {}, removed {}, changed {}. Max added severity: {:?}.</p>",
+        encode_text(&diff.base),
+        encode_text(&diff.head),
+        diff.summary.added,
+        diff.summary.removed,
+        diff.summary.changed,
+        diff.summary.max_added_severity
+    ));
+    out.push_str("<div class=\"grid\">");
+    render_finding_list(out, "Added findings", &diff.added);
+    render_finding_list(out, "Removed findings", &diff.removed);
+    out.push_str("<article><h3>Changed findings</h3>");
+    if diff.changed.is_empty() {
+        out.push_str("<p class=\"muted\">No severity or message changes.</p>");
+    } else {
+        for change in diff.changed.iter().take(8) {
+            out.push_str(&format!(
+                "<p><strong>{}</strong><br><span class=\"muted\">{:?} to {:?}</span><br>{}</p>",
+                encode_text(&change.after.rule),
+                change.before.severity,
+                change.after.severity,
+                encode_text(&change.after.message)
+            ));
+        }
+    }
+    out.push_str("</article></div></section>");
+}
+
+fn render_finding_list(out: &mut String, title: &str, findings: &[crate::Finding]) {
+    out.push_str(&format!("<article><h3>{}</h3>", encode_text(title)));
+    if findings.is_empty() {
+        out.push_str("<p class=\"muted\">None.</p>");
+    } else {
+        for finding in findings.iter().take(8) {
+            out.push_str(&format!(
+                "<p><strong>{:?} / {}</strong><br>{}<br><code>{}</code></p>",
+                finding.severity,
+                encode_text(&finding.rule),
+                encode_text(&finding.message),
+                encode_text(&finding.path)
+            ));
+        }
+    }
+    out.push_str("</article>");
+}
+
+fn render_analysis(out: &mut String, analysis: &AnalysisReport) {
+    out.push_str("<section class=\"panel\"><p class=\"label\">Analysis</p><h2>Provider and signal summary</h2>");
+    out.push_str(&format!(
+        "<p class=\"muted\">{} signals across {} subjects. Provider warnings: {}. Highest severity: {:?}.</p>",
+        analysis.summary.total_signals,
+        analysis.summary.total_subjects,
+        analysis.summary.provider_warnings,
+        analysis.summary.highest_severity
+    ));
+    if !analysis.signals.is_empty() {
+        out.push_str("<div class=\"grid\">");
+        for signal in analysis.signals.iter().take(6) {
+            out.push_str(&format!(
+                "<article><p class=\"label\">{} / {:?}</p><h3>{}</h3><p>{}</p>",
+                encode_text(&signal.provider),
+                signal.severity,
+                encode_text(&signal.rule),
+                encode_text(&signal.message)
+            ));
+            if !signal.evidence.is_empty() {
+                out.push_str(&format!("<pre>{}</pre>", encode_text(&signal.evidence)));
+            }
+            out.push_str("</article>");
+        }
+        out.push_str("</div>");
+    }
+    out.push_str("</section>");
 }

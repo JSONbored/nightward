@@ -1,0 +1,21 @@
+{
+  "results": [
+    {
+      "packages": [
+        {
+          "package": {
+            "name": "demo"
+          },
+          "source": {
+            "path": "Cargo.lock"
+          },
+          "vulnerabilities": [
+            {
+              "id": "GHSA-demo-0001"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

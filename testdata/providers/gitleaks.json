@@ -1,0 +1,7 @@
+[
+  {
+    "RuleID": "generic-api-key",
+    "File": "mcp.json",
+    "Secret": "sk-1234567890abcdef"
+  }
+]

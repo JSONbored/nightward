@@ -8,6 +8,7 @@ import {
   fixPlan,
   normalizePreferences,
   providersDoctor,
+  reportDiff,
   reportsDir,
   runNightwardJSON,
   type RuntimeOptions,
@@ -294,6 +295,48 @@ test("fix plan helpers pass scoped selectors", async () => {
     "finding-123",
     "--format",
     "markdown",
+  ]);
+});
+
+test("report diff helper calls the CLI compare path", async () => {
+  let observedArgs: string[] = [];
+  const options: RuntimeOptions = {
+    executable: "nightward",
+    allowOnlineProviders: false,
+    timeoutMs: 1000,
+    execFileImpl: (_file, args, _options, callback) => {
+      observedArgs = args;
+      callback(
+        null,
+        JSON.stringify({
+          generated_at: "2026-05-01T00:00:00Z",
+          base: "/tmp/old.json",
+          head: "/tmp/new.json",
+          summary: {
+            added: 1,
+            removed: 0,
+            changed: 0,
+            max_added_severity: "high",
+          },
+          added: [],
+          removed: [],
+          changed: [],
+        }),
+        "",
+      );
+    },
+  };
+
+  const diff = await reportDiff(options, "/tmp/old.json", "/tmp/new.json");
+
+  assert.equal(diff.summary.added, 1);
+  assert.deepEqual(observedArgs, [
+    "report",
+    "diff",
+    "--from",
+    "/tmp/old.json",
+    "--to",
+    "/tmp/new.json",
   ]);
 });
 

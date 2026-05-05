@@ -9,12 +9,15 @@ import {
 } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
 import {
+  basename,
   dashboardMarkdown,
   findingFixLabel,
   findingMarkdown,
   findingTitle,
   fixPlanTotal,
   maxSeverity,
+  reportDiffMarkdown,
+  reportDiffSubtitle,
   severityColor,
   sortedFindings,
 } from "./format";
@@ -23,13 +26,16 @@ import {
   doctor,
   fixPlan,
   normalizePreferences,
+  reportDiff,
   reportsDir,
   scan,
+  type RuntimeOptions,
 } from "./nightward";
 import type {
   AnalysisReport,
   DoctorReport,
   FixPlan,
+  ReportRecord,
   ScanReport,
 } from "./types";
 
@@ -176,6 +182,51 @@ export default function Command() {
           }
         />
       </List.Section>
+
+      {(data.doctor.schedule.history?.length ?? 0) >= 2 ? (
+        <List.Section title="Report History">
+          <List.Item
+            title="Compare Latest Report"
+            subtitle={`${data.doctor.schedule.history?.[1]?.findings ?? 0} -> ${data.doctor.schedule.history?.[0]?.findings ?? 0} findings`}
+            icon={{ source: Icon.BarChart, tintColor: Color.Blue }}
+            detail={
+              <List.Item.Detail
+                markdown={[
+                  "# Report Compare",
+                  "",
+                  `Base: \`${basename(data.doctor.schedule.history?.[1]?.path ?? "")}\``,
+                  `Head: \`${basename(data.doctor.schedule.history?.[0]?.path ?? "")}\``,
+                  "",
+                  "Open the compare view to load the full diff from Nightward.",
+                ].join("\n")}
+              />
+            }
+            actions={
+              <ActionPanel>
+                <Action.Push
+                  title="Open Compare"
+                  icon={Icon.BarChart}
+                  target={
+                    <ReportCompareDetail
+                      runtime={runtime}
+                      base={data.doctor.schedule.history![1]}
+                      head={data.doctor.schedule.history![0]}
+                    />
+                  }
+                />
+                <Action.ShowInFinder
+                  title="Show Latest Report"
+                  path={data.doctor.schedule.history![0].path}
+                />
+                <Action.ShowInFinder
+                  title="Show Previous Report"
+                  path={data.doctor.schedule.history![1].path}
+                />
+              </ActionPanel>
+            }
+          />
+        </List.Section>
+      ) : null}
 
       <List.Section title="Findings To Review">
         {sortedFindings(data.report.findings)
@@ -403,6 +454,96 @@ function ScheduleDetail({ doctor }: { doctor: DoctorReport }) {
             text={doctor.schedule.log_dir}
           />
         </List.Item.Detail.Metadata>
+      }
+    />
+  );
+}
+
+function ReportCompareDetail({
+  runtime,
+  base,
+  head,
+}: {
+  runtime: RuntimeOptions;
+  base: ReportRecord;
+  head: ReportRecord;
+}) {
+  const { data, error, isLoading, revalidate } = usePromise(() =>
+    reportDiff(runtime, base.path, head.path),
+  );
+  if (error) {
+    return (
+      <Detail
+        markdown={`# Report Compare\n\n${error.message}`}
+        actions={
+          <ActionPanel>
+            <Action
+              title="Refresh"
+              icon={Icon.ArrowClockwise}
+              onAction={revalidate}
+            />
+            <Action.ShowInFinder title="Show Latest Report" path={head.path} />
+            <Action.ShowInFinder
+              title="Show Previous Report"
+              path={base.path}
+            />
+          </ActionPanel>
+        }
+      />
+    );
+  }
+  if (!data) {
+    return <Detail isLoading={isLoading} markdown="# Report Compare" />;
+  }
+  const markdown = reportDiffMarkdown(data);
+  return (
+    <Detail
+      isLoading={isLoading}
+      markdown={markdown}
+      metadata={
+        <Detail.Metadata>
+          <Detail.Metadata.TagList title="Change">
+            <Detail.Metadata.TagList.Item
+              text={reportDiffSubtitle(data)}
+              color={severityColor(data.summary.max_added_severity)}
+            />
+          </Detail.Metadata.TagList>
+          <Detail.Metadata.Separator />
+          <Detail.Metadata.Label
+            title="Added"
+            text={String(data.summary.added)}
+          />
+          <Detail.Metadata.Label
+            title="Removed"
+            text={String(data.summary.removed)}
+          />
+          <Detail.Metadata.Label
+            title="Changed"
+            text={String(data.summary.changed)}
+          />
+          <Detail.Metadata.Label
+            title="Max Added"
+            text={data.summary.max_added_severity}
+          />
+          <Detail.Metadata.Separator />
+          <Detail.Metadata.Label title="Base" text={basename(base.path)} />
+          <Detail.Metadata.Label title="Head" text={basename(head.path)} />
+        </Detail.Metadata>
+      }
+      actions={
+        <ActionPanel>
+          <Action.CopyToClipboard
+            title="Copy Compare Markdown"
+            content={markdown}
+          />
+          <Action
+            title="Refresh"
+            icon={Icon.ArrowClockwise}
+            onAction={revalidate}
+          />
+          <Action.ShowInFinder title="Show Latest Report" path={head.path} />
+          <Action.ShowInFinder title="Show Previous Report" path={base.path} />
+        </ActionPanel>
       }
     />
   );
