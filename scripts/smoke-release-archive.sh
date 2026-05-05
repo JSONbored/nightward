@@ -8,8 +8,29 @@ if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 1
 fi
 version="${tag#v}"
-asset="nightward_${version}_linux_amd64.tar.gz"
-sbom="nightward_${version}_linux_amd64.sbom.json"
+case "$(uname -s)" in
+  Darwin) os="darwin" ;;
+  Linux) os="linux" ;;
+  MINGW* | MSYS* | CYGWIN*) os="windows" ;;
+  *)
+    echo "unsupported release smoke OS: $(uname -s)" >&2
+    exit 1
+    ;;
+esac
+case "$(uname -m)" in
+  x86_64 | amd64) arch="amd64" ;;
+  arm64 | aarch64) arch="arm64" ;;
+  *)
+    echo "unsupported release smoke architecture: $(uname -m)" >&2
+    exit 1
+    ;;
+esac
+if [[ "${os}" == "windows" ]]; then
+  asset="nightward_${version}_${os}_${arch}.zip"
+else
+  asset="nightward_${version}_${os}_${arch}.tar.gz"
+fi
+sbom="nightward_${version}_${os}_${arch}.sbom.json"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
@@ -30,10 +51,16 @@ cosign verify-blob \
   checksums.txt
 sha256sum -c checksums.txt --ignore-missing
 mkdir -p extracted
-tar -xzf "${asset}" -C extracted
+if [[ "${asset}" == *.zip ]]; then
+  unzip -q "${asset}" -d extracted
+  bin_ext=".exe"
+else
+  tar -xzf "${asset}" -C extracted
+  bin_ext=""
+fi
 
 cd extracted
-./nightward --version | grep -Fx "${version}"
-./nw --version | grep -Fx "${version}"
+./nightward"${bin_ext}" --version | grep -Fx "${version}"
+./nw"${bin_ext}" --version | grep -Fx "${version}"
 
 echo "release archive smoke passed for ${repo}@${tag}"
