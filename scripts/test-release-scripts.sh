@@ -9,6 +9,12 @@ if "${repo_root}/scripts/smoke-release-archive.sh" "latest" >/dev/null 2>&1; the
   echo "expected smoke-release-archive.sh to reject non-semver tag" >&2
   exit 1
 fi
+grep -q 'uname -s' "${repo_root}/scripts/smoke-release-archive.sh"
+grep -q 'uname -m' "${repo_root}/scripts/smoke-release-archive.sh"
+if grep -q 'nightward_${version}_linux_amd64.tar.gz' "${repo_root}/scripts/smoke-release-archive.sh"; then
+  echo "expected smoke-release-archive.sh to select the host release archive" >&2
+  exit 1
+fi
 
 if "${repo_root}/scripts/verify-npm-release.sh" "v0.1.0" >/dev/null 2>&1; then
   echo "expected verify-npm-release.sh to reject v-prefixed npm version" >&2
