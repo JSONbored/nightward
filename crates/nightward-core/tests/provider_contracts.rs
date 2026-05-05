@@ -1,6 +1,8 @@
 use nightward_core::analysis::SignalCategory;
 use nightward_core::providers::{parse_provider_output, run_provider, statuses};
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::time::{Duration, Instant};
 
 fn fixture(name: &str) -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -104,6 +106,35 @@ fn provider_timeout_returns_stable_warning_error() {
     let error = run_provider("gitleaks", dir.path()).expect_err("timeout");
 
     assert!(error.to_string().contains("provider timed out after"));
+}
+
+#[cfg(unix)]
+#[test]
+fn provider_timeout_does_not_wait_for_inherited_output_pipes() {
+    let _guard = EnvRestore::set(&[
+        ("PATH", None),
+        ("NIGHTWARD_PROVIDER_TIMEOUT_MS", Some("50")),
+        ("NIGHTWARD_PROVIDER_STDOUT_CAP", None),
+    ]);
+    let dir = tempfile::tempdir().expect("temp dir");
+    write_executable(
+        dir.path().join("gitleaks"),
+        "#!/bin/sh\n(/bin/sleep 2) &\n/bin/sleep 1\n",
+    );
+    std::env::set_var("PATH", dir.path());
+
+    let started = Instant::now();
+    let error = run_provider("gitleaks", dir.path()).expect_err("timeout");
+    let elapsed = started.elapsed();
+
+    assert!(
+        error.to_string().contains("provider timed out after"),
+        "actual error: {error}"
+    );
+    assert!(
+        elapsed < Duration::from_secs(1),
+        "provider timeout waited for inherited pipe holder: {elapsed:?}"
+    );
 }
 
 #[cfg(unix)]
