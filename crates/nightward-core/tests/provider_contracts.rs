@@ -91,12 +91,15 @@ fn provider_timeout_returns_stable_warning_error() {
         ("NIGHTWARD_PROVIDER_STDOUT_CAP", None),
     ]);
     let dir = tempfile::tempdir().expect("temp dir");
-    write_executable(dir.path().join("gitleaks"), "#!/bin/sh\nsleep 1\n");
+    write_executable(dir.path().join("gitleaks"), "#!/bin/sh\n/bin/sleep 1\n");
     std::env::set_var("PATH", dir.path());
 
     let error = run_provider("gitleaks", dir.path()).expect_err("timeout");
 
-    assert!(error.to_string().contains("provider timed out after"));
+    assert!(
+        error.to_string().contains("provider timed out after"),
+        "actual error: {error}"
+    );
 }
 
 #[cfg(unix)]

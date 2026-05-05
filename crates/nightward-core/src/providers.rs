@@ -8,6 +8,7 @@ use std::env;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::thread;
 use std::time::Duration;
 use wait_timeout::ChildExt;
 
@@ -161,6 +162,28 @@ pub fn run_provider(name: &str, root: &Path) -> Result<Vec<ProviderFinding>> {
         .stderr(Stdio::piped())
         .spawn()
         .with_context(|| format!("spawn provider {name}"))?;
+
+    let stdout_handle = child.stdout.take().map(|mut stream| {
+        thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = stream
+                .by_ref()
+                .take(stdout_cap as u64 + 1)
+                .read_to_end(&mut buf);
+            buf
+        })
+    });
+    let stderr_handle = child.stderr.take().map(|mut stream| {
+        thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = stream
+                .by_ref()
+                .take(stderr_cap as u64 + 1)
+                .read_to_end(&mut buf);
+            buf
+        })
+    });
+
     let status = match child.wait_timeout(timeout)? {
         Some(status) => status,
         None => {
@@ -169,20 +192,13 @@ pub fn run_provider(name: &str, root: &Path) -> Result<Vec<ProviderFinding>> {
             return Err(anyhow!("provider timed out after {:?}", timeout));
         }
     };
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    if let Some(mut stream) = child.stdout.take() {
-        let _ = stream
-            .by_ref()
-            .take(stdout_cap as u64 + 1)
-            .read_to_end(&mut stdout);
-    }
-    if let Some(mut stream) = child.stderr.take() {
-        let _ = stream
-            .by_ref()
-            .take(stderr_cap as u64 + 1)
-            .read_to_end(&mut stderr);
-    }
+
+    let stdout = stdout_handle
+        .map(|handle| handle.join().unwrap_or_default())
+        .unwrap_or_default();
+    let stderr = stderr_handle
+        .map(|handle| handle.join().unwrap_or_default())
+        .unwrap_or_default();
     let (stdout, stdout_truncated) = capped_string(stdout, stdout_cap);
     let (stderr, _) = capped_string(stderr, stderr_cap);
     if stdout_truncated {
