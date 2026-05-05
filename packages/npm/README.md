@@ -18,7 +18,8 @@ the archive SHA-256 against `checksums.txt`, caches the extracted `nightward`
 and `nw` Rust binaries, and then executes `nightward` or `nw`.
 
 Supported launcher platforms are macOS arm64/amd64, Linux arm64/amd64, and
-Windows amd64.
+Windows amd64. The embedded terminal TUI currently requires a Unix-like
+terminal; use JSON, policy, provider, and HTML report commands on Windows.
 
 Release notes are published with GitHub Releases:
 
