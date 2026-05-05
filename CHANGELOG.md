@@ -10,17 +10,29 @@ continue to use Conventional Commit style so generated notes stay readable.
 
 ## Unreleased
 
-- Collapsed redundant `mcp_server_review` noise when stronger server-specific findings already exist.
-- Added grouped fix-plan review items for repeated package-pin remediation.
-- Added compact MCP policy output for AI-client status checks.
-- Improved CLI/Raycast provider-token redaction and scoped Raycast fix-plan actions.
-- Replaced pre-1.0 deterministic SHA-1 IDs with SHA-256-backed IDs while preserving the short ID shape.
-- Added OpenSSF Silver-ready governance, threat model, DCO, coverage, and release snapshot hardening.
-- Added a release-gated npm launcher package that downloads GitHub Release binaries on first run without `postinstall`.
-- Added VitePress documentation site scaffolding and GitHub Pages deployment workflow.
-- Added rules list/explain commands and local static HTML report generation.
-- Improved report history, website install UX, Raycast polish, and
-  release-status documentation after the first stable release.
+## v0.1.6
+
+Release repair and workflow hardening after the protected `v0.1.5` tag could
+not be reused.
+
+- Added parser fuzz harnesses and regression coverage for MCP JSON/TOML/YAML
+  parsing, redaction, symlink traversal, huge files, and malformed configs.
+- Added first-class report-history comparison across CLI data, TUI, Raycast,
+  static HTML reports, tests, and docs.
+- Tightened provider normalization for `gitleaks`, `trufflehog`, `semgrep`,
+  `trivy`, `osv-scanner`, and `socket`, including skip, timeout, output-cap,
+  provider-warning, policy, SARIF, TUI, Raycast, and HTML behavior.
+- Hardened release publishing with signed-tag verification, Windows-compatible
+  builds for non-TUI commands, scoped archive uploads, and Cosign-backed release
+  smoke before npm publication.
+
+## v0.1.5
+
+Superseded release attempt.
+
+- The signed `v0.1.5` tag was created while repairing the release workflow, but
+  the GitHub Release was removed before npm publication completed. The protected
+  tag remains in the repository and should be skipped; use `v0.1.6` or newer.
 
 ## v0.1.4
 
