@@ -9,6 +9,12 @@ fn fixture(name: &str) -> String {
     std::fs::read_to_string(path).expect("provider fixture")
 }
 
+const FIXTURE_SECRETS: [&str; 3] = [
+    "example-gitleaks-redacted-value",
+    "example-trivy-redacted-value",
+    "example-trufflehog-redacted-value",
+];
+
 #[test]
 fn provider_fixtures_normalize_supported_outputs() {
     let root = Path::new("/tmp/nightward-provider-fixture");
@@ -49,8 +55,9 @@ fn provider_fixtures_normalize_supported_outputs() {
         assert!(
             findings
                 .iter()
-                .all(|finding| !finding.evidence.contains("1234567890abcdef")
-                    && !finding.message.contains("1234567890abcdef")),
+                .all(|finding| FIXTURE_SECRETS.iter().all(|secret| {
+                    !finding.evidence.contains(secret) && !finding.message.contains(secret)
+                })),
             "{provider} output should be redacted"
         );
     }
@@ -91,7 +98,7 @@ fn provider_timeout_returns_stable_warning_error() {
         ("NIGHTWARD_PROVIDER_STDOUT_CAP", None),
     ]);
     let dir = tempfile::tempdir().expect("temp dir");
-    write_executable(dir.path().join("gitleaks"), "#!/bin/sh\nsleep 1\n");
+    write_executable(dir.path().join("gitleaks"), "#!/bin/sh\n/bin/sleep 1\n");
     std::env::set_var("PATH", dir.path());
 
     let error = run_provider("gitleaks", dir.path()).expect_err("timeout");

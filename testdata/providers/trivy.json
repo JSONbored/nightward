@@ -12,7 +12,7 @@
       "Secrets": [
         {
           "RuleID": "secret-key",
-          "Match": "API_KEY=sk-1234567890abcdef"
+          "Match": "API_KEY=example-trivy-redacted-value"
         }
       ],
       "Misconfigurations": [
