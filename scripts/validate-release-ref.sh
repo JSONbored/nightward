@@ -10,6 +10,10 @@ if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 git fetch --force origin refs/heads/main:refs/remotes/origin/main --tags
+allowed_signers="$(git rev-parse --show-toplevel)/.github/allowed_signers"
+if [[ -f "${allowed_signers}" ]]; then
+  git config gpg.ssh.allowedSignersFile "${allowed_signers}"
+fi
 git verify-tag "${tag}" >/dev/null
 
 tag_commit="$(git rev-list -n 1 "${tag}")"
