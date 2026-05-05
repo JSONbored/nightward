@@ -127,6 +127,26 @@ fn provider_stdout_cap_fails_closed_before_parsing() {
 }
 
 #[cfg(unix)]
+#[test]
+fn provider_large_stdout_is_drained_until_cap_error() {
+    let _guard = EnvRestore::set(&[
+        ("PATH", None),
+        ("NIGHTWARD_PROVIDER_TIMEOUT_MS", Some("1000")),
+        ("NIGHTWARD_PROVIDER_STDOUT_CAP", Some("16")),
+    ]);
+    let dir = tempfile::tempdir().expect("temp dir");
+    write_executable(
+        dir.path().join("gitleaks"),
+        "#!/bin/sh\n/usr/bin/head -c 262144 /dev/zero | /usr/bin/tr '\\0' a\n",
+    );
+    std::env::set_var("PATH", dir.path());
+
+    let error = run_provider("gitleaks", dir.path()).expect_err("output cap");
+
+    assert_eq!(error.to_string(), "provider stdout exceeded 16 byte cap");
+}
+
+#[cfg(unix)]
 fn write_executable(path: impl AsRef<Path>, body: &str) {
     use std::os::unix::fs::PermissionsExt;
 

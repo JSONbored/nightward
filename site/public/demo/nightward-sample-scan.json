@@ -33,7 +33,7 @@
   },
   "items": [
     {
-      "id": "d02aa351e661",
+      "id": "47fe604fd067",
       "tool": "Codex",
       "path": "/tmp/nightward-fixture-home/.codex/config.toml",
       "kind": "file",
@@ -48,7 +48,7 @@
   ],
   "findings": [
     {
-      "id": "mcp_unpinned_package-23f4e5dd9f16",
+      "id": "mcp_unpinned_package-4aa22da6f0fe",
       "tool": "Codex",
       "path": "/tmp/nightward-fixture-home/.codex/config.toml",
       "server": "demo",
@@ -77,7 +77,7 @@
       }
     },
     {
-      "id": "mcp_secret_env-2b536e661bca",
+      "id": "mcp_secret_env-ac18995a3bb4",
       "tool": "Codex",
       "path": "/tmp/nightward-fixture-home/.codex/config.toml",
       "server": "demo",
@@ -106,7 +106,7 @@
       }
     },
     {
-      "id": "mcp_broad_filesystem-8dca8b68a5eb",
+      "id": "mcp_broad_filesystem-750be3ad0300",
       "tool": "Codex",
       "path": "/tmp/nightward-fixture-home/.codex/config.toml",
       "server": "demo",
@@ -131,7 +131,7 @@
       ]
     },
     {
-      "id": "mcp_server_review-b836ab7c82bf",
+      "id": "mcp_server_review-aa2fd568f642",
       "tool": "Codex",
       "path": "/tmp/nightward-fixture-home/.codex/config.toml",
       "server": "demo",

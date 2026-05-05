@@ -1,8 +1,8 @@
-import { chmod, mkdtemp, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -10,8 +10,10 @@ import {
   assetName,
   cachedBinaryPath,
   commandName,
+  ensureBinary,
   parseChecksums,
   releaseBaseURL,
+  sha256,
   targetFor,
   verifyArchiveChecksum
 } from "../bin/nightward.mjs";
@@ -88,3 +90,71 @@ console.log("fake-nightward " + process.argv.slice(2).join(" "));
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout.trim(), "fake-nightward --version");
 });
+
+test("cache hits are re-extracted from a verified archive before execution", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "nightward-npm-cache-"));
+  const release = path.join(dir, "release");
+  const packageDir = path.join(dir, "package");
+  const cache = path.join(dir, "cache");
+  const version = "9.9.9";
+  const target = targetFor(process.platform, process.arch);
+  const asset = assetName(version, target);
+  await mkdir(release, { recursive: true });
+  await mkdir(packageDir, { recursive: true });
+  const command = process.platform === "win32" ? "nightward.exe" : "nightward";
+  const binary = path.join(packageDir, command);
+  await writeFile(binary, "#!/usr/bin/env node\nconsole.log('GOOD_CACHE_BINARY');\n");
+  await chmod(binary, 0o755);
+  const archive = path.join(release, asset);
+  const archiveResult = process.platform === "win32"
+    ? spawnSync("powershell", [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      "Compress-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force",
+      binary,
+      archive
+    ], { encoding: "utf8" })
+    : spawnSync("tar", ["-czf", archive, "-C", packageDir, command], {
+      encoding: "utf8"
+    });
+  assert.equal(archiveResult.status, 0, archiveResult.stderr);
+  await writeFile(
+    path.join(release, "checksums.txt"),
+    `${await sha256(archive)}  ${asset}\n`
+  );
+
+  const previous = {
+    cache: process.env.NIGHTWARD_NPM_CACHE,
+    version: process.env.NIGHTWARD_NPM_VERSION,
+    base: process.env.NIGHTWARD_NPM_DOWNLOAD_BASE
+  };
+  process.env.NIGHTWARD_NPM_CACHE = cache;
+  process.env.NIGHTWARD_NPM_VERSION = version;
+  process.env.NIGHTWARD_NPM_DOWNLOAD_BASE = pathToFileURL(release).href;
+  try {
+    const cached = await ensureBinary("nightward");
+    await writeFile(cached, "#!/usr/bin/env node\nconsole.log('POISONED_CACHE_BINARY');\n");
+    await chmod(cached, 0o755);
+
+    const repaired = await ensureBinary("nightward");
+    const contents = await readFile(repaired, "utf8");
+
+    assert.equal(repaired, cached);
+    assert.match(contents, /GOOD_CACHE_BINARY/);
+    assert.doesNotMatch(contents, /POISONED_CACHE_BINARY/);
+  } finally {
+    restoreEnv("NIGHTWARD_NPM_CACHE", previous.cache);
+    restoreEnv("NIGHTWARD_NPM_VERSION", previous.version);
+    restoreEnv("NIGHTWARD_NPM_DOWNLOAD_BASE", previous.base);
+  }
+});
+
+function restoreEnv(key, value) {
+  if (value === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = value;
+  }
+}

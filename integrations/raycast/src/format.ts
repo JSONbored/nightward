@@ -13,8 +13,10 @@ import type {
 
 const secretAssignmentPattern =
   /((?:token|secret|password|passwd|api[_-]?key|auth|authorization|credential|private[_-]?key)[\w.-]*\s*[:=]\s*)(["']?)(?:\$\{[A-Za-z_][A-Za-z0-9_]*\}|[^"',\s}]+)/gi;
+const sensitiveFlagPattern =
+  /(--?[\w.-]*(?:token|secret|password|passwd|api[_-]?key|auth|authorization|credential|private[_-]?key)[\w.-]*)(?:=|\s+)(?:\$\{[A-Za-z_][A-Za-z0-9_]*\}|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s\r\n,}]+)/gi;
 const providerTokenPattern =
-  /\b(?:Bearer\s+[-A-Za-z0-9._~+/=]{8,}|sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b/g;
+  /\b(?:(?:Basic|Bearer)\s+[-A-Za-z0-9._~+/=]{8,}|sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b/g;
 
 const riskRank: Record<RiskLevel, number> = {
   info: 0,
@@ -28,11 +30,9 @@ export function redactText(value: string | undefined): string {
   if (!value) return "";
   const redacted = value
     .replace(providerTokenPattern, "[redacted]")
+    .replace(sensitiveFlagPattern, "$1 [redacted]")
     .replace(secretAssignmentPattern, "$1$2[redacted]");
-  return redacted
-    .split(/(\s+)/)
-    .map((part) => (looksOpaqueProviderToken(part) ? "[redacted]" : part))
-    .join("");
+  return redacted.split(/(\s+)/).map(redactOpaqueTokenPart).join("");
 }
 
 export function severityColor(severity: RiskLevel): string {
@@ -546,6 +546,17 @@ function looksOpaqueProviderToken(value: string): boolean {
     return false;
   }
   return /\d/.test(trimmed) && /[A-Za-z]/.test(trimmed);
+}
+
+function redactOpaqueTokenPart(part: string): string {
+  if (looksOpaqueProviderToken(part)) return "[redacted]";
+  const equalsIndex = part.indexOf("=");
+  if (equalsIndex > 0) {
+    const key = part.slice(0, equalsIndex);
+    const value = part.slice(equalsIndex + 1);
+    if (looksOpaqueProviderToken(value)) return `${key}=[redacted]`;
+  }
+  return part;
 }
 
 const markdownSpecialChars = new Set([
