@@ -22,6 +22,7 @@ nw adapters list --json
 nw adapters explain Codex --json
 nw policy check --strict --json
 nw policy sarif --output nightward.sarif
+nw actions apply policy.ignore --finding <finding-id> --reason "reviewed locally" --confirm
 ```
 
 ## Workspace mode
@@ -38,11 +39,11 @@ nw policy sarif --workspace . --include-analysis --output -
 
 ```sh
 nw schedule plan --preset nightly
-nw schedule install --preset nightly --dry-run
-nw schedule remove --dry-run
+nw schedule install --confirm
+nw schedule remove --confirm
 ```
 
-Schedule install/remove are plan-only in v1. Review the generated plan before any future write-capable scheduler workflow.
+Without `--confirm`, schedule install/remove return the action preview. With `--confirm`, Nightward writes or removes user-level launchd/systemd files and leaves existing reports/audit logs in place.
 
 ## Static report
 

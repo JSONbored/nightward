@@ -34,11 +34,16 @@ jobs:
         run: npm ci --ignore-scripts --no-audit
         working-directory: site
 
+      - name: Set up Rust for docs contract tests
+        run: |
+          rustup toolchain install 1.85.0 --profile minimal
+          rustup default 1.85.0
+
       - name: Audit site dependencies
         run: npm audit --audit-level=moderate
         working-directory: site
 
-      - name: Check generated docs freshness
+      - name: Run documentation contract tests
         run: make docs-qa
 
       - name: Configure Pages

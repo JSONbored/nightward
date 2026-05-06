@@ -2,7 +2,7 @@
 
 This page is generated from `nw providers list --json`.
 
-Nightward never installs providers. Local providers run only when selected with `--with`. Online-capable providers also require `--online` or `allow_online_providers: true` in policy config.
+Nightward never installs providers during doctor or analysis runs. Provider install actions are separate, disclosure-gated, and confirmation-gated. Local providers run only when selected with `--with`. Online-capable providers also require `--online` or `allow_online_providers: true` in policy/config/settings.
 
 | Provider | Mode | Command | Default | Install | Privacy | Capabilities |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -12,10 +12,15 @@ Nightward never installs providers. Local providers run only when selected with 
 | [semgrep](https://semgrep.dev/) | local/offline | `semgrep` | no | [docs](https://semgrep.dev/docs/getting-started/) | local command; no network enabled by Nightward | local rule scanning |
 | [trivy](https://trivy.dev/) | online-capable | `trivy` | no | [docs](https://trivy.dev/latest/getting-started/installation/) | online-capable; blocked unless explicitly enabled | filesystem vulnerability, secret, and misconfig scanning |
 | [osv-scanner](https://google.github.io/osv-scanner/) | online-capable | `osv-scanner` | no | [docs](https://google.github.io/osv-scanner/installation/) | online-capable; blocked unless explicitly enabled | dependency vulnerability scanning |
+| [grype](https://oss.anchore.com/grype/) | online-capable | `grype` | no | [docs](https://oss.anchore.com/docs/reference/grype/quickstart/) | online-capable; blocked unless explicitly enabled | filesystem and SBOM vulnerability scanning |
+| [syft](https://oss.anchore.com/syft/) | local/offline | `syft` | no | [docs](https://oss.anchore.com/docs/reference/syft/quickstart/) | local command; no network enabled by Nightward | local SBOM and package inventory |
+| [scorecard](https://github.com/ossf/scorecard) | online-capable | `scorecard` | no | [docs](https://github.com/ossf/scorecard#installation) | online-capable; blocked unless explicitly enabled | repository trust and supply-chain score checks |
 | [socket](https://socket.dev/) | online-capable | `socket` | no | [docs](https://docs.socket.dev/docs/socket-cli) | online-capable; creates a remote Socket scan artifact | dependency risk metadata and Socket scan creation |
 
 ## Online-Capable Providers
 
 - `trivy`: explicit filesystem scan with JSON output. Vulnerability database activity can contact upstream services, so Nightward requires `--online`.
 - `osv-scanner`: explicit source scan against vulnerability data. Nightward requires `--online`.
+- `grype`: filesystem/SBOM vulnerability scanning. Vulnerability database activity can contact upstream services, so Nightward requires `--online`.
+- `scorecard`: repository-trust checks against a git remote or `NIGHTWARD_SCORECARD_REPO`. Nightward requires `--online`.
 - `socket`: creates a remote Socket scan artifact and uploads dependency manifest metadata. Nightward does not fetch remote Socket reports in v1.

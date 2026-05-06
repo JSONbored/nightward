@@ -16,7 +16,7 @@ Nightward is pre-1.0. Security fixes target `main` until tagged releases exist.
 - Explicit output flags may write redacted report or SARIF artifacts.
 - Scheduling only writes explicit user-level scheduler files through `schedule install`.
 - Policy ignores require documented reasons so suppressions are reviewable.
-- Parser and provider hardening is regression-tested with fixture-backed unit tests plus optional cargo-fuzz harnesses. Local fuzz smoke is `make fuzz-smoke`; focused runs are `cargo fuzz run mcp_config_formats`, `cargo fuzz run redaction_urls_headers`, and `cargo fuzz run filesystem_boundaries`.
+- Parser and provider hardening is regression-tested with fixture-backed unit tests plus optional cargo-fuzz harnesses. The bounded local fuzz check is `make fuzz-check`; focused runs are `cargo fuzz run mcp_config_formats`, `cargo fuzz run redaction_urls_headers`, and `cargo fuzz run filesystem_boundaries`.
 
 ## Reporting a Vulnerability
 

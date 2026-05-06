@@ -1,0 +1,15 @@
+{
+  "score": 6.5,
+  "checks": [
+    {
+      "name": "Branch-Protection",
+      "score": 3,
+      "reason": "branch protection is not enabled"
+    },
+    {
+      "name": "Pinned-Dependencies",
+      "score": 9,
+      "reason": "dependencies are pinned"
+    }
+  ]
+}

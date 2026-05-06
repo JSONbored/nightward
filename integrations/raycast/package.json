@@ -76,6 +76,13 @@
       "keywords": ["providers", "doctor", "security", "privacy"]
     },
     {
+      "name": "actions",
+      "title": "Nightward Actions",
+      "description": "Preview and apply confirmed Nightward provider, schedule, backup, and setup actions.",
+      "mode": "view",
+      "keywords": ["actions", "apply", "backup", "schedule", "providers", "fix"]
+    },
+    {
       "name": "explain-finding",
       "title": "Explain Nightward Finding",
       "description": "Open a detailed explanation for one Nightward finding ID.",
@@ -129,8 +136,8 @@
   ],
   "scripts": {
     "dev": "ray develop",
-    "test": "node --import tsx --test test/*.test.ts",
-    "test:junit": "mkdir -p ../../reports/junit && node --import tsx --test --test-reporter=spec --test-reporter=junit --test-reporter-destination=stdout --test-reporter-destination=../../reports/junit/raycast.raw.xml test/*.test.ts && node scripts/normalize-junit.mjs ../../reports/junit/raycast.raw.xml ../../reports/junit/raycast.xml",
+    "test": "vitest run",
+    "test:junit": "mkdir -p ../../reports/junit && vitest run --config vitest.junit.config.mjs",
     "build": "ray build -e dist",
     "lint": "ray lint",
     "fix-lint": "ray lint --fix",
@@ -145,7 +152,7 @@
   "devDependencies": {
     "@types/node": "22.19.17",
     "@raycast/eslint-config": "2.1.1",
-    "tsx": "4.21.0",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vitest": "^4.0.8"
   }
 }

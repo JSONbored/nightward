@@ -1,0 +1,17 @@
+{
+  "source": {
+    "target": "."
+  },
+  "artifacts": [
+    {
+      "name": "demo",
+      "version": "1.0.0",
+      "type": "npm"
+    },
+    {
+      "name": "serde",
+      "version": "1.0.0",
+      "type": "rust-crate"
+    }
+  ]
+}

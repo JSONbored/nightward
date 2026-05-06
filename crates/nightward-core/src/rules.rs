@@ -62,6 +62,27 @@ pub fn all_rules() -> Vec<Rule> {
             docs_url: "https://nightward.aethereal.dev/guide/privacy-model",
         },
         Rule {
+            id: "mcp_docker_socket",
+            severity: RiskLevel::High,
+            fix_kind: FixKind::ManualReview,
+            title: "MCP server can control Docker or container host state",
+            docs_url: "https://nightward.aethereal.dev/guide/mcp-security",
+        },
+        Rule {
+            id: "mcp_typosquat_package",
+            severity: RiskLevel::Medium,
+            fix_kind: FixKind::ManualReview,
+            title: "MCP server package resembles a trusted namespace",
+            docs_url: "https://nightward.aethereal.dev/guide/mcp-security",
+        },
+        Rule {
+            id: "mcp_untrusted_package_source",
+            severity: RiskLevel::Medium,
+            fix_kind: FixKind::ManualReview,
+            title: "MCP server launches a remote package or script source",
+            docs_url: "https://nightward.aethereal.dev/guide/mcp-security",
+        },
+        Rule {
             id: "mcp_server_review",
             severity: RiskLevel::Info,
             fix_kind: FixKind::ManualReview,
@@ -87,6 +108,13 @@ pub fn all_rules() -> Vec<Rule> {
             severity: RiskLevel::Info,
             fix_kind: FixKind::ManualReview,
             title: "Config file is a symbolic link",
+            docs_url: "https://nightward.aethereal.dev/guide/privacy-model",
+        },
+        Rule {
+            id: "config_stale",
+            severity: RiskLevel::Low,
+            fix_kind: FixKind::ManualReview,
+            title: "Config file has not changed in over 180 days",
             docs_url: "https://nightward.aethereal.dev/guide/privacy-model",
         },
     ]

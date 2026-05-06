@@ -41,6 +41,14 @@ fn provider_fixtures_normalize_supported_outputs() {
             1,
             SignalCategory::SupplyChain,
         ),
+        ("grype", "grype.json", 1, SignalCategory::SupplyChain),
+        ("syft", "syft.json", 1, SignalCategory::SupplyChain),
+        (
+            "scorecard",
+            "scorecard.json",
+            1,
+            SignalCategory::SupplyChain,
+        ),
         ("socket", "socket.json", 1, SignalCategory::SupplyChain),
     ];
 

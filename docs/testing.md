@@ -59,7 +59,7 @@ make gitleaks
 make cargo-audit
 make cargo-deny
 make coverage-check
-make fuzz-smoke
+make fuzz-check
 make test-junit
 make trunk-flaky-validate
 make trunk-check
@@ -86,25 +86,26 @@ make verify
 - Redaction tests must cover scan JSON, policy output, SARIF, Markdown exports, fix exports, and TUI text.
 - Badge artifact tests must cover pass/fail shape, policy summary fields, optional SARIF URL, and no-write stdout mode.
 - Golden-style tests should stay stable for JSON/SARIF shape, not timestamps or host-specific paths. Scan-summary goldens must keep item buckets separate from finding buckets.
-- MCP fixture tests should cover command servers, URL-shaped servers, sensitive headers, local endpoints, and unsupported shapes.
-- Parser fuzz harnesses live under `fuzz/` and cover MCP JSON/TOML/YAML parsing, URL/header redaction, symlink traversal, huge-file handling, and malformed config cases. Run a bounded local fuzz check with `make fuzz-smoke`; run a single target directly with `cargo fuzz run mcp_config_formats -- -runs=1024`.
-- Provider contract tests use `testdata/providers/*` fixtures for `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, and `socket`.
+- MCP fixture tests should cover command servers, URL-shaped servers, sensitive headers, local/private endpoints, Docker/socket exposure, package provenance hints, stale configs, app-owned state, and unsupported shapes.
+- MCP server protocol tests should cover initialize negotiation, tools/resources/prompts lists, strict input schemas, server-side invalid-argument rejection, MCP path scoping, structured output, annotations, tool-result errors, disclosure-gated apply, successful action-registry apply, and report-change failure paths.
+- Parser fuzz harnesses live under `fuzz/` and cover MCP JSON/TOML/YAML parsing, URL/header redaction, symlink traversal, huge-file handling, and malformed config cases. Run a bounded local fuzz check with `make fuzz-check`; run a single target directly with `cargo fuzz run mcp_config_formats -- -runs=1024`.
+- Provider contract tests use `testdata/providers/*` fixtures for `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, `grype`, `syft`, `scorecard`, and `socket`.
 - Scheduler tests verify generated launchd, systemd user timer, and cron text without installing schedules.
 - TUI tests cover fixed terminal rendering behavior, redaction boundaries, and embedded OpenTUI layout helpers.
 - Scheduler tests cover report history ordering, finding counts, non-report filtering, and symlink skipping without installing timers.
-- Raycast extension tests cover pure redaction/formatting helpers and safe command execution wrappers.
+- Raycast extension tests cover pure redaction/formatting helpers, safe command execution wrappers, and Provider Doctor install routing through the shared action registry instead of direct shell execution.
 - `cargo fmt`, `cargo clippy -D warnings`, `cargo test`, optional `cargo audit`/`cargo deny`, Gitleaks, and coverage checks are part of the local verification bar.
 - `make coverage-check` enforces the practical coverage target when `cargo-llvm-cov` is available, and always runs the Rust workspace tests.
 - `make ci-scripts-test` verifies repository-maintained CI helper scripts such as DCO checking, action path validation, and release-script input validation.
 - Raycast dependency audits run with `npm audit --audit-level=moderate`.
 - The npm launcher tests run with `make npm-package-verify`, including unit tests, `npm audit`, and `npm pack --dry-run`.
-- `make docs-qa` verifies generated CLI/provider/rule/config references and fails on stale release-version placeholders in public docs.
+- `make docs-qa` verifies generated CLI/provider/rule/config references and runs the site Vitest docs contracts for stale copy, demo fixture IDs, and MCP tool/resource/prompt docs coverage.
 
 ## Trunk Flaky Tests
 
 `make test-junit` writes:
 
-- `reports/junit/raycast.xml` from the Raycast extension Node tests
+- `reports/junit/raycast.xml` from the Raycast extension Vitest suite
 
 `make trunk-flaky-validate` runs:
 
@@ -126,13 +127,14 @@ The extension has its own npm package under `integrations/raycast`.
 cd integrations/raycast
 npm ci
 npm test
+npm run test:junit
 npm run lint
 npm run build
 ```
 
-`npm run dev` is the manual Raycast development path when the Raycast CLI is available. Do not run `npm run publish` unless release/publish scope is explicit.
+`npm test` runs the Raycast Vitest suite. `npm run test:junit` emits `reports/junit/raycast.xml` for Trunk flaky-test validation. `npm run dev` is the manual Raycast development path when the Raycast CLI is available. Do not run `npm run publish` unless release/publish scope is explicit.
 
-Manual smoke and screenshots must use fixture `Home Override` data only. Keep the evidence table in `docs/screenshots.md` current before broader promotion or Raycast store metadata work.
+Manual Raycast UI checks and screenshots must use fixture `Home Override` data only. Keep the evidence table in `docs/screenshots.md` current before broader promotion or Raycast store metadata work.
 
 ## NPM Launcher
 
@@ -153,13 +155,14 @@ The public docs/marketing site lives under `site/` and uses VitePress with local
 ```sh
 cd site
 npm ci
+npm test
 npm audit --audit-level=moderate
 npm run build
 ```
 
 `make site-verify` also runs `make docs-qa` from the repository root. The site should not add analytics or third-party runtime scripts by default. If validating the public website analytics path, build once without Umami env values and confirm no tracker script exists, then build once with `NIGHTWARD_UMAMI_SCRIPT_URL` and `NIGHTWARD_UMAMI_WEBSITE_ID` set and confirm the script is scoped to `nightward.aethereal.dev`, respects Do Not Track, and excludes search/hash data.
 
-The launcher must remain dependency-light, avoid `postinstall`, and verify downloaded GitHub Release archives against `checksums.txt` before extraction.
+The launcher must remain dependency-light, avoid `postinstall`, verify downloaded GitHub Release archives against `checksums.txt`, reject unsafe archive entries before extraction, and support strict `NIGHTWARD_NPM_REQUIRE_SIGSTORE=1` Cosign verification when the caller requires it.
 
 ## Intentional Manual Or Post-Release Checks
 
@@ -168,6 +171,6 @@ Most repository checks are centralized behind `make verify` and the suite aliase
 - `make demo-assets` regenerates fixture-only sample JSON, HTML, report screenshot, and social preview assets. It requires Chrome, Chromium, Brave, or `NIGHTWARD_CHROME`.
 - `make tui-media` regenerates fixture-only TUI PNGs, the walkthrough GIF, and the homepage WebM loop from the embedded Rust TUI. It requires `vhs` and `ffmpeg`, uses `site/public/demo/nightward-sample-scan.json`, and must not be run against live HOME data.
 - `make test-release-install VERSION=<version>` verifies a published GitHub/npm release after artifacts exist.
-- `npm run dev` under `integrations/raycast` is the local Raycast UI smoke path and should be paired with fixture-only evidence in `docs/screenshots.md`.
+- `npm run dev` under `integrations/raycast` is the local Raycast UI development path and should be paired with fixture-only evidence in `docs/screenshots.md`.
 
 New validation scripts should be wired into `make verify`, a suite alias, or this section with a clear reason they are manual.

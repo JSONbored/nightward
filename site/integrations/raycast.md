@@ -1,6 +1,6 @@
 # Raycast
 
-Nightward’s [Raycast](https://www.raycast.com/) extension is a read-only macOS companion for AI-agent, MCP, provider, and dotfiles risk review. It shells out to `nw` or `nightward`, renders redacted output, and does not mutate local agent configs.
+Nightward’s [Raycast](https://www.raycast.com/) extension is a macOS companion for AI-agent, MCP, provider, and dotfiles risk review. It shells out to `nw` or `nightward`, renders redacted output, and uses the shared Nightward action registry for confirmation-gated local writes.
 
 ## Command Surface
 
@@ -10,7 +10,8 @@ Nightward’s [Raycast](https://www.raycast.com/) extension is a read-only macOS
 | Nightward Status | Compact menu-bar finding count with a structured dropdown. | No |
 | Nightward Findings | Browse findings, copy redacted evidence, export finding/rule fix plans, and copy reviewed-ignore snippets. | Clipboard only |
 | Nightward Analysis | Browse built-in and selected-provider analysis signals. | No |
-| Nightward Provider Doctor | Check provider availability and choose providers for Raycast Analysis. | Raycast local preference only |
+| Nightward Provider Doctor | Check provider availability, choose providers for Raycast Analysis, and preview/apply known provider install actions. | Raycast preference or confirmed action-registry provider install |
+| Nightward Actions | Preview and apply confirmed provider, policy, schedule, backup, cleanup, and setup actions. | Confirmation-gated local writes |
 | Explain Finding / Explain Signal | Jump directly to one known ID. | No |
 | Export Fix Plan / Export Analysis | Copy redacted Markdown for review. | Clipboard only |
 | Open Nightward Reports | Open the local report folder in Finder. | Finder open only |
@@ -25,11 +26,15 @@ The menu-bar title stays intentionally small: icon plus the current finding coun
 | `Home Override` | Typed `NIGHTWARD_HOME` path for fixture homes, QA profiles, or demos. |
 | `Allow Online Providers` | Allows selected online-capable providers in Raycast Analysis. Leave off for local-only behavior. |
 
-Provider selection is separate from execution. If a provider is missing, Provider Doctor offers the install command, upstream install docs, and a confirmation-gated install action for known Homebrew/npm provider CLIs.
+Provider selection is separate from execution. If a provider is missing, Provider Doctor and Nightward Actions offer confirmation-gated install actions for known package-manager provider CLIs through the shared Nightward action registry, not through ad hoc shell execution.
+
+## Responsibility
+
+Nightward is beta operator tooling. Actions can change local package-manager state, scheduled jobs, settings, backup files, or Nightward-owned report/cache files. Review every confirmation and write target before applying. Nightward is provided without warranty; maintainers are not liable for broken configs, lost data, exposed secrets, or third-party tool side effects.
 
 ## Providers
 
-Provider Doctor can select `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, and `socket` for the Analysis command.
+Provider Doctor can select `gitleaks`, `trufflehog`, `semgrep`, `syft`, `trivy`, `osv-scanner`, `grype`, `scorecard`, and `socket` for the Analysis command.
 
 - Local providers run only after they are selected.
 - Online-capable providers stay blocked until `Allow Online Providers` is enabled.

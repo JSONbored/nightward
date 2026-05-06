@@ -2,7 +2,9 @@ use anyhow::Result;
 use nightward_core::analysis::{self, Options as AnalysisOptions};
 use nightward_core::fixplan::{self, Selector};
 use nightward_core::reportdiff::DiffReport;
-use nightward_core::{backupplan, max_risk, Classification, Finding, Report, RiskLevel};
+use nightward_core::{
+    actions, backupplan, max_risk, state, Classification, Finding, Report, RiskLevel,
+};
 use opentui::buffer::{BoxOptions, BoxStyle, ClipRect, TitleAlign};
 use opentui::input::{Event, InputParser, KeyCode};
 use opentui::terminal::{enable_raw_mode, terminal_size};
@@ -12,13 +14,14 @@ use std::io::{self, Read};
 use std::sync::mpsc;
 use std::time::Duration;
 
-const VIEWS: [&str; 7] = [
+const VIEWS: [&str; 8] = [
     "Overview",
     "Findings",
     "Analysis",
     "Fix Plan",
     "Inventory",
     "Backup",
+    "Actions",
     "Help",
 ];
 const REPO_LABEL: &str = "github.com/JSONbored/nightward";
@@ -46,6 +49,16 @@ fn view_index(value: &str) -> Option<usize> {
 
 fn view_slug(value: &str) -> String {
     value.trim().to_ascii_lowercase().replace(['_', ' '], "-")
+}
+
+#[cfg(not(test))]
+fn disclosure_pending_for(report: &Report) -> bool {
+    !state::disclosure_status(&report.home).accepted
+}
+
+#[cfg(test)]
+fn disclosure_pending_for(_report: &Report) -> bool {
+    false
 }
 
 fn version() -> &'static str {
@@ -194,6 +207,10 @@ struct TuiState<'a> {
     report: &'a Report,
     active_view: usize,
     selected_finding: usize,
+    selected_action: usize,
+    pending_action: Option<String>,
+    action_message: String,
+    disclosure_pending: bool,
     severity_filter: Option<RiskLevel>,
     search_query: String,
     search_mode: bool,
@@ -489,6 +506,10 @@ impl<'a> TuiState<'a> {
             report,
             active_view: 0,
             selected_finding: 0,
+            selected_action: 0,
+            pending_action: None,
+            action_message: String::new(),
+            disclosure_pending: disclosure_pending_for(report),
             severity_filter: None,
             search_query: String::new(),
             search_mode: false,
@@ -507,6 +528,31 @@ impl<'a> TuiState<'a> {
         };
         if key.is_ctrl_c() {
             return false;
+        }
+        if self.disclosure_pending {
+            match key.code {
+                KeyCode::Enter | KeyCode::Char('y') => {
+                    self.apply_action("disclosure.accept".to_string());
+                    self.disclosure_pending = false;
+                }
+                KeyCode::Char('q') | KeyCode::Esc => return false,
+                _ => {}
+            }
+            return true;
+        }
+        if let Some(action_id) = self.pending_action.clone() {
+            match key.code {
+                KeyCode::Char('y') | KeyCode::Enter => {
+                    self.apply_action(action_id);
+                    self.pending_action = None;
+                }
+                KeyCode::Char('n') | KeyCode::Esc => {
+                    self.pending_action = None;
+                    self.action_message = "action canceled".to_string();
+                }
+                _ => {}
+            }
+            return true;
         }
         if self.search_mode {
             match key.code {
@@ -529,11 +575,12 @@ impl<'a> TuiState<'a> {
         match key.code {
             KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => self.next_view(),
             KeyCode::BackTab | KeyCode::Left | KeyCode::Char('h') => self.previous_view(),
-            KeyCode::Char(ch @ '1'..='7') => {
+            KeyCode::Char(ch @ '1'..='8') => {
                 self.active_view = usize::from(ch as u8 - b'1');
             }
-            KeyCode::Down | KeyCode::Char('j') => self.select_next_finding(),
-            KeyCode::Up | KeyCode::Char('k') => self.select_previous_finding(),
+            KeyCode::Down | KeyCode::Char('j') => self.select_next(),
+            KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
+            KeyCode::Enter if self.active_view == 6 => self.confirm_selected_action(),
             KeyCode::Char('/') => self.search_mode = true,
             KeyCode::Char('s') => self.cycle_severity_filter(),
             KeyCode::Char('x') => self.clear_filters(),
@@ -548,6 +595,78 @@ impl<'a> TuiState<'a> {
 
     fn previous_view(&mut self) {
         self.active_view = self.active_view.checked_sub(1).unwrap_or(VIEWS.len() - 1);
+    }
+
+    fn select_next(&mut self) {
+        if self.active_view == 6 {
+            let count = self.actions().len();
+            if count == 0 {
+                self.selected_action = 0;
+            } else {
+                self.selected_action = (self.selected_action + 1) % count;
+            }
+        } else {
+            self.select_next_finding();
+        }
+    }
+
+    fn select_previous(&mut self) {
+        if self.active_view == 6 {
+            let count = self.actions().len();
+            if count == 0 {
+                self.selected_action = 0;
+            } else {
+                self.selected_action = self.selected_action.checked_sub(1).unwrap_or(count - 1);
+            }
+        } else {
+            self.select_previous_finding();
+        }
+    }
+
+    fn actions(&self) -> Vec<actions::ActionSpec> {
+        actions::list(&self.report.home)
+    }
+
+    fn selected_action(&self) -> Option<actions::ActionSpec> {
+        self.actions().into_iter().nth(self.selected_action)
+    }
+
+    fn confirm_selected_action(&mut self) {
+        let Some(action) = self.selected_action() else {
+            self.action_message = "no action selected".to_string();
+            return;
+        };
+        if !action.available {
+            self.action_message = action.blocked_reason;
+            return;
+        }
+        self.pending_action = Some(action.id.clone());
+        self.action_message = format!("press y to apply {} or n to cancel", action.id);
+    }
+
+    fn apply_action(&mut self, action_id: String) {
+        match actions::apply(
+            &self.report.home,
+            &action_id,
+            actions::ApplyOptions {
+                confirm: true,
+                executable: std::env::current_exe()
+                    .ok()
+                    .map(|path| path.display().to_string())
+                    .unwrap_or_else(|| "nightward".to_string()),
+                ..Default::default()
+            },
+        ) {
+            Ok(result) => {
+                self.action_message = result.message;
+                self.selected_action = self
+                    .selected_action
+                    .min(self.actions().len().saturating_sub(1));
+            }
+            Err(err) => {
+                self.action_message = format!("action failed: {err}");
+            }
+        }
     }
 
     fn select_next_finding(&mut self) {
@@ -598,6 +717,13 @@ impl<'a> TuiState<'a> {
 
     fn render(&self, buffer: &mut OptimizedBuffer, width: u32, height: u32) {
         buffer.clear(self.palette.bg);
+        if self.disclosure_pending {
+            self.render_disclosure(
+                buffer,
+                Area::new(2, 1, width.saturating_sub(4), height.saturating_sub(2)),
+            );
+            return;
+        }
         if width < 72 || height < 18 {
             self.render_tiny(buffer, width, height);
             return;
@@ -619,6 +745,47 @@ impl<'a> TuiState<'a> {
         self.render_footer(
             buffer,
             Area::new(main_x, height.saturating_sub(3), main_w, 2),
+        );
+    }
+
+    fn render_disclosure(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        draw_panel(
+            buffer,
+            area,
+            "Beta Responsibility Disclosure",
+            self.palette.amber,
+            self.palette.panel,
+        );
+        let status = state::disclosure_status(&self.report.home);
+        let mut row = area.y + 2;
+        draw_text(
+            buffer,
+            area.x + 2,
+            row,
+            "Nightward can run write-capable local actions after confirmation.",
+            Style::fg(self.palette.white).with_bold(),
+        );
+        row += 2;
+        for line in wrap(&status.text, area.w.saturating_sub(4) as usize)
+            .into_iter()
+            .take(area.h.saturating_sub(8) as usize)
+        {
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                &line,
+                Style::fg(self.palette.white),
+            );
+            row += 1;
+        }
+        row += 1;
+        draw_text(
+            buffer,
+            area.x + 2,
+            row,
+            "Press Enter/y to accept and continue. Press q/Esc to quit.",
+            Style::fg(self.palette.cyan).with_bold(),
         );
     }
 
@@ -695,7 +862,7 @@ impl<'a> TuiState<'a> {
         );
         draw_hline(buffer, 1, 4, width.saturating_sub(2), self.palette.line);
 
-        let nav = "1 Overview  2 Findings  3 Analysis  4 Fix Plan  5 Inventory  6 Backup  7 Help";
+        let nav = "1 Overview  2 Findings  3 Analysis  4 Fix Plan  5 Inventory  6 Backup  7 Actions  8 Help";
         draw_text(
             buffer,
             1,
@@ -794,7 +961,7 @@ impl<'a> TuiState<'a> {
         let compact = limit < 48;
         let max_x = x + limit;
         let hints = [
-            ("tab/1-7", "navigate"),
+            ("tab/1-8", "navigate"),
             ("/", "search"),
             ("s", "severity"),
             ("x", "clear"),
@@ -966,7 +1133,7 @@ impl<'a> TuiState<'a> {
             buffer,
             x,
             posture_y + 6,
-            "tab/1-7 navigate",
+            "tab/1-8 navigate",
             Style::fg(self.palette.muted),
         );
         draw_text(
@@ -1005,6 +1172,7 @@ impl<'a> TuiState<'a> {
             3 => self.render_fix_plan(buffer, area),
             4 => self.render_inventory(buffer, area),
             5 => self.render_backup(buffer, area),
+            6 => self.render_actions(buffer, area),
             _ => self.render_help(buffer, area),
         }
     }
@@ -1862,6 +2030,165 @@ impl<'a> TuiState<'a> {
         }
     }
 
+    fn render_actions(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        let actions = self.actions();
+        let left_w = responsive_width(area.w, 48, 34, 40);
+        let right_x = area.x + left_w + 2;
+        let right_w = area.w.saturating_sub(left_w + 2);
+
+        draw_panel(
+            buffer,
+            Area::new(area.x, area.y, left_w, area.h),
+            "Action Queue",
+            self.palette.amber,
+            self.palette.panel,
+        );
+        let mut row = area.y + 2;
+        for (idx, action) in actions
+            .iter()
+            .enumerate()
+            .take(area.h.saturating_sub(4) as usize / 2)
+        {
+            let selected = idx == self.selected_action;
+            let color = action_color(&self.palette, action);
+            if selected {
+                buffer.fill_rect(
+                    area.x + 1,
+                    row.saturating_sub(1),
+                    left_w.saturating_sub(2),
+                    2,
+                    self.palette.surface,
+                );
+            }
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                &truncate(&action.title, left_w.saturating_sub(16) as usize),
+                if selected {
+                    Style::fg(color).with_bold()
+                } else {
+                    Style::fg(color)
+                },
+            );
+            draw_text(
+                buffer,
+                area.x + left_w.saturating_sub(11),
+                row,
+                &truncate(&action.risk, 8),
+                Style::fg(color),
+            );
+            row += 1;
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                &truncate(&action.category, left_w.saturating_sub(4) as usize),
+                Style::fg(self.palette.muted),
+            );
+            row += 1;
+        }
+
+        draw_panel(
+            buffer,
+            Area::new(right_x, area.y, right_w, area.h),
+            "Preview",
+            self.palette.cyan,
+            self.palette.surface,
+        );
+        let mut row = area.y + 2;
+        if let Some(action) = self.selected_action() {
+            draw_text(
+                buffer,
+                right_x + 2,
+                row,
+                &truncate(&action.title, right_w.saturating_sub(4) as usize),
+                Style::fg(action_color(&self.palette, &action)).with_bold(),
+            );
+            row += 2;
+            for line in wrap(&action.description, right_w.saturating_sub(4) as usize)
+                .into_iter()
+                .take(3)
+            {
+                draw_text(
+                    buffer,
+                    right_x + 2,
+                    row,
+                    &line,
+                    Style::fg(self.palette.white),
+                );
+                row += 1;
+            }
+            row += 1;
+            section_label(buffer, right_x + 2, row, "writes", self.palette.cyan);
+            row += 2;
+            for write in action.writes.iter().take(5) {
+                draw_text(buffer, right_x + 2, row, "•", Style::fg(self.palette.amber));
+                draw_text(
+                    buffer,
+                    right_x + 5,
+                    row,
+                    &truncate(write, right_w.saturating_sub(7) as usize),
+                    Style::fg(self.palette.white),
+                );
+                row += 1;
+            }
+            if !action.command.is_empty() {
+                row += 1;
+                section_label(buffer, right_x + 2, row, "command", self.palette.cyan);
+                row += 2;
+                draw_text(
+                    buffer,
+                    right_x + 2,
+                    row,
+                    &truncate(
+                        &action.command.join(" "),
+                        right_w.saturating_sub(4) as usize,
+                    ),
+                    Style::fg(self.palette.white),
+                );
+                row += 2;
+            }
+            if !action.blocked_reason.is_empty() {
+                for line in wrap(&action.blocked_reason, right_w.saturating_sub(4) as usize)
+                    .into_iter()
+                    .take(3)
+                {
+                    draw_text(buffer, right_x + 2, row, &line, Style::fg(self.palette.red));
+                    row += 1;
+                }
+            }
+        }
+        if let Some(action) = &self.pending_action {
+            draw_text(
+                buffer,
+                right_x + 2,
+                area.y + area.h.saturating_sub(3),
+                &truncate(
+                    &format!("Confirm {action}: y apply / n cancel"),
+                    right_w.saturating_sub(4) as usize,
+                ),
+                Style::fg(self.palette.amber).with_bold(),
+            );
+        } else if !self.action_message.is_empty() {
+            draw_text(
+                buffer,
+                right_x + 2,
+                area.y + area.h.saturating_sub(3),
+                &truncate(&self.action_message, right_w.saturating_sub(4) as usize),
+                Style::fg(self.palette.cyan),
+            );
+        } else {
+            draw_text(
+                buffer,
+                right_x + 2,
+                area.y + area.h.saturating_sub(3),
+                "Enter preview/confirm selected action",
+                Style::fg(self.palette.muted),
+            );
+        }
+    }
+
     fn render_help(&self, buffer: &mut OptimizedBuffer, area: Area) {
         let left_w = responsive_width(area.w, 45, 32, 40);
         let right_x = area.x + left_w + 2;
@@ -1877,9 +2204,11 @@ impl<'a> TuiState<'a> {
         let mut row = area.y + 2;
         for (key, label) in [
             ("tab / shift-tab", "switch views"),
-            ("1-7", "open view"),
+            ("1-8", "open view"),
             ("j / down", "next finding"),
             ("k / up", "previous finding"),
+            ("enter", "confirm action"),
+            ("y / n", "apply/cancel"),
             ("q / esc", "quit"),
         ] {
             draw_text(
@@ -1908,10 +2237,11 @@ impl<'a> TuiState<'a> {
         );
         let mut row = area.y + 2;
         for line in [
-            "No live config mutation from the TUI.",
-            "Fixes are plan-only review material.",
+            "Write actions require explicit confirmation.",
+            "Beta users accept responsibility before applying changes.",
             "Evidence is redacted before display.",
-            "Online providers require explicit CLI flags.",
+            "Online-capable providers remain opt-in.",
+            "Backups, schedules, and provider installs are logged.",
             "Use report diff/history for follow-up review.",
         ] {
             draw_text(buffer, right_x + 2, row, "•", Style::fg(self.palette.green));
@@ -2099,7 +2429,20 @@ fn view_nav_color(palette: &Palette, idx: usize) -> Rgba {
         3 => palette.amber,
         4 => palette.blue,
         5 => palette.green,
+        6 => palette.amber,
         _ => palette.white,
+    }
+}
+
+fn action_color(palette: &Palette, action: &actions::ActionSpec) -> Rgba {
+    if !action.available {
+        return palette.muted;
+    }
+    match action.risk.as_str() {
+        "critical" | "high" => palette.red,
+        "medium" => palette.amber,
+        "low" => palette.blue,
+        _ => palette.green,
     }
 }
 
@@ -2531,7 +2874,7 @@ mod tests {
         let app = TuiState::new(&report);
         let text = render_text(&app, 120, 36);
 
-        assert!(text.contains("tab/1-7"));
+        assert!(text.contains("tab/1-8"));
         assert!(text.contains(&format!("v{}", version())));
         assert!(text.contains(REPO_LABEL));
         assert!(text.contains(STAR_CTA));
@@ -2674,7 +3017,7 @@ mod tests {
     fn full_help_keyboard_text_does_not_overwrite_panel_border() {
         let report = fixture_report();
         let mut app = TuiState::new(&report);
-        app.active_view = 6;
+        app.active_view = 7;
         let mut buffer = OptimizedBuffer::new(120, 36);
         app.render(&mut buffer, 120, 36);
 
@@ -2687,7 +3030,7 @@ mod tests {
     fn full_help_keyboard_text_uses_short_labels() {
         let report = fixture_report();
         let mut app = TuiState::new(&report);
-        app.active_view = 6;
+        app.active_view = 7;
         let text = render_text(&app, 120, 36);
 
         assert!(text.contains("switch views"));

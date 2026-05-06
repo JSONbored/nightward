@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import test from "node:test";
 import assert from "node:assert/strict";
+import { test } from "vitest";
 
 import {
   assetName,
@@ -15,6 +15,8 @@ import {
   releaseBaseURL,
   sha256,
   targetFor,
+  validateArchiveEntries,
+  validateArchiveEntryName,
   verifyArchiveChecksum
 } from "../bin/nightward.mjs";
 
@@ -49,6 +51,80 @@ test("verifies archive sha256 before extraction", async () => {
     () => verifyArchiveChecksum(archive, "0".repeat(64)),
     /checksum mismatch/
   );
+});
+
+test("validates release archive entries before extraction", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "nightward-npm-archive-"));
+  const packageDir = path.join(dir, "package");
+  const target = targetFor(process.platform, process.arch);
+  await mkdir(packageDir, { recursive: true });
+  const names = target.os === "windows"
+    ? ["nightward.exe", "nw.exe"]
+    : ["nightward", "nw"];
+  for (const name of names) {
+    await writeFile(path.join(packageDir, name), "binary\n");
+  }
+
+  const archive = path.join(dir, target.os === "windows" ? "valid.zip" : "valid.tar.gz");
+  const archiveResult = target.os === "windows"
+    ? spawnSync("powershell", [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      "Compress-Archive -LiteralPath $args[0],$args[1] -DestinationPath $args[2] -Force",
+      path.join(packageDir, names[0]),
+      path.join(packageDir, names[1]),
+      archive
+    ], { encoding: "utf8" })
+    : spawnSync("tar", ["-czf", archive, "-C", packageDir, ...names], {
+      encoding: "utf8"
+    });
+  assert.equal(archiveResult.status, 0, archiveResult.stderr);
+
+  assert.deepEqual(validateArchiveEntries(archive, target).sort(), names.sort());
+  assert.throws(() => validateArchiveEntryName("../nightward"), /unsafe entry/);
+
+  if (target.os !== "windows") {
+    const outside = path.join(dir, "outside");
+    await mkdir(outside, { recursive: true });
+    await writeFile(path.join(outside, "nightward"), "evil\n");
+    const malicious = path.join(dir, "malicious.tar.gz");
+    const maliciousResult = spawnSync("tar", [
+      "-czf",
+      malicious,
+      "-C",
+      packageDir,
+      "nw",
+      "-C",
+      packageDir,
+      "nightward",
+      "-C",
+      packageDir,
+      "../outside/nightward"
+    ], { encoding: "utf8" });
+    assert.equal(maliciousResult.status, 0, maliciousResult.stderr);
+    assert.throws(() => validateArchiveEntries(malicious, target), /unsafe entry|unexpected entries/);
+  }
+});
+
+test("strict sigstore mode requires cosign before trusting checksums", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "nightward-npm-sigstore-"));
+  const launcher = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../bin/nightward.mjs");
+  const result = spawnSync(process.execPath, [launcher, "--version"], {
+    env: {
+      ...process.env,
+      NIGHTWARD_NPM_REQUIRE_SIGSTORE: "1",
+      NIGHTWARD_NPM_VERSION: "9.9.9",
+      NIGHTWARD_NPM_CACHE: path.join(dir, "cache"),
+      NIGHTWARD_NPM_DOWNLOAD_BASE: pathToFileURL(dir).href,
+      PATH: dir
+    },
+    encoding: "utf8"
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /requires cosign on PATH|checksums/);
 });
 
 test("uses invocation name and environment overrides", () => {
@@ -101,10 +177,14 @@ test("cache hits are re-extracted from a verified archive before execution", asy
   const asset = assetName(version, target);
   await mkdir(release, { recursive: true });
   await mkdir(packageDir, { recursive: true });
-  const command = process.platform === "win32" ? "nightward.exe" : "nightward";
-  const binary = path.join(packageDir, command);
-  await writeFile(binary, "#!/usr/bin/env node\nconsole.log('GOOD_CACHE_BINARY');\n");
-  await chmod(binary, 0o755);
+  const targetNames = target.os === "windows"
+    ? ["nightward.exe", "nw.exe"]
+    : ["nightward", "nw"];
+  for (const name of targetNames) {
+    const binary = path.join(packageDir, name);
+    await writeFile(binary, "#!/usr/bin/env node\nconsole.log('GOOD_CACHE_BINARY');\n");
+    await chmod(binary, 0o755);
+  }
   const archive = path.join(release, asset);
   const archiveResult = process.platform === "win32"
     ? spawnSync("powershell", [
@@ -112,11 +192,12 @@ test("cache hits are re-extracted from a verified archive before execution", asy
       "-ExecutionPolicy",
       "Bypass",
       "-Command",
-      "Compress-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force",
-      binary,
+      "Compress-Archive -LiteralPath $args[0],$args[1] -DestinationPath $args[2] -Force",
+      path.join(packageDir, targetNames[0]),
+      path.join(packageDir, targetNames[1]),
       archive
     ], { encoding: "utf8" })
-    : spawnSync("tar", ["-czf", archive, "-C", packageDir, command], {
+    : spawnSync("tar", ["-czf", archive, "-C", packageDir, ...targetNames], {
       encoding: "utf8"
     });
   assert.equal(archiveResult.status, 0, archiveResult.stderr);

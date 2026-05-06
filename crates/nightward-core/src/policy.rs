@@ -8,6 +8,8 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
+pub const DEFAULT_POLICY: &str = "severity_threshold: high\nignore_findings: []\nignore_rules: []\ninclude_analysis: false\nanalysis_threshold: high\nanalysis_providers: []\nallow_online_providers: false\n";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolicyConfig {
     #[serde(default = "default_threshold")]
@@ -126,10 +128,7 @@ pub fn init_file(path: impl AsRef<Path>) -> Result<()> {
     if let Some(parent) = path.as_ref().parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::write(
-        path.as_ref(),
-        "severity_threshold: high\nignore_findings: []\nignore_rules: []\ninclude_analysis: false\nanalysis_threshold: high\nanalysis_providers: []\nallow_online_providers: false\n",
-    )?;
+    fs::write(path.as_ref(), DEFAULT_POLICY)?;
     Ok(())
 }
 

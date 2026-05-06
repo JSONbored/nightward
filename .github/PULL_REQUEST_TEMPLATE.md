@@ -26,7 +26,7 @@
 - [ ] `trunk check --show-existing --all`
 - [ ] `make gitleaks`
 - [ ] `make cargo-audit`
-- [ ] `make fuzz-smoke`
+- [ ] `make fuzz-check`
 - [ ] `make release-snapshot` when release/build behavior changed
 
 ## Notes

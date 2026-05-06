@@ -3,7 +3,7 @@ use crate::inventory::redact_text;
 use crate::RiskLevel;
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::env;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -41,6 +41,23 @@ pub struct ProviderStatus {
     pub detail: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderInstallCommand {
+    pub provider: String,
+    pub program: String,
+    pub args: Vec<String>,
+    pub url: String,
+    pub note: String,
+}
+
+impl ProviderInstallCommand {
+    pub fn command(&self) -> Vec<String> {
+        std::iter::once(self.program.clone())
+            .chain(self.args.iter().cloned())
+            .collect()
+    }
+}
+
 pub fn providers() -> Vec<Provider> {
     vec![
         Provider {
@@ -60,6 +77,12 @@ pub fn providers() -> Vec<Provider> {
             "filesystem vulnerability, secret, and misconfig scanning",
         ),
         online_provider("osv-scanner", "dependency vulnerability scanning"),
+        online_provider("grype", "filesystem and SBOM vulnerability scanning"),
+        local_provider("syft", "local SBOM and package inventory"),
+        online_provider(
+            "scorecard",
+            "repository trust and supply-chain score checks",
+        ),
         Provider {
             name: "socket".to_string(),
             kind: "local-command".to_string(),
@@ -70,6 +93,73 @@ pub fn providers() -> Vec<Provider> {
             capabilities: "dependency risk metadata and Socket scan creation".to_string(),
         },
     ]
+}
+
+pub fn install_command(name: &str) -> Option<ProviderInstallCommand> {
+    let (program, args, url, note) = match name.trim().to_ascii_lowercase().as_str() {
+        "gitleaks" => (
+            "brew",
+            vec!["install", "gitleaks"],
+            "https://github.com/gitleaks/gitleaks#installing",
+            "Local secret scanner. Homebrew is the lowest-friction macOS path.",
+        ),
+        "trufflehog" => (
+            "brew",
+            vec!["install", "trufflehog"],
+            "https://github.com/trufflesecurity/trufflehog#installation",
+            "Local secret scanner. Nightward runs it with verification disabled by default.",
+        ),
+        "semgrep" => (
+            "brew",
+            vec!["install", "semgrep"],
+            "https://semgrep.dev/docs/getting-started/",
+            "Local static analyzer. Nightward only runs Semgrep with a repo-local config.",
+        ),
+        "trivy" => (
+            "brew",
+            vec!["install", "trivy"],
+            "https://trivy.dev/latest/getting-started/installation/",
+            "Online-capable scanner. Nightward requires online-provider opt-in before use.",
+        ),
+        "osv-scanner" => (
+            "brew",
+            vec!["install", "osv-scanner"],
+            "https://google.github.io/osv-scanner/installation/",
+            "Online-capable vulnerability scanner. Nightward requires online-provider opt-in before use.",
+        ),
+        "grype" => (
+            "brew",
+            vec!["install", "grype"],
+            "https://oss.anchore.com/docs/reference/grype/quickstart/",
+            "Online-capable vulnerability scanner. Nightward requires online-provider opt-in before use.",
+        ),
+        "syft" => (
+            "brew",
+            vec!["install", "syft"],
+            "https://oss.anchore.com/docs/reference/syft/quickstart/",
+            "Local SBOM generator. Nightward uses it for package inventory signals.",
+        ),
+        "scorecard" => (
+            "go",
+            vec!["install", "github.com/ossf/scorecard/v5@latest"],
+            "https://github.com/ossf/scorecard#installation",
+            "Online repository trust scanner. Nightward requires online-provider opt-in before use.",
+        ),
+        "socket" => (
+            "npm",
+            vec!["install", "-g", "socket"],
+            "https://docs.socket.dev/docs/socket-cli",
+            "Remote scan creation provider. Nightward requires online-provider opt-in before use.",
+        ),
+        _ => return None,
+    };
+    Some(ProviderInstallCommand {
+        provider: name.trim().to_ascii_lowercase(),
+        program: program.to_string(),
+        args: args.into_iter().map(str::to_string).collect(),
+        url: url.to_string(),
+        note: note.to_string(),
+    })
 }
 
 pub fn statuses(selected: &[String], online: bool) -> Vec<ProviderStatus> {
@@ -256,6 +346,9 @@ pub fn parse_provider_output(
         "semgrep" => parse_semgrep(root, output),
         "trivy" => parse_trivy(root, output),
         "osv-scanner" => parse_osv(root, output),
+        "grype" => parse_grype(root, output),
+        "syft" => parse_syft(root, output),
+        "scorecard" => parse_scorecard(root, output),
         "socket" => parse_socket(root, output),
         _ => Ok(Vec::new()),
     }
@@ -346,6 +439,14 @@ fn provider_args(name: &str, root: &Path) -> Result<Vec<String>> {
             .into_iter()
             .map(str::to_string)
             .collect(),
+        "grype" => vec![format!("dir:{root}"), "-o".to_string(), "json".to_string()],
+        "syft" => vec![format!("dir:{root}"), "-o".to_string(), "json".to_string()],
+        "scorecard" => vec![
+            "--format".to_string(),
+            "json".to_string(),
+            "--repo".to_string(),
+            scorecard_repo(Path::new(&root))?,
+        ],
         "socket" => vec!["scan", "create", &root, "--json"]
             .into_iter()
             .map(str::to_string)
@@ -557,6 +658,124 @@ fn collect_osv_results(root: &Path, value: &Value, out: &mut Vec<ProviderFinding
     }
 }
 
+fn parse_grype(root: &Path, output: &str) -> Result<Vec<ProviderFinding>> {
+    if output.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let value: Value = serde_json::from_str(output)?;
+    let mut out = Vec::new();
+    for item in value
+        .get("matches")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let id = nested_string(item, &["vulnerability", "id"])
+            .or_else(|| first_string(item, &["vulnerabilityID", "id"]))
+            .unwrap_or_else(|| "vulnerability".to_string());
+        let package = nested_string(item, &["artifact", "name"]).unwrap_or_default();
+        let path = item
+            .get("artifact")
+            .and_then(|artifact| artifact.get("locations"))
+            .and_then(Value::as_array)
+            .and_then(|locations| locations.first())
+            .and_then(|location| nested_string(location, &["path"]))
+            .unwrap_or_default();
+        out.push(ProviderFinding {
+            rule: id.clone(),
+            path: normalize_provider_path(root, &path),
+            message: redact_text(&format!("Grype reported {id} in {package}.")),
+            evidence: redact_text(&item.to_string()),
+            severity: severity_from_string(
+                nested_string(item, &["vulnerability", "severity"]).as_deref(),
+            ),
+            category: SignalCategory::SupplyChain,
+        });
+    }
+    Ok(out)
+}
+
+fn parse_syft(root: &Path, output: &str) -> Result<Vec<ProviderFinding>> {
+    if output.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let value: Value = serde_json::from_str(output)?;
+    let artifacts = value
+        .get("artifacts")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or_default();
+    if artifacts == 0 {
+        return Ok(Vec::new());
+    }
+    let source = nested_string(&value, &["source", "target"])
+        .or_else(|| nested_string(&value, &["source", "name"]))
+        .unwrap_or_else(|| root.display().to_string());
+    Ok(vec![ProviderFinding {
+        rule: "sbom_inventory".to_string(),
+        path: normalize_provider_path(root, &source),
+        message: format!("Syft identified {artifacts} package artifacts for SBOM review."),
+        evidence: redact_text(&json!({ "artifacts": artifacts, "source": source }).to_string()),
+        severity: RiskLevel::Info,
+        category: SignalCategory::SupplyChain,
+    }])
+}
+
+fn parse_scorecard(root: &Path, output: &str) -> Result<Vec<ProviderFinding>> {
+    if output.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let value: Value = serde_json::from_str(output)?;
+    let mut out = Vec::new();
+    for check in value
+        .get("checks")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let score = first_number(check, &["score"]).unwrap_or(10.0);
+        if !(0.0..8.0).contains(&score) {
+            continue;
+        }
+        let name = first_string(check, &["name"]).unwrap_or_else(|| "scorecard_check".to_string());
+        let reason = first_string(check, &["reason"])
+            .unwrap_or_else(|| "OpenSSF Scorecard reported a lower-scoring check.".to_string());
+        out.push(ProviderFinding {
+            rule: format!("scorecard_{}", normalize_rule_label(&name)),
+            path: root.display().to_string(),
+            message: redact_text(&format!(
+                "OpenSSF Scorecard scored {name} at {score:.1}: {reason}"
+            )),
+            evidence: redact_text(&check.to_string()),
+            severity: if score < 5.0 {
+                RiskLevel::Medium
+            } else {
+                RiskLevel::Low
+            },
+            category: SignalCategory::SupplyChain,
+        });
+    }
+    if out.is_empty() {
+        if let Some(score) = first_number(&value, &["score"]) {
+            if score < 8.0 {
+                out.push(ProviderFinding {
+                    rule: "scorecard_overall".to_string(),
+                    path: root.display().to_string(),
+                    message: format!("OpenSSF Scorecard overall score is {score:.1}."),
+                    evidence: redact_text(&value.to_string()),
+                    severity: if score < 5.0 {
+                        RiskLevel::Medium
+                    } else {
+                        RiskLevel::Low
+                    },
+                    category: SignalCategory::SupplyChain,
+                });
+            }
+        }
+    }
+    Ok(out)
+}
+
 fn parse_socket(root: &Path, output: &str) -> Result<Vec<ProviderFinding>> {
     if output.trim().is_empty() {
         return Ok(Vec::new());
@@ -602,11 +821,11 @@ fn parse_socket(root: &Path, output: &str) -> Result<Vec<ProviderFinding>> {
 }
 
 fn trivy_severity(value: &Value) -> RiskLevel {
-    match first_string(value, &["Severity"])
-        .unwrap_or_default()
-        .to_ascii_uppercase()
-        .as_str()
-    {
+    severity_from_string(first_string(value, &["Severity"]).as_deref())
+}
+
+fn severity_from_string(value: Option<&str>) -> RiskLevel {
+    match value.unwrap_or_default().to_ascii_uppercase().as_str() {
         "CRITICAL" => RiskLevel::Critical,
         "HIGH" => RiskLevel::High,
         "MEDIUM" => RiskLevel::Medium,
@@ -636,6 +855,23 @@ fn nested_string(value: &Value, keys: &[&str]) -> Option<String> {
     current.as_str().map(ToString::to_string)
 }
 
+fn first_number(value: &Value, keys: &[&str]) -> Option<f64> {
+    for key in keys {
+        if key.contains('.') {
+            let mut current = value;
+            for part in key.split('.') {
+                current = current.get(part)?;
+            }
+            if let Some(number) = current.as_f64() {
+                return Some(number);
+            }
+        } else if let Some(number) = value.get(*key).and_then(Value::as_f64) {
+            return Some(number);
+        }
+    }
+    None
+}
+
 fn normalize_provider_path(root: &Path, path: &str) -> String {
     if path.is_empty() {
         return root.display().to_string();
@@ -646,6 +882,54 @@ fn normalize_provider_path(root: &Path, path: &str) -> String {
     } else {
         root.join(path).display().to_string()
     }
+}
+
+fn scorecard_repo(root: &Path) -> Result<String> {
+    if let Ok(repo) = env::var("NIGHTWARD_SCORECARD_REPO") {
+        let repo = repo.trim();
+        if !repo.is_empty() {
+            return Ok(repo.to_string());
+        }
+    }
+    let output = Command::new("git")
+        .args([
+            "-C",
+            root.to_string_lossy().as_ref(),
+            "config",
+            "--get",
+            "remote.origin.url",
+        ])
+        .output()
+        .context("spawn git for scorecard repo discovery")?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "scorecard requires NIGHTWARD_SCORECARD_REPO or a git remote.origin.url"
+        ));
+    }
+    let repo = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if repo.is_empty() {
+        return Err(anyhow!(
+            "scorecard requires NIGHTWARD_SCORECARD_REPO or a git remote.origin.url"
+        ));
+    }
+    Ok(repo)
+}
+
+fn normalize_rule_label(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .split('_')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("_")
 }
 
 fn provider_timeout() -> Duration {

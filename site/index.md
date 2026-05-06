@@ -54,7 +54,7 @@ Prefer a persistent CLI? Use [npm, GitHub Releases, or a source build](/guide/in
 - [Audit an MCP-heavy workstation](/start/audit-mcp-workstation): review command execution, broad filesystem access, local endpoints, and credential exposure.
 - [Run in CI](/start/run-in-ci): fail a workflow on policy violations and upload SARIF to code scanning.
 - [Use Raycast](/integrations/raycast): keep a menu-bar status surface and jump into findings without opening a terminal.
-- [Use MCP](/integrations/mcp-server): expose local Nightward context to Claude, Cursor, Codex, Antigravity, Windsurf, and other MCP clients without giving them write tools.
+- [Use MCP](/integrations/mcp-server): expose local Nightward context and bounded action workflows to Claude, Cursor, Codex, Antigravity, Windsurf, and other MCP clients.
 - [Verify a release](/security/release-verification): check signatures, checksums, npm provenance, and install behavior.
 
 ## Real Fixture Output
@@ -88,14 +88,14 @@ The sample report below is generated from the committed `testdata/homes/policy` 
 | Area | What you get |
 | --- | --- |
 | Inventory | Portable, machine-local, secret-auth, runtime-cache, app-owned, and unknown state across HOME or a workspace. |
-| MCP security | Findings for unpinned package executors, shell wrappers, broad filesystem mounts, sensitive env/header exposure, local endpoints, token paths, symlinks, parse failures, and unknown server shapes. |
+| MCP security | Findings for unpinned package executors, package-name impersonation risk, remote package sources, shell wrappers, Docker/socket exposure, broad filesystem mounts, sensitive env/header exposure, local endpoints, token paths, stale configs, symlinks, parse failures, and unknown server shapes. |
 | Report history | Compare scan JSON files, inspect latest-report status, render filterable diff-aware HTML, and generate a static local report index. |
 | Policy and CI | Reason-required ignores, policy badges, SARIF output, GitHub Action mode, and Trunk plugin support. |
-| Providers | Local [Gitleaks](https://github.com/gitleaks/gitleaks), [TruffleHog](https://github.com/trufflesecurity/trufflehog), and [Semgrep](https://semgrep.dev/); online-gated [Trivy](https://trivy.dev/), [OSV-Scanner](https://google.github.io/osv-scanner/), and remote [Socket](https://socket.dev/) scan creation. |
-| MCP server | Read-only stdio tools/resources for local AI clients; no network listener, no mutation tools, and no online providers in v1. |
+| Providers | Local [Gitleaks](https://github.com/gitleaks/gitleaks), [TruffleHog](https://github.com/trufflesecurity/trufflehog), [Semgrep](https://semgrep.dev/), and [Syft](https://oss.anchore.com/syft/); online-gated [Trivy](https://trivy.dev/), [OSV-Scanner](https://google.github.io/osv-scanner/), [Grype](https://oss.anchore.com/grype/), [OpenSSF Scorecard](https://github.com/ossf/scorecard), and remote [Socket](https://socket.dev/) scan creation. |
+| MCP server | Stdio tools/resources/prompts for local AI clients; direct apply only through shared action-registry IDs with disclosure, confirmation, redaction, and audit logging. |
 
 ## Trust Posture
 
-Nightward ships through signed GitHub Releases and a no-`postinstall` npm launcher that verifies GitHub Release checksums before running a cached Rust binary. The project keeps OpenSSF evidence in-repo, runs CodeQL/Scorecard/Gitleaks/OSV/Clippy, and keeps online-capable providers blocked until explicitly enabled.
+Nightward ships through signed GitHub Releases and a no-`postinstall` npm launcher that verifies GitHub Release checksums, validates archive entries, and can require Sigstore verification before running a cached Rust binary. The project keeps OpenSSF evidence in-repo, runs CodeQL/Scorecard/Gitleaks/OSV/Clippy, and keeps online-capable providers blocked until explicitly enabled.
 
-Nightward does not copy secrets, push to Git, restore configs, sync machines, or apply live mutations in v1.
+Nightward does not copy secrets, push to Git, restore configs, sync machines, or rewrite live MCP/agent configs in v1. Confirmed actions are limited to provider setup/settings, user-level scheduled scans, and local portable backup snapshots.

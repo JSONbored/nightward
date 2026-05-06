@@ -65,7 +65,7 @@ nw tui --input scan.json
   </figure>
   <figure>
     <img :src="withBase('/demo/tui/help.png')" alt="Nightward TUI fixture help">
-    <figcaption><strong>Help.</strong> Keyboard controls and the read-only safety model shown inside the app.</figcaption>
+    <figcaption><strong>Help.</strong> Keyboard controls and the confirmed-action safety model shown inside the app.</figcaption>
   </figure>
 </div>
 
@@ -77,23 +77,26 @@ nw tui --input scan.json
 - Fix Plan: plan-only remediation groups and review steps.
 - Inventory: discovered AI-tool paths by tool, classification, and risk.
 - Backup: dry-run dotfiles backup choices.
+- Actions: preview and confirm bounded provider, policy, schedule, backup, cleanup, and setup actions.
 - Help: key bindings and safety reminders.
 
 The Rust CLI is the source of truth. The TUI uses embedded `opentui_rust` rendering for the colored dashboard; there is no Bun package or `nightward-tui` sidecar.
 
 ## Shortcuts
 
-- `1`-`7`: switch sections.
+- `1`-`8`: switch sections.
 - `tab`, `right`, or `l`: next section.
 - `left` or `h`: previous section.
 - `up`, `down`, `j`, or `k`: move selection.
+- `enter`: confirm the selected action in the Actions section.
+- `y` / `n`: apply or cancel the pending action.
 - `/`: search.
 - `s`: cycle severity.
 - `x`: clear filters.
 - `q` or `esc`: quit.
 
 > [!NOTE]
-> The TUI is read-only. It does not mutate MCP, agent, or dotfiles config. Fixes remain plan-only review material.
+> The TUI is read-only until the user accepts the beta responsibility disclosure and confirms a specific action. High-risk MCP edits remain review-first; bounded provider, policy, schedule, backup, cleanup, and setup actions can be applied from the Actions section.
 
 ## Local Development
 

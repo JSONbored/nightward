@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { readFile } from "node:fs/promises";
+import { test } from "vitest";
 import {
   analysisReport,
   explainFinding,
   explainSignal,
   exportFixPlanMarkdown,
   fixPlan,
+  applyAction,
+  listActions,
   normalizePreferences,
+  previewAction,
   providersDoctor,
   reportDiff,
   reportsDir,
@@ -41,7 +45,10 @@ test("passes NIGHTWARD_HOME and parses JSON output", async () => {
     },
   };
 
-  const result = await runNightwardJSON<{ ok: boolean }>(["doctor", "--json"], options);
+  const result = await runNightwardJSON<{ ok: boolean }>(
+    ["doctor", "--json"],
+    options,
+  );
   assert.deepEqual(result, { ok: true });
   assert.equal(observedHome, "/tmp/nightward-home");
 });
@@ -129,13 +136,19 @@ test("falls back from nw to nightward when nw is missing", async () => {
     },
   };
 
-  const result = await runNightwardJSON<{ ok: boolean }>(["scan", "--json"], options);
+  const result = await runNightwardJSON<{ ok: boolean }>(
+    ["scan", "--json"],
+    options,
+  );
   assert.deepEqual(result, { ok: true });
   assert.deepEqual(calls, ["nw", "nightward"]);
 });
 
 test("reports directory follows the optional home override", () => {
-  assert.equal(reportsDir("/tmp/example"), "/tmp/example/.local/state/nightward/reports");
+  assert.equal(
+    reportsDir("/tmp/example"),
+    "/tmp/example/.local/state/nightward/reports",
+  );
 });
 
 test("normalizes and gates provider selections", () => {
@@ -157,8 +170,23 @@ test("provider install metadata exposes safe user-run commands", () => {
     installInfoForProvider("gitleaks")?.command,
     "brew install gitleaks",
   );
-  assert.equal(installInfoForProvider("SOCKET")?.command, "npm install -g socket");
+  assert.equal(
+    installInfoForProvider("SOCKET")?.command,
+    "npm install -g socket",
+  );
   assert.equal(installInfoForProvider("unknown"), undefined);
+});
+
+test("provider doctor routes installs through the shared action registry", async () => {
+  const source = await readFile(
+    new URL("../src/provider-doctor.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(source, /node:child_process|\/bin\/zsh|execFile\(/);
+  assert.match(source, /provider\.install\.\$\{provider\}/);
+  assert.match(source, /previewAction/);
+  assert.match(source, /applyAction/);
 });
 
 test("analysis command passes selected local providers without online gate", async () => {
@@ -228,6 +256,63 @@ test("provider doctor reflects selected providers and online preference", async 
     "--with",
     "socket",
     "--online",
+    "--json",
+  ]);
+});
+
+test("action helpers call the shared CLI action surface", async () => {
+  const observed: string[][] = [];
+  const options: RuntimeOptions = {
+    executable: "nightward",
+    allowOnlineProviders: false,
+    timeoutMs: 1000,
+    execFileImpl: (_file, args, _options, callback) => {
+      observed.push(args);
+      if (args.includes("list")) {
+        callback(null, "[]", "");
+        return;
+      }
+      if (args.includes("preview")) {
+        callback(
+          null,
+          JSON.stringify({
+            action: { id: "backup.snapshot" },
+            steps: [],
+            warnings: [],
+          }),
+          "",
+        );
+        return;
+      }
+      callback(
+        null,
+        JSON.stringify({
+          action_id: "backup.snapshot",
+          status: "applied",
+          message: "ok",
+          writes: [],
+        }),
+        "",
+      );
+    },
+  };
+
+  await listActions(options);
+  await previewAction(options, "backup.snapshot");
+  await applyAction(options, "backup.snapshot");
+
+  assert.deepEqual(observed[0], ["actions", "list", "--json"]);
+  assert.deepEqual(observed[1], [
+    "actions",
+    "preview",
+    "backup.snapshot",
+    "--json",
+  ]);
+  assert.deepEqual(observed[2], [
+    "actions",
+    "apply",
+    "backup.snapshot",
+    "--confirm",
     "--json",
   ]);
 });

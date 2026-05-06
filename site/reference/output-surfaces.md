@@ -13,8 +13,11 @@
 | Badge JSON | `nw policy badge --output badge.json` | explicit badge file or stdout with `-` |
 | Fix plan | `nw fix plan --json` | stdout only |
 | Fix export | `nw fix export --format markdown` | stdout only |
-| MCP server | `nw mcp serve` | stdio JSON-RPC only; no config writes or network listener |
-| Schedule install | `nw schedule install --dry-run` | plan-only in v1 |
+| Actions list/preview | `nw actions list --json`, `nw actions preview <id> --json` | stdout only |
+| Actions apply | `nw actions apply <id> --confirm` | disclosure-accepted, confirmation-gated provider, policy, schedule, backup, or settings writes |
+| MCP server | `nw mcp serve` | stdio JSON-RPC only; read tools plus shared action-registry apply with disclosure acceptance, `confirm: true`, and audit logging |
+| Schedule install/remove | `nw schedule install --confirm`, `nw schedule remove --confirm` | user-level launchd/systemd files only |
+| Backup snapshot | `nw backup create --confirm` | local snapshot under Nightward state |
 
 Labels used in docs:
 
@@ -22,4 +25,6 @@ Labels used in docs:
 - `explicit write`: writes only the path requested by the user.
 - `online-capable`: can invoke provider behavior that contacts a network service.
 - `plan-only`: generates review material without mutating live config.
+- `confirmed action`: mutates only after explicit preview and confirmation.
+- `mcp direct apply`: mutates only through a shared Nightward action ID; never arbitrary agent/MCP config rewrites.
 - `future/not shipped`: documented as roadmap, not a current interface.

@@ -22,6 +22,6 @@ Nightward needs real-world config shapes, but contributions must stay synthetic 
 - New MCP client config shapes for Codex, Claude Code, Cursor, VS Code, Cline/Roo, Goose, OpenCode, and generic MCP tools.
 - Malformed JSON/TOML/YAML cases that should produce safe parse findings.
 - Huge-file, symlink, local endpoint, credential path, broad filesystem, URL/header, and redaction edge cases.
-- Provider output samples from `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, and `socket` with all secret material replaced.
+- Provider output samples from `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, `grype`, `syft`, `scorecard`, and `socket` with all secret material replaced.
 
 Open an adapter or rule request issue when the fixture is not ready as a pull request.

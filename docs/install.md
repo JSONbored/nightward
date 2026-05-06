@@ -43,6 +43,8 @@ The package is a thin launcher:
 - no bundled Node implementation of Nightward
 - downloads the matching GitHub Release archive on first run
 - verifies the archive SHA-256 from `checksums.txt`
+- rejects absolute, parent-directory, symlink, duplicate, or unexpected archive entries before extraction
+- optionally requires Cosign verification of `checksums.txt.sigstore.json` when `NIGHTWARD_NPM_REQUIRE_SIGSTORE=1` is set
 - caches extracted `nightward` and `nw` binaries locally
 Windows ARM64 remains deferred until the release matrix includes a validated Windows ARM64 Rust build.
 

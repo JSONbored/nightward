@@ -30,6 +30,8 @@ declare namespace Preferences {
   export type Analysis = ExtensionPreferences & {}
   /** Preferences accessible in the `provider-doctor` command */
   export type ProviderDoctor = ExtensionPreferences & {}
+  /** Preferences accessible in the `actions` command */
+  export type Actions = ExtensionPreferences & {}
   /** Preferences accessible in the `explain-finding` command */
   export type ExplainFinding = ExtensionPreferences & {}
   /** Preferences accessible in the `explain-signal` command */
@@ -53,6 +55,8 @@ declare namespace Arguments {
   export type Analysis = {}
   /** Arguments passed to the `provider-doctor` command */
   export type ProviderDoctor = {}
+  /** Arguments passed to the `actions` command */
+  export type Actions = {}
   /** Arguments passed to the `explain-finding` command */
   export type ExplainFinding = {
   /** Finding ID */

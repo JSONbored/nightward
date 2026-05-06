@@ -17,7 +17,7 @@ The npm package exposes both `nightward` and `nw`. If you are working from a sou
 Run:
 
 ```sh
-nw providers doctor --with gitleaks,trufflehog,semgrep
+nw providers doctor --with gitleaks,trufflehog,semgrep,syft
 ```
 
 Nightward only uses provider binaries already available on `PATH`. Online-capable providers stay blocked without `--online`.

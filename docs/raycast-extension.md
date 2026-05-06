@@ -1,6 +1,6 @@
 # Raycast Extension
 
-Nightward's Raycast extension is a local read-only companion for the CLI/TUI.
+Nightward's Raycast extension is a local companion for the CLI/TUI. Most commands are review-only; `Nightward Actions` can apply confirmation-gated local writes through the shared CLI action registry.
 
 ## Location
 
@@ -15,6 +15,7 @@ integrations/raycast
 - `Nightward Findings`: searchable findings with a severity filter, detail pane, scoped fix-plan exports, reviewed-policy-ignore snippets, redacted evidence copy, and open-doc actions.
 - `Nightward Analysis`: built-in offline signals plus explicitly selected providers.
 - `Nightward Provider Doctor`: optional provider availability, privacy posture, install guidance for missing tools, and Raycast Analysis enable/disable controls.
+- `Nightward Actions`: preview and apply confirmed provider, policy, schedule, backup, cleanup, and setup actions.
 - `Explain Nightward Finding`: detail view for a known finding ID.
 - `Explain Nightward Signal`: analysis signal view for a known finding ID.
 - `Export Nightward Fix Plan`: copies `nw fix export --all --format markdown`.
@@ -43,7 +44,9 @@ The extension uses `execFile`, not a shell, for local Nightward commands. It cal
 - `analyze finding <id> --json`
 - `providers doctor [--with providers] [--online] --json`
 
-It does not call schedule install/remove, backup writes, snapshot writes, restore, Git, or any config mutation command. Provider Doctor can run a displayed Homebrew/npm install command only after explicit confirmation.
+Write-capable calls are limited to `actions apply <id> --confirm` through the shared action registry. Provider Doctor previews `provider.install.<name>` and applies that registry action after explicit confirmation; it no longer runs package-manager commands through a shell. No Raycast command runs restore, Git, or hidden shell mutation.
+
+Nightward is beta operator tooling. Users are responsible for reviewing confirmations, write targets, provider behavior, and package-manager side effects before applying actions. The project provides no warranty.
 
 The menu-bar command runs the same read-only scan, doctor, and built-in offline analysis commands. Provider selections affect the Analysis and Export Analysis commands only. Online-capable selections remain blocked unless the user enables `Allow Online Providers`; the extension never enables background mutation.
 
@@ -58,19 +61,20 @@ npm run build
 npm run store-check
 ```
 
-Manual smoke:
+Fixture UI validation:
 
 ```sh
 npm run dev
 ```
 
-Manual smoke must use a fixture `Home Override`, not a real local home, before screenshots or store metadata are published. Cover at least:
+Manual UI validation must use a fixture `Home Override`, not a real local home, before screenshots or store metadata are published. Cover at least:
 
 - Dashboard loads scan counts, schedule status, adapters, and top findings.
 - Menu-bar status shows finding, analysis, provider-warning, and schedule counters; its actions open existing read-only commands, open the latest report when present, and copy a redacted summary.
 - Findings search/filter/detail panes render redacted evidence, docs actions, scoped fix-plan exports, and reviewed-policy-ignore snippets.
 - Analysis renders built-in signals, selected provider output, provider warnings, and blocked-online-provider state.
-- Provider Doctor shows provider status, install guidance, confirmation-gated provider CLI installation, and enable/disable controls for Raycast Analysis without running online-capable providers unless explicit opt-in is enabled.
+- Provider Doctor shows provider status, install guidance, action-registry provider CLI installation, and enable/disable controls for Raycast Analysis without running online-capable providers unless explicit opt-in is enabled.
+- Nightward Actions lists action IDs, risk, writes, commands, blocked reasons, and applies only after confirmation.
 - Export commands copy redacted Markdown and do not mutate local config.
 - Open Reports opens only an existing reports folder.
 

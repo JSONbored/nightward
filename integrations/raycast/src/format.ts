@@ -264,7 +264,7 @@ export function dashboardMarkdown(
   lines.push(
     "",
     "## Safety",
-    "Raycast actions stay read-only: view, copy, export, and open local reports. Nightward does not mutate MCP config, dotfiles, schedules, or secrets from this dashboard.",
+    "This dashboard stays read-only: view, copy, export, and open local reports. Write-capable provider, schedule, backup, and setup operations live in Nightward Actions and require confirmation.",
   );
   if (doctor.schedule?.installed || doctor.schedule?.last_report || delta) {
     lines.push("", "## Scheduled Reports");

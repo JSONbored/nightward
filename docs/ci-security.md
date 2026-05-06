@@ -9,7 +9,7 @@ Nightward's CI is meant to prove the project is serious about the same safety po
 - `nw policy badge`: writes a local JSON status artifact for dashboards or release evidence when a workflow explicitly requests it.
 - `plugin.yaml`: defines Trunk Check linters for workspace policy and analysis SARIF once release tags are available.
 - `scorecard.yml`: runs OpenSSF Scorecard on PRs, `main`, branch-protection changes, and a weekly schedule. PR runs do not publish results or upload SARIF; `main` and scheduled runs upload SARIF.
-- `release.yml`: publishes signed Rust artifacts from strict `vX.Y.Z` tags, smokes published Linux archives, and can publish the npm launcher only through trusted publishing when explicitly enabled.
+- `release.yml`: publishes signed Rust artifacts from strict `vX.Y.Z` tags, verifies published archives, and can publish the npm launcher only through trusted publishing when explicitly enabled.
 - `pages.yml`: builds and deploys the VitePress documentation site from `site/` to GitHub Pages.
 - `renovate.json`: manages Cargo dependencies, Raycast/npm packages, pinned GitHub Actions, local tool pins, and release tooling updates.
 

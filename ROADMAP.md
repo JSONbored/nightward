@@ -24,7 +24,7 @@ Nightward is intentionally staged. The scanner and policy model need to stay tru
 ## Next
 
 - More MCP config shapes for Codex, Claude Code, and editor integrations.
-- Raycast screenshots, store metadata, and manual development-mode smoke evidence.
+- Raycast screenshots, store metadata, and manual fixture-backed development-mode evidence.
 - Golden SARIF snapshots and broader no-write tests.
 - OpenTUI interaction polish with richer list/table behavior, detail panes, command palette, report history, mouse support, and fixture-driven visual regression screenshots.
 - Deeper provider normalization, provider-specific fixtures, and clearer skip/timeout/output-cap reporting across CLI, TUI, Raycast, SARIF, policy, and HTML.

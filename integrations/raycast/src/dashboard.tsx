@@ -553,7 +553,7 @@ function FixPlanDetail({ plan }: { plan: FixPlan }) {
   const lines = [
     "# Fix Plan",
     "",
-    "Nightward exports fix plans only. It does not mutate local configs from Raycast.",
+    "Nightward fix plans are review material. Config changes stay outside Raycast fix exports.",
   ];
   if (plan.groups && plan.groups.length > 0) {
     lines.push("", "## Grouped Review");

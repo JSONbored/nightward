@@ -264,7 +264,7 @@ fn signal_from_finding(subject: &Subject, finding: &Finding) -> Signal {
 fn signal_from_item(item: &Item) -> Option<(Subject, Signal)> {
     if !matches!(
         item.classification,
-        Classification::SecretAuth | Classification::MachineLocal
+        Classification::SecretAuth | Classification::MachineLocal | Classification::AppOwned
     ) {
         return None;
     }
@@ -285,6 +285,7 @@ fn signal_from_item(item: &Item) -> Option<(Subject, Signal)> {
         category: match item.classification {
             Classification::SecretAuth => SignalCategory::SecretsExposure,
             Classification::MachineLocal => SignalCategory::MachineLocality,
+            Classification::AppOwned => SignalCategory::AppState,
             _ => SignalCategory::Unknown,
         },
         subject_id: subject.id.clone(),
@@ -391,7 +392,7 @@ fn provider_recommendation(provider: &str, category: SignalCategory) -> String {
 fn category_for_rule(rule: &str) -> SignalCategory {
     if rule.contains("secret") || rule.contains("token") {
         SignalCategory::SecretsExposure
-    } else if rule.contains("package") {
+    } else if rule.contains("package") || rule.contains("typosquat") || rule.contains("docker") {
         SignalCategory::SupplyChain
     } else if rule.contains("filesystem") {
         SignalCategory::FilesystemScope

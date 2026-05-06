@@ -28,4 +28,4 @@ npm install --global --prefix "${prefix}" --ignore-scripts --no-audit "${tmp_dir
 PATH="${prefix}/bin:${PATH}" nightward --version | grep -Fx "${version}"
 PATH="${prefix}/bin:${PATH}" nw --version | grep -Fx "${version}"
 
-echo "npm release smoke passed for ${package}@${version}"
+echo "npm release verification passed for ${package}@${version}"

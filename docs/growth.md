@@ -4,7 +4,7 @@ Nightward's growth should come from practical trust and low-friction adoption, n
 
 ## Product Features
 
-- Deeper provider normalization and fixtures for `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, and `socket`.
+- Deeper provider normalization and fixtures for `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, `grype`, `syft`, `scorecard`, and `socket`.
 - Richer static HTML reports with local filtering, diff and history views, provider-warning summaries, policy status, and stronger remediation grouping.
 - First-class report-history comparison across CLI, TUI, Raycast, and HTML.
 - Contributor-facing rule metadata beyond the initial `nw rules list` and `nw rules explain` commands.
@@ -31,4 +31,4 @@ Nightward's growth should come from practical trust and low-friction adoption, n
 - Redacted fixture contribution guide.
 - Additional TUI screenshots and sample SARIF screenshot.
 - Blog post: "What your AI tools leave in dotfiles."
-- Raycast store screenshots, privacy copy, command metadata, and development-mode smoke evidence.
+- Raycast store screenshots, privacy copy, command metadata, and fixture-backed development-mode evidence.

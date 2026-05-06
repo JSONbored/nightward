@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.jsonbored/nightward",
+  "title": "Nightward",
+  "description": "Local-first AI agent, MCP, provider, and dotfiles security posture with bounded Nightward action previews and applies.",
+  "repository": {
+    "url": "https://github.com/JSONbored/nightward",
+    "source": "github"
+  },
+  "version": "0.0.0-development",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@jsonbored/nightward",
+      "version": "0.0.0-development",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
