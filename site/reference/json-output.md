@@ -2,7 +2,7 @@
 
 Nightward emits redacted JSON for automation.
 
-Public JSON objects include `schema_version` unless they predate the v0.1.4 schema contract. Pre-1.0 schema changes should stay additive whenever possible.
+Public JSON objects include `schema_version` unless they predate the schema contract documented in `CHANGELOG.md`. Pre-1.0 schema changes should stay additive whenever possible.
 
 ## Scan
 

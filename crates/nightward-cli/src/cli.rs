@@ -7,8 +7,8 @@ use nightward_core::inventory::{
 };
 use nightward_core::policy::{self, PolicyConfig};
 use nightward_core::{
-    actions, backupplan, mcpserver, providers, reportdiff, reporthtml, rules, schedule, snapshot,
-    state,
+    actions, approvals, backupplan, mcpserver, providers, reportdiff, reporthtml, rules, schedule,
+    snapshot, state,
 };
 use serde::Serialize;
 use std::env;
@@ -42,6 +42,7 @@ pub fn run() -> Result<()> {
         "backup" => cmd_backup(&args),
         "schedule" => cmd_schedule(&args),
         "actions" => cmd_actions(&args),
+        "approvals" => cmd_approvals(&args),
         "disclosure" => cmd_disclosure(&args),
         "help" | "--help" | "-h" => {
             print_help();
@@ -547,6 +548,52 @@ fn cmd_actions(args: &[String]) -> Result<()> {
     }
 }
 
+fn cmd_approvals(args: &[String]) -> Result<()> {
+    let home = home_dir_from_env();
+    match args.first().map(String::as_str) {
+        Some("list") | None => print_json(&approvals::list(&home)?),
+        Some("show") | Some("status") => {
+            let id = args.get(1).ok_or_else(|| anyhow!("approval id required"))?;
+            print_json(&approvals::status(&home, id)?)
+        }
+        Some("request") => {
+            let action_id = args.get(1).ok_or_else(|| anyhow!("action id required"))?;
+            print_json(&approvals::request(
+                &home,
+                approvals::ApprovalRequestOptions {
+                    action_id: action_id.to_string(),
+                    action_options: approval_options_from_args(action_id, args),
+                    requested_by: value_after(args, "--client")
+                        .unwrap_or("nightward-cli")
+                        .to_string(),
+                },
+            )?)
+        }
+        Some("approve") => {
+            let id = args.get(1).ok_or_else(|| anyhow!("approval id required"))?;
+            print_json(&approvals::approve(
+                &home,
+                id,
+                value_after(args, "--reason").unwrap_or("approved locally"),
+            )?)
+        }
+        Some("deny") => {
+            let id = args.get(1).ok_or_else(|| anyhow!("approval id required"))?;
+            print_json(&approvals::deny(
+                &home,
+                id,
+                value_after(args, "--reason").unwrap_or("denied locally"),
+            )?)
+        }
+        Some("apply") => {
+            let id = args.get(1).ok_or_else(|| anyhow!("approval id required"))?;
+            print_json(&approvals::apply_approved(&home, id)?)
+        }
+        Some("cleanup") => print_json(&approvals::cleanup(&home)?),
+        _ => Err(anyhow!("unknown approvals command")),
+    }
+}
+
 fn cmd_disclosure(args: &[String]) -> Result<()> {
     match args.first().map(String::as_str) {
         Some("status") | None => print_json(&state::disclosure_status(home_dir_from_env())),
@@ -560,6 +607,26 @@ fn cmd_disclosure(args: &[String]) -> Result<()> {
             },
         )?),
         _ => Err(anyhow!("unknown disclosure command")),
+    }
+}
+
+fn approval_options_from_args(
+    action_id: &str,
+    args: &[String],
+) -> approvals::ApprovalActionOptions {
+    approvals::ApprovalActionOptions {
+        executable: if action_id == "schedule.install" {
+            current_executable()
+        } else {
+            String::new()
+        },
+        policy_path: value_after(args, "--policy")
+            .or_else(|| value_after(args, "--config"))
+            .unwrap_or("")
+            .to_string(),
+        finding_id: value_after(args, "--finding").unwrap_or("").to_string(),
+        rule: value_after(args, "--rule").unwrap_or("").to_string(),
+        reason: value_after(args, "--reason").unwrap_or("").to_string(),
     }
 }
 
@@ -676,6 +743,9 @@ fn option_takes_value(option: &str) -> bool {
             | "--to"
             | "--finding"
             | "--rule"
+            | "--reason"
+            | "--policy"
+            | "--client"
             | "--format"
             | "--input"
     )
@@ -697,7 +767,7 @@ fn version() -> &'static str {
 
 fn print_help() {
     println!(
-        "Nightward audits AI agent state, MCP config, and dotfiles sync risk.\n\nUSAGE:\n  nightward                         Open the TUI\n  nightward tui --input scan.json   Review a saved report in the TUI\n  nightward tui --from old.json --to new.json\n  nightward scan --json             Scan HOME\n  nightward scan --workspace . --json\n  nightward analyze --all --with gitleaks --json\n  nightward providers doctor --with trivy --online --json\n  nightward providers enable gitleaks --confirm\n  nightward providers install gitleaks --confirm\n  nightward disclosure accept\n  nightward fix plan --all --json\n  nightward backup create --confirm\n  nightward schedule install --confirm\n  nightward actions list --json\n  nightward actions apply backup.snapshot --confirm\n  nightward actions apply reports.cleanup --confirm\n  nightward actions apply cache.cleanup --confirm\n  nightward actions apply policy.ignore --finding <id> --reason \"reviewed\" --confirm\n  nightward report html --input scan.json --output report.html\n  nightward report html --from old.json --to new.json --output report.html\n  nightward policy check --json\n  nightward mcp serve\n\nNightward is local-first and read-only by default. Write-capable actions require disclosure acceptance and explicit confirmation."
+        "Nightward audits AI agent state, MCP config, and dotfiles sync risk.\n\nUSAGE:\n  nightward                         Open the TUI\n  nightward tui --input scan.json   Review a saved report in the TUI\n  nightward tui --from old.json --to new.json\n  nightward scan --json             Scan HOME\n  nightward scan --workspace . --json\n  nightward analyze --all --with gitleaks --json\n  nightward providers doctor --with trivy --online --json\n  nightward providers enable gitleaks --confirm\n  nightward providers install gitleaks --confirm\n  nightward disclosure accept\n  nightward fix plan --all --json\n  nightward backup create --confirm\n  nightward schedule install --confirm\n  nightward actions list --json\n  nightward actions apply backup.snapshot --confirm\n  nightward actions apply reports.cleanup --confirm\n  nightward actions apply cache.cleanup --confirm\n  nightward actions apply policy.ignore --finding <id> --reason \"reviewed\" --confirm\n  nightward approvals list --json\n  nightward approvals approve <approval-id> --reason \"reviewed\"\n  nightward approvals apply <approval-id>\n  nightward report html --input scan.json --output report.html\n  nightward report html --from old.json --to new.json --output report.html\n  nightward policy check --json\n  nightward mcp serve\n\nNightward is local-first and read-only by default. Write-capable actions require disclosure acceptance and explicit confirmation. Approval commands do not take --confirm: approve is the local confirmation step, and apply only consumes an already-approved one-time ticket."
     );
 }
 

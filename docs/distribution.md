@@ -4,8 +4,8 @@ Nightward distribution should optimize for trust first, then convenience.
 
 ## Order
 
-1. GitHub Releases with signed checksums and SBOMs. Shipped in `v0.1.4`.
-2. Scoped npm launcher `@jsonbored/nightward` with trusted publishing and provenance. Shipped in `v0.1.4`.
+1. GitHub Releases with signed checksums and SBOMs. Shipped.
+2. Scoped npm launcher `@jsonbored/nightward` with trusted publishing and provenance. Shipped.
 3. Source builds with `make install-local`. Development-only.
 4. Trunk plugin import from a release tag. Shipped.
 5. GitHub Action release tags. Shipped.

@@ -92,7 +92,7 @@ The sample report below is generated from the committed `testdata/homes/policy` 
 | Report history | Compare scan JSON files, inspect latest-report status, render filterable diff-aware HTML, and generate a static local report index. |
 | Policy and CI | Reason-required ignores, policy badges, SARIF output, GitHub Action mode, and Trunk plugin support. |
 | Providers | Local [Gitleaks](https://github.com/gitleaks/gitleaks), [TruffleHog](https://github.com/trufflesecurity/trufflehog), [Semgrep](https://semgrep.dev/), and [Syft](https://oss.anchore.com/syft/); online-gated [Trivy](https://trivy.dev/), [OSV-Scanner](https://google.github.io/osv-scanner/), [Grype](https://oss.anchore.com/grype/), [OpenSSF Scorecard](https://github.com/ossf/scorecard), and remote [Socket](https://socket.dev/) scan creation. |
-| MCP server | Stdio tools/resources/prompts for local AI clients; read-only action list/preview with local writes applied through CLI/TUI/Raycast. |
+| MCP server | Exposes tools, resources, and prompts over stdio for local AI clients; includes action previews, approval workflows, and controlled application of approved actions through the shared local action registry. |
 
 ## Trust Posture
 

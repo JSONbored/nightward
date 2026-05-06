@@ -201,7 +201,7 @@ test("menu bar status summarizes risk and schedule state", () => {
   };
   const doctor: DoctorReport = {
     generated_at: "2026-05-01T00:00:00Z",
-    version: "0.1.4",
+    version: "0.1.11",
     home: "/tmp/nightward-home",
     executable: "/tmp/nw",
     checks: [],
@@ -284,7 +284,7 @@ test("menu bar status title ignores provider warnings when there are no findings
   };
   const doctor: DoctorReport = {
     generated_at: "2026-05-01T00:00:00Z",
-    version: "0.1.4",
+    version: "0.1.11",
     home: "/tmp/nightward-home",
     executable: "/tmp/nw",
     checks: [],

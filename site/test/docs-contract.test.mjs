@@ -16,7 +16,11 @@ test("public docs do not contain stale release placeholders", () => {
     /Trusted npm publishing/i,
     /uses:\s*JSONbored\/nightward@v0\.1\.0/i,
     /trunk .*v0\.1\.0/i,
+    /v0\.1\.(?:[0-9]|10)\b/i,
     /semantic_version:\s*0\.1\.0/i,
+    /MCP is read-only/i,
+    /MCP cannot apply local writes/i,
+    /read-only action list\/preview/i,
     /Static HTML report export before any self-hosted dashboard/i,
     /Broader provider execution beyond the first explicit local/i,
     /Rules list\/explain commands and contributor fixture templates/i,
@@ -106,12 +110,19 @@ test("MCP docs list every runtime tool, resource, and prompt", { timeout: 60000 
 
     const missing = [...tools, ...resources, ...prompts].filter((value) => !docs.includes(value));
     assert.deepEqual(missing, []);
-    assert.equal(tools.length, 14);
-    assert.equal(resources.length, 8);
+    assert.equal(tools.length, 17);
+    assert.equal(resources.length, 9);
     assert.equal(prompts.length, 5);
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
+});
+
+test("generated CLI reference includes approval commands", () => {
+  const cliReference = readFileSync(join(repoRoot, "site/reference/cli.md"), "utf8");
+  assert.match(cliReference, /nightward approvals list --json/);
+  assert.match(cliReference, /nightward approvals approve <approval-id>/);
+  assert.match(cliReference, /nightward approvals apply <approval-id>/);
 });
 
 function gitTrackedDocs() {

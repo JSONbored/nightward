@@ -21,14 +21,15 @@ Expected write paths:
 - Explicit redacted exports from the TUI/Raycast flows.
 - Explicit clipboard/report-folder actions from Raycast.
 - Confirmed action writes such as action-registry provider installs, provider settings, scheduled scan install/remove, bounded policy updates, and local backup snapshots.
+- MCP (Model Context Protocol) approval requests under Nightward-owned state, followed by a single approved apply operation only after CLI/TUI/Raycast approval.
 
 Schedule install/remove uses user-level launchd or systemd user jobs where supported. Cleanup actions remove only Nightward-owned report, log, or cache entries. Action-managed writes reject symlinked Nightward-owned state paths, and backup snapshots skip symlinked or non-regular candidates without following their targets. These actions do not install root daemons, push to Git, or copy secrets.
 
-The MCP server validates tool inputs on the server side and scopes explicit workspace/report paths under `NIGHTWARD_HOME` with regular-file/directory and no-symlink checks.
+The MCP server validates tool inputs on the server side and scopes explicit workspace/report paths under `NIGHTWARD_HOME` with regular-file/directory and no-symlink checks. It cannot accept tickets that would disclose sensitive information or bypass user approval for write operations.
 
 ## Responsibility disclosure
 
-Nightward is beta local operator tooling. Before TUI write actions run, users must accept that they are responsible for reviewing previews, confirmations, backups, provider behavior, and any resulting system changes. Nightward provides no warranty, and maintainers are not liable for broken configs, lost data, exposed secrets, package-manager side effects, or third-party tool behavior.
+Nightward is beta local operator tooling. Before write-capable actions run, users must accept that they are responsible for reviewing previews, confirmations, MCP approval tickets, backups, provider behavior, and any resulting system changes. Nightward provides no warranty, and maintainers are not liable for broken configs, lost data, exposed secrets, package-manager side effects, or third-party tool behavior.
 
 ## Optional providers
 

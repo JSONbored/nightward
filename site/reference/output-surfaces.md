@@ -15,7 +15,8 @@
 | Fix export | `nw fix export --format markdown` | stdout only |
 | Actions list/preview | `nw actions list --json`, `nw actions preview <id> --json` | stdout only |
 | Actions apply | `nw actions apply <id> --confirm` | disclosure-accepted, confirmation-gated provider, policy, schedule, backup, or settings writes |
-| MCP server | `nw mcp serve` | stdio JSON-RPC only; read tools plus shared action-registry list/preview, no local writes |
+| Approvals | `nw approvals list`, `nw approvals approve <id>`, `nw approvals apply <id>` | approval ticket state writes; applying approval tickets runs exact actions from the shared Nightward action registry |
+| MCP server | `nw mcp serve` | stdio JSON-RPC only; read tools plus approval ticket request/status/apply |
 | Schedule install/remove | `nw schedule install --confirm`, `nw schedule remove --confirm` | user-level launchd/systemd files only |
 | Backup snapshot | `nw backup create --confirm` | local snapshot under Nightward state |
 
@@ -26,5 +27,5 @@ Labels used in docs:
 - `online-capable`: can invoke provider behavior that contacts a network service.
 - `plan-only`: generates review material without mutating live config.
 - `confirmed action`: mutates only after explicit preview and confirmation.
-- `mcp action preview`: shows shared Nightward action write targets and risks without applying local writes.
+- `mcp action approval`: lets MCP request a bounded write, but only CLI/TUI/Raycast can approve the exact one-time ticket.
 - `future/not shipped`: documented as roadmap, not a current interface.

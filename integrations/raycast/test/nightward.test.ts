@@ -8,6 +8,9 @@ import {
   exportFixPlanMarkdown,
   fixPlan,
   applyAction,
+  approveApproval,
+  denyApproval,
+  listApprovals,
   listActions,
   normalizePreferences,
   previewAction,
@@ -313,6 +316,62 @@ test("action helpers call the shared CLI action surface", async () => {
     "apply",
     "backup.snapshot",
     "--confirm",
+    "--json",
+  ]);
+});
+
+test("approval helpers call the shared CLI approval queue", async () => {
+  const observed: string[][] = [];
+  const options: RuntimeOptions = {
+    executable: "nightward",
+    allowOnlineProviders: false,
+    timeoutMs: 1000,
+    execFileImpl: (_file, args, _options, callback) => {
+      observed.push(args);
+      if (args.includes("list")) {
+        callback(null, JSON.stringify({ schema_version: 1, approvals: [] }), "");
+        return;
+      }
+      callback(
+        null,
+        JSON.stringify({
+          approval_id: "appr-test",
+          status: args.includes("approve") ? "approved" : "denied",
+          action_id: "backup.snapshot",
+          preview_digest: "digest",
+          preview: {
+            action: { id: "backup.snapshot", writes: [], command: [] },
+            steps: [],
+            warnings: [],
+          },
+          requested_by: "mcp-client",
+          requested_at: "2026-05-06T00:00:00Z",
+          expires_at: "2026-05-06T00:15:00Z",
+        }),
+        "",
+      );
+    },
+  };
+
+  await listApprovals(options);
+  await approveApproval(options, "appr-test", "reviewed");
+  await denyApproval(options, "appr-test", "rejected");
+
+  assert.deepEqual(observed[0], ["approvals", "list", "--json"]);
+  assert.deepEqual(observed[1], [
+    "approvals",
+    "approve",
+    "appr-test",
+    "--reason",
+    "reviewed",
+    "--json",
+  ]);
+  assert.deepEqual(observed[2], [
+    "approvals",
+    "deny",
+    "appr-test",
+    "--reason",
+    "rejected",
     "--json",
   ]);
 });

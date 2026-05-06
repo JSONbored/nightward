@@ -44,7 +44,7 @@ The in-repo plugin exposes:
 Users should import a pinned Nightward tag, not a moving branch:
 
 ```sh
-trunk plugins add --id nightward https://github.com/JSONbored/nightward v0.1.4
+trunk plugins add --id nightward https://github.com/JSONbored/nightward v0.1.11
 trunk check enable nightward-policy
 ```
 

@@ -5,7 +5,7 @@ Use workspace mode in CI so Nightward scans the repository checkout, not the run
 ## GitHub Action
 
 ```yaml
-- uses: JSONbored/nightward@v0.1.4
+- uses: JSONbored/nightward@v0.1.11
   with:
     mode: sarif
     output: nightward.sarif

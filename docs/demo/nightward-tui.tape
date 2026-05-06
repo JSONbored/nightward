@@ -38,6 +38,10 @@ Type "6"
 Sleep 2600ms
 Type "7"
 Sleep 2800ms
+Type "8"
+Sleep 2400ms
+Type "9"
+Sleep 2200ms
 Type "1"
 Sleep 1400ms
 Type "x"
