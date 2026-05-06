@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vitepress dev . --host 127.0.0.1",
+    "test": "vitest run",
     "build": "vitepress build .",
     "preview": "vitepress preview . --host 127.0.0.1"
   },
@@ -12,5 +13,8 @@
     "simple-icons": "16.18.0",
     "vitepress": "2.0.0-alpha.17",
     "vue": "3.5.33"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.8"
   }
 }

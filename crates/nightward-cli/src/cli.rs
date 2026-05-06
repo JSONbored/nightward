@@ -7,7 +7,8 @@ use nightward_core::inventory::{
 };
 use nightward_core::policy::{self, PolicyConfig};
 use nightward_core::{
-    backupplan, mcpserver, providers, reportdiff, reporthtml, rules, schedule, snapshot,
+    actions, backupplan, mcpserver, providers, reportdiff, reporthtml, rules, schedule, snapshot,
+    state,
 };
 use serde::Serialize;
 use std::env;
@@ -38,7 +39,10 @@ pub fn run() -> Result<()> {
         "policy" => cmd_policy(&args),
         "mcp" => cmd_mcp(&args),
         "snapshot" => cmd_snapshot(&args),
+        "backup" => cmd_backup(&args),
         "schedule" => cmd_schedule(&args),
+        "actions" => cmd_actions(&args),
+        "disclosure" => cmd_disclosure(&args),
         "help" | "--help" | "-h" => {
             print_help();
             Ok(())
@@ -93,8 +97,9 @@ fn cmd_doctor(args: &[String]) -> Result<()> {
     let home = home_dir_from_env();
     let payload = serde_json::json!({
         "schema_version": 1,
-        "providers": providers::statuses(&[], false),
-        "schedule": schedule::status(home),
+        "providers": providers::statuses(&selected_providers_for_args(args), online_for_args(args)),
+        "schedule": schedule::status(&home),
+        "disclosure": state::disclosure_status(home),
     });
     if has(args, "--json") {
         print_json(&payload)?;
@@ -195,15 +200,8 @@ fn cmd_analyze(args: &[String]) -> Result<()> {
     let options = AnalysisOptions {
         mode: scan.scan_mode.clone(),
         workspace: scan.workspace.clone(),
-        with: value_after(args, "--with")
-            .map(|value| {
-                value
-                    .split(',')
-                    .map(|part| part.trim().to_string())
-                    .collect()
-            })
-            .unwrap_or_default(),
-        online: has(args, "--online"),
+        with: selected_providers_for_args(args),
+        online: online_for_args(args),
         package: if args.iter().any(|arg| arg == "package") {
             positional_after_command(args, "package")
                 .unwrap_or_default()
@@ -224,18 +222,66 @@ fn cmd_analyze(args: &[String]) -> Result<()> {
 }
 
 fn cmd_providers(args: &[String]) -> Result<()> {
-    let selected: Vec<String> = value_after(args, "--with")
-        .map(|value| {
-            value
-                .split(',')
-                .map(|part| part.trim().to_string())
-                .collect()
-        })
-        .unwrap_or_default();
-    let online = has(args, "--online");
     match args.first().map(String::as_str) {
         Some("list") | None => print_json(&providers::providers()),
-        Some("doctor") => print_json(&providers::statuses(&selected, online)),
+        Some("doctor") => print_json(&providers::statuses(
+            &selected_providers_for_args(args),
+            online_for_args(args),
+        )),
+        Some("enable") => {
+            let name = args
+                .get(1)
+                .ok_or_else(|| anyhow!("provider name required"))?;
+            let id = format!("provider.enable.{name}");
+            if !has(args, "--confirm") {
+                return print_json(&actions::preview(home_dir_from_env(), &id)?);
+            }
+            print_json(&actions::apply(
+                home_dir_from_env(),
+                &id,
+                actions::ApplyOptions {
+                    confirm: true,
+                    executable: current_executable(),
+                    ..Default::default()
+                },
+            )?)
+        }
+        Some("disable") => {
+            let name = args
+                .get(1)
+                .ok_or_else(|| anyhow!("provider name required"))?;
+            let id = format!("provider.disable.{name}");
+            if !has(args, "--confirm") {
+                return print_json(&actions::preview(home_dir_from_env(), &id)?);
+            }
+            print_json(&actions::apply(
+                home_dir_from_env(),
+                &id,
+                actions::ApplyOptions {
+                    confirm: true,
+                    executable: current_executable(),
+                    ..Default::default()
+                },
+            )?)
+        }
+        Some("install") => {
+            let name = args
+                .get(1)
+                .ok_or_else(|| anyhow!("provider name required"))?;
+            let id = format!("provider.install.{name}");
+            if !has(args, "--confirm") {
+                return print_json(&actions::preview(home_dir_from_env(), &id)?);
+            }
+            print_json(&actions::apply(
+                home_dir_from_env(),
+                &id,
+                actions::ApplyOptions {
+                    confirm: true,
+                    executable: current_executable(),
+                    ..Default::default()
+                },
+            )?)
+        }
         _ => Err(anyhow!("unknown providers command")),
     }
 }
@@ -411,13 +457,109 @@ fn cmd_snapshot(args: &[String]) -> Result<()> {
     }
 }
 
+fn cmd_backup(args: &[String]) -> Result<()> {
+    match args.first().map(String::as_str) {
+        Some("plan") | None => print_json(&backupplan::plan(home_dir_from_env())),
+        Some("create") | Some("snapshot") => {
+            if !has(args, "--confirm") {
+                return print_json(&actions::preview(home_dir_from_env(), "backup.snapshot")?);
+            }
+            print_json(&actions::apply(
+                home_dir_from_env(),
+                "backup.snapshot",
+                actions::ApplyOptions {
+                    confirm: true,
+                    executable: current_executable(),
+                    ..Default::default()
+                },
+            )?)
+        }
+        _ => Err(anyhow!("unknown backup command")),
+    }
+}
+
 fn cmd_schedule(args: &[String]) -> Result<()> {
     match args.first().map(String::as_str) {
         Some("status") | None => print_json(&schedule::status(home_dir_from_env())),
-        Some("plan") => print_json(&schedule::plan(true)),
-        Some("install") => print_json(&schedule::plan(true)),
-        Some("remove") => print_json(&schedule::plan(false)),
+        Some("plan") => print_json(&schedule::plan(
+            home_dir_from_env(),
+            true,
+            &current_executable(),
+        )),
+        Some("install") => {
+            if !has(args, "--confirm") {
+                return print_json(&actions::preview(home_dir_from_env(), "schedule.install")?);
+            }
+            print_json(&actions::apply(
+                home_dir_from_env(),
+                "schedule.install",
+                actions::ApplyOptions {
+                    confirm: true,
+                    executable: current_executable(),
+                    ..Default::default()
+                },
+            )?)
+        }
+        Some("remove") => {
+            if !has(args, "--confirm") {
+                return print_json(&actions::preview(home_dir_from_env(), "schedule.remove")?);
+            }
+            print_json(&actions::apply(
+                home_dir_from_env(),
+                "schedule.remove",
+                actions::ApplyOptions {
+                    confirm: true,
+                    executable: current_executable(),
+                    ..Default::default()
+                },
+            )?)
+        }
         _ => Err(anyhow!("unknown schedule command")),
+    }
+}
+
+fn cmd_actions(args: &[String]) -> Result<()> {
+    match args.first().map(String::as_str) {
+        Some("list") | None => print_json(&actions::list(home_dir_from_env())),
+        Some("preview") => {
+            let id = args.get(1).ok_or_else(|| anyhow!("action id required"))?;
+            print_json(&actions::preview(home_dir_from_env(), id)?)
+        }
+        Some("apply") => {
+            let id = args.get(1).ok_or_else(|| anyhow!("action id required"))?;
+            print_json(&actions::apply(
+                home_dir_from_env(),
+                id,
+                actions::ApplyOptions {
+                    confirm: has(args, "--confirm"),
+                    executable: current_executable(),
+                    policy_path: value_after(args, "--policy")
+                        .or_else(|| value_after(args, "--config"))
+                        .unwrap_or("")
+                        .to_string(),
+                    finding_id: value_after(args, "--finding").unwrap_or("").to_string(),
+                    rule: value_after(args, "--rule").unwrap_or("").to_string(),
+                    reason: value_after(args, "--reason").unwrap_or("").to_string(),
+                },
+            )?)
+        }
+        _ => Err(anyhow!("unknown actions command")),
+    }
+}
+
+fn cmd_disclosure(args: &[String]) -> Result<()> {
+    match args.first().map(String::as_str) {
+        Some("status") | None => print_json(&state::disclosure_status(home_dir_from_env())),
+        Some("accept") => print_json(&actions::apply(
+            home_dir_from_env(),
+            "disclosure.accept",
+            actions::ApplyOptions {
+                confirm: true,
+                executable: current_executable(),
+                ..Default::default()
+            },
+        )?),
+        _ => Err(anyhow!("unknown disclosure command")),
     }
 }
 
@@ -469,6 +611,36 @@ fn value_after<'a>(args: &'a [String], key: &str) -> Option<&'a str> {
 
 fn has(args: &[String], key: &str) -> bool {
     args.iter().any(|arg| arg == key)
+}
+
+fn selected_providers_for_args(args: &[String]) -> Vec<String> {
+    value_after(args, "--with")
+        .map(|value| {
+            value
+                .split(',')
+                .map(|part| part.trim().to_string())
+                .filter(|part| !part.is_empty())
+                .collect()
+        })
+        .unwrap_or_else(|| {
+            state::load_settings(home_dir_from_env())
+                .map(|settings| settings.selected_providers)
+                .unwrap_or_default()
+        })
+}
+
+fn online_for_args(args: &[String]) -> bool {
+    has(args, "--online")
+        || state::load_settings(home_dir_from_env())
+            .map(|settings| settings.allow_online_providers)
+            .unwrap_or(false)
+}
+
+fn current_executable() -> String {
+    env::current_exe()
+        .ok()
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|| "nightward".to_string())
 }
 
 fn positional_after_command<'a>(args: &'a [String], command: &str) -> Option<&'a str> {
@@ -525,7 +697,7 @@ fn version() -> &'static str {
 
 fn print_help() {
     println!(
-        "Nightward audits AI agent state, MCP config, and dotfiles sync risk.\n\nUSAGE:\n  nightward                         Open the TUI\n  nightward tui --input scan.json   Review a saved report in the TUI\n  nightward tui --from old.json --to new.json\n  nightward scan --json             Scan HOME\n  nightward scan --workspace . --json\n  nightward analyze --all --with gitleaks --json\n  nightward providers doctor --with trivy --online --json\n  nightward fix plan --all --json\n  nightward report html --input scan.json --output report.html\n  nightward report html --from old.json --to new.json --output report.html\n  nightward policy check --json\n  nightward mcp serve\n\nNightward is local-first, read-only by default, and never enables online providers without --online."
+        "Nightward audits AI agent state, MCP config, and dotfiles sync risk.\n\nUSAGE:\n  nightward                         Open the TUI\n  nightward tui --input scan.json   Review a saved report in the TUI\n  nightward tui --from old.json --to new.json\n  nightward scan --json             Scan HOME\n  nightward scan --workspace . --json\n  nightward analyze --all --with gitleaks --json\n  nightward providers doctor --with trivy --online --json\n  nightward providers enable gitleaks --confirm\n  nightward providers install gitleaks --confirm\n  nightward disclosure accept\n  nightward fix plan --all --json\n  nightward backup create --confirm\n  nightward schedule install --confirm\n  nightward actions list --json\n  nightward actions apply backup.snapshot --confirm\n  nightward actions apply reports.cleanup --confirm\n  nightward actions apply cache.cleanup --confirm\n  nightward actions apply policy.ignore --finding <id> --reason \"reviewed\" --confirm\n  nightward report html --input scan.json --output report.html\n  nightward report html --from old.json --to new.json --output report.html\n  nightward policy check --json\n  nightward mcp serve\n\nNightward is local-first and read-only by default. Write-capable actions require disclosure acceptance and explicit confirmation."
     );
 }
 

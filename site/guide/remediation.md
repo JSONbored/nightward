@@ -1,6 +1,6 @@
 # Remediation
 
-Nightward remediation is plan-only in v1.
+Nightward fix plans are plan-only in v1.
 
 ## Fix kinds
 

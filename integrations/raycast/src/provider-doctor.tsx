@@ -15,9 +15,14 @@ import {
   Toast,
 } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
-import { execFile } from "node:child_process";
 import { useEffect, useMemo, useState } from "react";
-import { normalizePreferences, providersDoctor } from "./nightward";
+import {
+  applyAction,
+  normalizePreferences,
+  previewAction,
+  providersDoctor,
+  type RuntimeOptions,
+} from "./nightward";
 import { installInfoForProvider, isOnlineProvider } from "./provider-options";
 import {
   clearSelectedProviders,
@@ -77,6 +82,7 @@ export default function Command() {
             <ProviderItem
               key={provider.name}
               provider={provider}
+              runtime={runtime}
               selected={selectedSet.has(provider.name)}
               onlineAllowed={runtime.allowOnlineProviders}
               onRefresh={revalidate}
@@ -91,6 +97,7 @@ export default function Command() {
             <ProviderItem
               key={provider.name}
               provider={provider}
+              runtime={runtime}
               selected={selectedSet.has(provider.name)}
               onlineAllowed={runtime.allowOnlineProviders}
               onRefresh={revalidate}
@@ -104,12 +111,14 @@ export default function Command() {
 
 function ProviderItem({
   provider,
+  runtime,
   selected,
   onlineAllowed,
   onRefresh,
   onSelectedChange,
 }: {
   provider: ProviderStatus;
+  runtime: RuntimeOptions;
   selected: boolean;
   onlineAllowed: boolean;
   onRefresh: () => void;
@@ -233,11 +242,7 @@ function ProviderItem({
                       title="Install Provider"
                       icon={Icon.Download}
                       onAction={() =>
-                        void installProvider(
-                          provider.name,
-                          installCommand,
-                          onRefresh,
-                        )
+                        void installProvider(runtime, provider.name, onRefresh)
                       }
                     />
                   ) : null}
@@ -344,13 +349,44 @@ async function copyInstallCommand(provider: string, command: string) {
 }
 
 async function installProvider(
+  runtime: RuntimeOptions,
   provider: string,
-  command: string,
   onRefresh: () => void,
 ) {
+  const actionId = `provider.install.${provider}`;
+  let preview;
+  try {
+    preview = await previewAction(runtime, actionId);
+  } catch (error) {
+    await showToast({
+      style: Toast.Style.Failure,
+      title: `Could not preview ${provider} install`,
+      message: error instanceof Error ? error.message.slice(0, 180) : undefined,
+    });
+    return;
+  }
+
+  const action = preview.action;
+  if (!action.available) {
+    await showToast({
+      style: Toast.Style.Failure,
+      title: `${provider} install is blocked`,
+      message: action.blocked_reason || "Nightward action is not available.",
+    });
+    return;
+  }
+
+  const command = action.command.join(" ");
   const confirmed = await confirmAlert({
-    title: `Install ${provider}?`,
-    message: `Raycast will run: ${command}`,
+    title: `Apply ${action.title}?`,
+    message: [
+      action.description,
+      command ? `Command: ${command}` : "",
+      ...preview.warnings,
+      "Nightward will apply this through the shared action registry and audit the result.",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
     primaryAction: {
       title: "Install",
       style: Alert.ActionStyle.Default,
@@ -363,21 +399,19 @@ async function installProvider(
     title: `Installing ${provider}`,
     message: command,
   });
-  execFile("/bin/zsh", ["-lc", command], (error, stdout, stderr) => {
-    if (error) {
-      void showToast({
-        style: Toast.Style.Failure,
-        title: `Could not install ${provider}`,
-        message: (stderr || error.message).trim().slice(0, 180),
-      });
-      return;
-    }
+  try {
+    const result = await applyAction(runtime, actionId);
     toast.style = Toast.Style.Success;
     toast.title = `${provider} installed`;
     toast.message =
-      stdout.trim().slice(0, 180) || "Provider is ready to refresh.";
+      result.message.slice(0, 180) || "Provider is ready to refresh.";
     onRefresh();
-  });
+  } catch (error) {
+    toast.style = Toast.Style.Failure;
+    toast.title = `Could not install ${provider}`;
+    toast.message =
+      error instanceof Error ? error.message.slice(0, 180) : "Action failed.";
+  }
 }
 
 async function toggleProvider(

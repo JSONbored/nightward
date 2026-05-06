@@ -14,28 +14,28 @@ Nightward inspects local AI agent and devtool state, so its primary risk is acci
 
 - Local filesystem input is untrusted. Config files may be malformed, hostile, huge, symlinked, or privacy-sensitive.
 - CLI/TUI/Raycast output is a disclosure boundary. Secret values must not cross it.
-- Optional providers are execution boundaries. They are discovered but not installed automatically, unselected providers are skipped, online-capable providers are blocked until explicitly allowed, and provider timeout/output-cap failures are surfaced as warnings instead of clean results. Socket is treated as online-capable because it creates a remote scan artifact from dependency manifest metadata.
-- MCP clients are agent boundaries. `nw mcp serve` exposes read-only local context through stdio, so returned tool/resource content must stay redacted and bounded.
+- Optional providers are execution boundaries. They are discovered, selected, and installed only through explicit action paths, unselected providers are skipped, online-capable providers are blocked until explicitly allowed, and provider timeout/output-cap failures are surfaced as warnings instead of clean results. Trivy, Grype, OSV-Scanner, OpenSSF Scorecard, and Socket are treated as online-capable when their normal operation can contact external services.
+- MCP clients are agent boundaries. `nw mcp serve` exposes local context and bounded action application through stdio, so returned tool/resource/prompt content must stay redacted and writes must flow only through the action registry.
 - GitHub Actions and Trunk integrations treat repository contents and PR input as untrusted.
-- Scheduler install/remove is plan-only in v1; any future scheduler writes must stay explicit and user-level.
+- Scheduler install/remove is explicit, confirmation-gated, and user-level only.
 - Release automation and npm publishing are privileged publishing boundaries.
 
 ## Threats And Controls
 
 - Secret disclosure: redact env/header values, secret-looking args, token-like strings, and Markdown/SARIF/TUI exports; test every output surface.
-- Unexpected mutation: scan, doctor, findings, fix, policy, backup-plan, snapshot, analysis, TUI, Raycast, and GitHub Action policy paths stay read-only except explicit output files.
+- Unexpected mutation: scan, doctor, findings, fix, policy, backup-plan, snapshot-plan, analysis, MCP, and GitHub Action policy paths stay read-only except explicit output files. TUI, Raycast, and CLI writes must flow through the shared action registry with disclosure acceptance and confirmation; cleanup actions are limited to Nightward-owned report, log, and cache paths.
 - Unsafe portability: classify secret-auth, app-owned, runtime-cache, machine-local, and unknown state conservatively.
-- MCP execution ambiguity: flag shell wrappers, broad filesystem access, unpinned package execution, local endpoints, sensitive headers/env, token paths, and unknown shapes.
-- Supply-chain compromise: pin GitHub Actions by full SHA, use Renovate, run Gitleaks/OSV/CodeQL/Clippy/Trunk, keep release artifacts signed, and keep the npm package as a no-postinstall launcher that verifies archive checksums.
+- MCP execution ambiguity: flag shell wrappers, broad filesystem access, unpinned package execution, package-name impersonation risk, remote package sources, Docker/socket exposure, local/private endpoints, sensitive headers/env, token paths, stale configs, app-owned state, and unknown shapes.
+- Supply-chain compromise: pin GitHub Actions by full SHA, use Renovate, run Gitleaks/OSV/CodeQL/Clippy/Trunk, keep release artifacts signed, and keep the npm package as a no-postinstall launcher that verifies archive checksums, rejects unsafe archive entries, and can require Sigstore verification in strict environments.
 - Malformed config denial-of-service: keep parser/fuzz coverage for MCP JSON/TOML/YAML, URL/header redaction, symlink traversal, huge-file handling, and malformed configs.
-- Agent overreach through MCP: do not expose write tools, schedule install/remove, HTTP listeners, live config mutation, or online provider execution through the MCP server in v1.
+- Agent overreach through MCP: expose write capability only through `nightward_action_apply`, not through arbitrary config mutation. Direct apply requires disclosure acceptance, `confirm: true`, registry action availability, redacted output, and audit logging. Tool inputs are validated against strict server-side schemas, and explicit workspace/report paths are scoped under `NIGHTWARD_HOME` with no-symlink regular-file/directory checks. Do not expose live MCP/agent config mutation, restore, sync, or HTTP listener behavior through MCP v1.
 
 ## Non-Goals
 
 Nightward does not prove a tool, package, MCP server, or URL is safe. It reports local structure, known risky signals, and review guidance.
 
-Nightward does not back up, restore, sync, push to Git, or mutate agent configs in v1.
+Nightward can create local portable backup snapshots, but it does not restore, sync, push to Git, or mutate agent configs in v1.
 
 ## Review Triggers
 
-Update this model before adding live config mutation, restore, encrypted sync, online provider execution, hosted dashboards, release/npm publishing changes, MCP write tools, or new writable integrations.
+Update this model before adding live MCP/agent config mutation, restore, encrypted sync, hosted dashboards, release/npm publishing changes, MCP write tools, or new writable integrations.

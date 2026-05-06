@@ -1,0 +1,18 @@
+{
+  "matches": [
+    {
+      "vulnerability": {
+        "id": "CVE-2026-0002",
+        "severity": "High"
+      },
+      "artifact": {
+        "name": "demo",
+        "locations": [
+          {
+            "path": "package-lock.json"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -93,17 +93,17 @@ nw doctor --json
 
 If a bad npm package is published, deprecate that version with a clear reason and publish a fixed patch release. Do not unpublish unless npm policy and the severity of the issue require it.
 
-## Release Smoke
+## Release Verification
 
-The release workflow smokes the published GitHub archive before npm publish:
+The release workflow verifies the published GitHub archive before npm publish:
 
 ```sh
-bash scripts/smoke-release-archive.sh vX.Y.Z
+bash scripts/verify-release-archive.sh vX.Y.Z
 ```
 
 The npm job then installs the packed npm tarball and runs both command names before publishing.
 
-After npm publish, verify package metadata and launcher install smoke:
+After npm publish, verify package metadata and launcher install behavior:
 
 ```sh
 bash scripts/verify-npm-release.sh X.Y.Z

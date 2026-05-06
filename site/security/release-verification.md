@@ -8,8 +8,7 @@ Nightward releases are human-gated and signed.
 cosign verify-blob \
   --certificate-identity-regexp 'https://github.com/JSONbored/nightward/.github/workflows/release.yml@refs/tags/v.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate checksums.txt.pem \
-  --signature checksums.txt.sig \
+  --bundle checksums.txt.sigstore.json \
   checksums.txt
 ```
 
@@ -21,7 +20,7 @@ sha256sum -c checksums.txt --ignore-missing
 
 ## NPM launcher
 
-The npm package downloads the matching GitHub Release archive on first run and verifies it against `checksums.txt`.
+The npm package downloads the matching GitHub Release archive on first run, verifies it against `checksums.txt`, validates archive entries before extraction, and then executes the cached binary. Set `NIGHTWARD_NPM_REQUIRE_SIGSTORE=1` to require Cosign verification of `checksums.txt.sigstore.json` in strict environments.
 
 After install:
 

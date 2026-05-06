@@ -72,6 +72,27 @@ const providerLinks = new Map([
     },
   ],
   [
+    "grype",
+    {
+      home: "https://oss.anchore.com/grype/",
+      install: "https://oss.anchore.com/docs/reference/grype/quickstart/",
+    },
+  ],
+  [
+    "syft",
+    {
+      home: "https://oss.anchore.com/syft/",
+      install: "https://oss.anchore.com/docs/reference/syft/quickstart/",
+    },
+  ],
+  [
+    "scorecard",
+    {
+      home: "https://github.com/ossf/scorecard",
+      install: "https://github.com/ossf/scorecard#installation",
+    },
+  ],
+  [
     "socket",
     {
       home: "https://socket.dev/",
@@ -108,7 +129,7 @@ write(
 
 This page is generated from \`nw providers list --json\`.
 
-Nightward never installs providers. Local providers run only when selected with \`--with\`. Online-capable providers also require \`--online\` or \`allow_online_providers: true\` in policy config.
+Nightward never installs providers during doctor or analysis runs. Provider install actions are separate, disclosure-gated, and confirmation-gated. Local providers run only when selected with \`--with\`. Online-capable providers also require \`--online\` or \`allow_online_providers: true\` in policy/config/settings.
 
 | Provider | Mode | Command | Default | Install | Privacy | Capabilities |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -131,6 +152,8 @@ ${providers
 
 - \`trivy\`: explicit filesystem scan with JSON output. Vulnerability database activity can contact upstream services, so Nightward requires \`--online\`.
 - \`osv-scanner\`: explicit source scan against vulnerability data. Nightward requires \`--online\`.
+- \`grype\`: filesystem/SBOM vulnerability scanning. Vulnerability database activity can contact upstream services, so Nightward requires \`--online\`.
+- \`scorecard\`: repository-trust checks against a git remote or \`NIGHTWARD_SCORECARD_REPO\`. Nightward requires \`--online\`.
 - \`socket\`: creates a remote Socket scan artifact and uploads dependency manifest metadata. Nightward does not fetch remote Socket reports in v1.
 `,
 );

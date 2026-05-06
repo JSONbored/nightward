@@ -11,7 +11,11 @@ This page is generated from `nw rules list --json`.
 | `mcp_local_endpoint` | medium | [docs](https://nightward.aethereal.dev/guide/mcp-security) | `manual-review` | MCP server references a machine-local endpoint |
 | `mcp_broad_filesystem` | medium | [docs](https://nightward.aethereal.dev/guide/mcp-security) | `narrow-filesystem` | MCP server can access a broad filesystem path |
 | `mcp_local_token_path` | high | [docs](https://nightward.aethereal.dev/guide/privacy-model) | `manual-review` | MCP server references a local credential path |
+| `mcp_docker_socket` | high | [docs](https://nightward.aethereal.dev/guide/mcp-security) | `manual-review` | MCP server can control Docker or container host state |
+| `mcp_typosquat_package` | medium | [docs](https://nightward.aethereal.dev/guide/mcp-security) | `manual-review` | MCP server package resembles a trusted namespace |
+| `mcp_untrusted_package_source` | medium | [docs](https://nightward.aethereal.dev/guide/mcp-security) | `manual-review` | MCP server launches a remote package or script source |
 | `mcp_server_review` | info | [docs](https://nightward.aethereal.dev/reference/rules) | `manual-review` | MCP server should be reviewed |
 | `mcp_unknown_command` | info | [docs](https://nightward.aethereal.dev/reference/rules) | `manual-review` | MCP server has an unsupported command shape |
 | `config_parse_failed` | medium | [docs](https://nightward.aethereal.dev/use/troubleshooting) | `manual-review` | Nightward could not parse a config file |
 | `config_symlink` | info | [docs](https://nightward.aethereal.dev/guide/privacy-model) | `manual-review` | Config file is a symbolic link |
+| `config_stale` | low | [docs](https://nightward.aethereal.dev/guide/privacy-model) | `manual-review` | Config file has not changed in over 180 days |

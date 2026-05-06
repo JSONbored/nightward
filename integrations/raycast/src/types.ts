@@ -277,3 +277,34 @@ export type FixPlan = {
     why_this_matters?: string;
   }>;
 };
+
+export type NightwardAction = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  risk: "info" | "low" | "medium" | "high" | "critical" | string;
+  available: boolean;
+  requires_confirmation: boolean;
+  requires_online: boolean;
+  reversible: boolean;
+  writes: string[];
+  command: string[];
+  blocked_reason: string;
+};
+
+export type NightwardActionPreview = {
+  schema_version?: number;
+  action: NightwardAction;
+  steps: string[];
+  warnings: string[];
+};
+
+export type NightwardActionResult = {
+  schema_version?: number;
+  action_id: string;
+  status: string;
+  message: string;
+  writes: string[];
+  audit_path?: string;
+};

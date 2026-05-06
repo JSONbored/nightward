@@ -275,6 +275,18 @@ fn add_item_for_path(report: &mut Report, tool: &str, path: &Path) {
 
 fn classify_path(path: &str) -> (Classification, RiskLevel, String, String) {
     let lower = path.to_ascii_lowercase();
+    if lower.contains(".open-webui")
+        || lower.contains(".ollama")
+        || lower.contains("globalstorage")
+        || lower.contains("workspace storage")
+    {
+        return (
+            Classification::AppOwned,
+            RiskLevel::Medium,
+            "Path looks like app-owned runtime or extension state.".to_string(),
+            "Do not sync this as portable dotfiles; export/import only through the owning app when supported.".to_string(),
+        );
+    }
     if lower.contains("auth")
         || lower.contains("credential")
         || lower.contains("id_ed25519")
@@ -346,6 +358,23 @@ fn inspect_config(report: &mut Report, tool: &str, path: &Path) {
                 None,
             );
             return;
+        }
+        if let Some(mod_time) = meta.modified().ok().map(DateTime::<Utc>::from) {
+            if Utc::now().signed_duration_since(mod_time).num_days() > 180 {
+                push_finding(
+                    report,
+                    tool,
+                    path,
+                    "",
+                    "config_stale",
+                    RiskLevel::Low,
+                    "Config file has not changed in over 180 days.",
+                    &format!("last_modified={}", mod_time.to_rfc3339()),
+                    "Review whether this config is still active before syncing or trusting it.",
+                    FixKind::ManualReview,
+                    None,
+                );
+            }
         }
     }
 
@@ -473,8 +502,55 @@ fn inspect_server(report: &mut Report, tool: &str, path: &Path, server: &str, co
             }),
         );
     }
+    if !command.is_empty() && !known_command_shape(&command) {
+        push_finding(
+            report,
+            tool,
+            path,
+            server,
+            "mcp_unknown_command",
+            RiskLevel::Info,
+            "MCP server uses a command shape Nightward does not recognize.",
+            &evidence,
+            "Review the launcher command, installed binary source, and arguments before trusting it.",
+            FixKind::ManualReview,
+            None,
+        );
+    }
+    if docker_exposure(&command, &args, &url) {
+        push_finding(
+            report,
+            tool,
+            path,
+            server,
+            "mcp_docker_socket",
+            RiskLevel::High,
+            "MCP server appears to expose Docker or container-host control.",
+            &evidence,
+            "Avoid giving AI tools Docker socket, privileged container, or host-root bind access unless it is isolated and explicitly required.",
+            FixKind::ManualReview,
+            None,
+        );
+    }
 
     if let Some(package) = unpinned_package(&command, &args) {
+        if let Some(package) = &package {
+            if typosquat_like_package(package) {
+                push_finding(
+                    report,
+                    tool,
+                    path,
+                    server,
+                    "mcp_typosquat_package",
+                    RiskLevel::Medium,
+                    "MCP server package name resembles a trusted MCP package namespace but is not from the expected scope.",
+                    &evidence,
+                    "Verify the package publisher, repository, install counts, and source before running it.",
+                    FixKind::ManualReview,
+                    None,
+                );
+            }
+        }
         let patch_hint = package.map(|package| PatchHint {
             kind: Some(FixKind::PinPackage),
             package,
@@ -500,6 +576,21 @@ fn inspect_server(report: &mut Report, tool: &str, path: &Path, server: &str, co
             "Replace unversioned or @latest package references with a reviewed explicit version.",
             FixKind::PinPackage,
             patch_hint,
+        );
+    }
+    if let Some(source) = remote_package_source(&args) {
+        push_finding(
+            report,
+            tool,
+            path,
+            server,
+            "mcp_untrusted_package_source",
+            RiskLevel::Medium,
+            "MCP server launches a package or script from a remote source.",
+            &format!("source={}", redact_text(&source)),
+            "Prefer reviewed package-manager releases with pinned versions over direct URL, git, or tarball sources.",
+            FixKind::ManualReview,
+            None,
         );
     }
 
@@ -814,6 +905,72 @@ fn shell_command(command: &str) -> bool {
         command.rsplit('/').next().unwrap_or(command),
         "sh" | "bash" | "zsh" | "fish" | "pwsh" | "powershell" | "cmd"
     )
+}
+
+fn known_command_shape(command: &str) -> bool {
+    let base = command.rsplit('/').next().unwrap_or(command);
+    matches!(
+        base,
+        "npx"
+            | "uvx"
+            | "pipx"
+            | "pnpm"
+            | "yarn"
+            | "bunx"
+            | "node"
+            | "python"
+            | "python3"
+            | "uv"
+            | "deno"
+            | "docker"
+            | "go"
+            | "npm"
+            | "sh"
+            | "bash"
+            | "zsh"
+            | "fish"
+            | "pwsh"
+            | "powershell"
+            | "cmd"
+    ) || command.starts_with("./")
+        || command.starts_with("../")
+        || command.starts_with('/')
+}
+
+fn docker_exposure(command: &str, args: &[String], url: &str) -> bool {
+    let combined = format!("{} {} {}", command, args.join(" "), url).to_ascii_lowercase();
+    command.rsplit('/').next().unwrap_or(command) == "docker"
+        || combined.contains("docker.sock")
+        || combined.contains("/var/run/docker")
+        || combined.contains("--privileged")
+        || combined.contains("source=/")
+        || combined.contains("-v /:")
+        || combined.contains("--volume /:")
+}
+
+fn typosquat_like_package(package: &str) -> bool {
+    let lower = package.to_ascii_lowercase();
+    if lower.starts_with("@modelcontextprotocol/") {
+        return false;
+    }
+    (lower.contains("modelcontext") || lower.contains("model-context") || lower.contains("mcp"))
+        && (lower.contains("filesystem")
+            || lower.contains("server-filesystem")
+            || lower.contains("contextprotocol")
+            || lower.contains("modelcontextprotocol"))
+}
+
+fn remote_package_source(args: &[String]) -> Option<String> {
+    args.iter()
+        .find(|arg| {
+            let lower = arg.to_ascii_lowercase();
+            lower.starts_with("git+")
+                || lower.starts_with("http://")
+                || lower.starts_with("https://")
+                || lower.ends_with(".tgz")
+                || lower.ends_with(".tar.gz")
+        })
+        .cloned()
 }
 
 fn secret_key(key: &str) -> bool {
@@ -1144,6 +1301,57 @@ mod tests {
 
         assert!(!redacted.contains(&token));
         assert!(redacted.contains(path));
+    }
+
+    #[test]
+    fn detects_docker_package_provenance_and_unknown_command_shapes() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            dir.path().join(".mcp.json"),
+            r#"{
+              "mcpServers": {
+                "docker": {
+                  "command": "docker",
+                  "args": ["run", "-v", "/var/run/docker.sock:/var/run/docker.sock", "demo"]
+                },
+                "lookalike": {
+                  "command": "npx",
+                  "args": ["modelcontextprotocol-server-filesystem"]
+                },
+                "remote": {
+                  "command": "npx",
+                  "args": ["https://example.test/mcp-server.tgz"]
+                },
+                "custom": {
+                  "command": "custom-mcp-launcher",
+                  "args": []
+                }
+              }
+            }"#,
+        )
+        .unwrap();
+
+        let report = scan_workspace(dir.path()).unwrap();
+        let rules: BTreeSet<_> = report.findings.iter().map(|f| f.rule.as_str()).collect();
+        assert!(rules.contains("mcp_docker_socket"));
+        assert!(rules.contains("mcp_typosquat_package"));
+        assert!(rules.contains("mcp_untrusted_package_source"));
+        assert!(rules.contains("mcp_unknown_command"));
+    }
+
+    #[test]
+    fn classifies_app_owned_state_as_not_portable() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir(dir.path().join(".open-webui")).unwrap();
+
+        let report = scan_home(dir.path()).unwrap();
+        let item = report
+            .items
+            .iter()
+            .find(|item| item.path.ends_with(".open-webui"))
+            .expect("open webui item");
+
+        assert_eq!(item.classification, Classification::AppOwned);
     }
 
     #[test]

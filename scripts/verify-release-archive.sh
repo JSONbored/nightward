@@ -13,7 +13,7 @@ case "$(uname -s)" in
   Linux) os="linux" ;;
   MINGW* | MSYS* | CYGWIN*) os="windows" ;;
   *)
-    echo "unsupported release smoke OS: $(uname -s)" >&2
+    echo "unsupported release verification OS: $(uname -s)" >&2
     exit 1
     ;;
 esac
@@ -21,7 +21,7 @@ case "$(uname -m)" in
   x86_64 | amd64) arch="amd64" ;;
   arm64 | aarch64) arch="arm64" ;;
   *)
-    echo "unsupported release smoke architecture: $(uname -m)" >&2
+    echo "unsupported release verification architecture: $(uname -m)" >&2
     exit 1
     ;;
 esac
@@ -63,4 +63,4 @@ cd extracted
 ./nightward"${bin_ext}" --version | grep -Fx "${version}"
 ./nw"${bin_ext}" --version | grep -Fx "${version}"
 
-echo "release archive smoke passed for ${repo}@${tag}"
+echo "release archive verification passed for ${repo}@${tag}"

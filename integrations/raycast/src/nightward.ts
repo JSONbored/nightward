@@ -14,6 +14,9 @@ import type {
   FixPlan,
   ProviderStatus,
   ScanReport,
+  NightwardAction,
+  NightwardActionPreview,
+  NightwardActionResult,
 } from "./types";
 import { redactText } from "./format";
 
@@ -147,6 +150,35 @@ export async function providersDoctor(
   }
   args.push("--json");
   return runNightwardJSON<ProviderStatus[]>(args, options);
+}
+
+export async function listActions(
+  options: RuntimeOptions,
+): Promise<NightwardAction[]> {
+  return runNightwardJSON<NightwardAction[]>(
+    ["actions", "list", "--json"],
+    options,
+  );
+}
+
+export async function previewAction(
+  options: RuntimeOptions,
+  actionId: string,
+): Promise<NightwardActionPreview> {
+  return runNightwardJSON<NightwardActionPreview>(
+    ["actions", "preview", actionId, "--json"],
+    options,
+  );
+}
+
+export async function applyAction(
+  options: RuntimeOptions,
+  actionId: string,
+): Promise<NightwardActionResult> {
+  return runNightwardJSON<NightwardActionResult>(
+    ["actions", "apply", actionId, "--confirm", "--json"],
+    { ...options, timeoutMs: Math.max(options.timeoutMs, 120000) },
+  );
 }
 
 export async function reportDiff(

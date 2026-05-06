@@ -40,7 +40,7 @@ npm install -g @jsonbored/nightward
 nw scan --json
 ```
 
-The launcher has no `postinstall` script. On first run it downloads the matching GitHub Release archive, verifies its SHA-256 from `checksums.txt`, caches the extracted binaries, and executes `nightward` or `nw`.
+The launcher has no `postinstall` script. On first run it downloads the matching GitHub Release archive, verifies its SHA-256 from `checksums.txt`, rejects unsafe archive entries before extraction, caches the extracted binaries, and executes `nightward` or `nw`. Set `NIGHTWARD_NPM_REQUIRE_SIGSTORE=1` to require Cosign verification of `checksums.txt.sigstore.json` before the launcher trusts the checksum file.
 
 Published release archives currently cover macOS arm64/amd64, Linux arm64/amd64, and Windows amd64. Windows ARM64 remains deferred until the release matrix includes a validated Rust build.
 
@@ -49,7 +49,7 @@ Published release archives currently cover macOS arm64/amd64, Linux arm64/amd64,
 Use GitHub Releases when you want to verify everything yourself:
 
 1. Download the archive for your platform.
-2. Download `checksums.txt` and `checksums.txt.sig`.
+2. Download `checksums.txt` and `checksums.txt.sigstore.json`.
 3. Verify the signed checksum file.
 4. Verify the archive checksum.
 5. Place `nightward` and `nw` on `PATH`.
@@ -71,7 +71,7 @@ This installs `nightward` and `nw` into `~/.local/bin` by default.
 | Channel | Status | Notes |
 | --- | --- | --- |
 | GitHub Releases | Shipped | Canonical signed release artifacts. |
-| npm launcher | Shipped | No `postinstall`; verifies GitHub Release checksums. |
+| npm launcher | Shipped | No `postinstall`; verifies GitHub Release checksums and validates archive entries. |
 | Cargo source build | Development | Useful for local Nightward development and branch comparison. |
 | Trunk plugin import | Shipped | Pin to a Nightward release tag or SHA. |
 | GitHub Action tags | Shipped | Use for policy/SARIF checks in CI. |

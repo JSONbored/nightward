@@ -1,6 +1,6 @@
 # Current Priorities
 
-Nightward’s roadmap is intentionally conservative. The next releases should make local AI-tool review easier to understand, easier to trust, and easier to extend before adding live mutation, restore, or sync behavior.
+Nightward’s roadmap is intentionally conservative. The next releases should make local AI-tool review easier to understand, easier to trust, and easier to extend before adding live MCP/agent config mutation, restore, or sync behavior.
 
 ## Shipped
 
@@ -10,6 +10,7 @@ Nightward’s roadmap is intentionally conservative. The next releases should ma
 - GitHub Action, Trunk plugin definition, Raycast extension, and npm launcher.
 - Signed v0.1.x releases with npm provenance and release-checksum verification.
 - Explicit provider execution for local providers and online-gated provider runs.
+- Confirmation-gated provider setup/settings, user-level schedule install/remove, and local portable backup snapshots through the shared action registry.
 - Static HTML reports with local finding filters, report diffs, report history, and sample fixture assets.
 - Read-only stdio MCP server for local AI-client integration.
 - Embedded Rust OpenTUI dashboard with colored severity panels, findings, analysis, fix plan, inventory, backup preview, and help sections.

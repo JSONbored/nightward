@@ -5,14 +5,14 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
 
-if "${repo_root}/scripts/smoke-release-archive.sh" "latest" >/dev/null 2>&1; then
-  echo "expected smoke-release-archive.sh to reject non-semver tag" >&2
+if "${repo_root}/scripts/verify-release-archive.sh" "latest" >/dev/null 2>&1; then
+  echo "expected verify-release-archive.sh to reject non-semver tag" >&2
   exit 1
 fi
-grep -q 'uname -s' "${repo_root}/scripts/smoke-release-archive.sh"
-grep -q 'uname -m' "${repo_root}/scripts/smoke-release-archive.sh"
-if grep -q 'nightward_${version}_linux_amd64.tar.gz' "${repo_root}/scripts/smoke-release-archive.sh"; then
-  echo "expected smoke-release-archive.sh to select the host release archive" >&2
+grep -q 'uname -s' "${repo_root}/scripts/verify-release-archive.sh"
+grep -q 'uname -m' "${repo_root}/scripts/verify-release-archive.sh"
+if grep -q 'nightward_${version}_linux_amd64.tar.gz' "${repo_root}/scripts/verify-release-archive.sh"; then
+  echo "expected verify-release-archive.sh to select the host release archive" >&2
   exit 1
 fi
 
@@ -45,7 +45,7 @@ grep -q 'NIGHTWARD_VERSION="${version}"' "${repo_root}/.github/workflows/release
 grep -q "dist/nightward_\\*.tar.gz" "${repo_root}/.github/workflows/release.yml"
 grep -q "dist/nightward_\\*.zip" "${repo_root}/.github/workflows/release.yml"
 if [[ "$(grep -c "sigstore/cosign-installer" "${repo_root}/.github/workflows/release.yml")" -lt 2 ]]; then
-  echo "expected release publish and smoke jobs to install cosign" >&2
+  echo "expected release publish and verification jobs to install cosign" >&2
   exit 1
 fi
 if grep -q "path: dist/nightward_\\*" "${repo_root}/.github/workflows/release.yml"; then

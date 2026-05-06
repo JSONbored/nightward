@@ -35,6 +35,9 @@ Run `nw adapters list --json` or `nw adapters explain <name>` for the exact path
 | [Semgrep](https://semgrep.dev/) | Explicit local provider | [Install](https://semgrep.dev/docs/getting-started/) | Runs only with `--with semgrep` and repo-local config. |
 | [Trivy](https://trivy.dev/) | Explicit online-capable provider | [Install](https://trivy.dev/latest/getting-started/installation/) | Requires `--with trivy --online`; vulnerability DB behavior can contact upstream services. |
 | [OSV-Scanner](https://google.github.io/osv-scanner/) | Explicit online-capable provider | [Install](https://google.github.io/osv-scanner/installation/) | Requires `--with osv-scanner --online`. |
+| [Grype](https://oss.anchore.com/grype/) | Explicit online-capable provider | [Install](https://oss.anchore.com/docs/reference/grype/quickstart/) | Requires `--with grype --online`; vulnerability DB behavior can contact upstream services. |
+| [Syft](https://oss.anchore.com/syft/) | Explicit local provider | [Install](https://oss.anchore.com/docs/reference/syft/quickstart/) | Runs only with `--with syft`; emits local SBOM/package inventory signals. |
+| [OpenSSF Scorecard](https://github.com/ossf/scorecard) | Explicit online-capable provider | [Install](https://github.com/ossf/scorecard#installation) | Requires `--with scorecard --online` and a git remote or `NIGHTWARD_SCORECARD_REPO`. |
 | [Socket](https://socket.dev/) | Explicit online-capable provider | [CLI docs](https://docs.socket.dev/docs/socket-cli) | Requires `--with socket --online`; creates a remote scan artifact and uploads dependency manifest metadata. |
 
 ## Integration Coverage
@@ -43,7 +46,7 @@ Run `nw adapters list --json` or `nw adapters explain <name>` for the exact path
 | --- | --- | --- |
 | CLI/TUI | Shipped | Local read-only scan/report flows plus explicit output/export files |
 | [Raycast](/integrations/raycast) | Shipped in-repo | Read-only commands, menu-bar status, clipboard/report-folder actions |
-| [MCP server](/integrations/mcp-server) | Shipped | Stdio-only read-only tools/resources; no listener, mutation tools, or online providers |
+| [MCP server](/integrations/mcp-server) | Shipped | Stdio-only tools/resources/prompts; direct apply only through shared action-registry actions with disclosure, confirmation, redaction, and audit logging |
 | [GitHub Action](/integrations/github-action) | Shipped | CI policy/SARIF output against repository fixtures/workspaces |
 | [Trunk](/integrations/trunk) | Shipped | Repo-owned plugin definition; users pin to a Nightward tag or SHA |
 

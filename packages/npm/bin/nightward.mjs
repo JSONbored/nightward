@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { createWriteStream, existsSync, realpathSync } from "node:fs";
-import { chmod, copyFile, lstat, mkdir, readFile, rm } from "node:fs/promises";
+import { chmod, copyFile, lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { get } from "node:https";
 import { homedir, platform as osPlatform, tmpdir } from "node:os";
 import path from "node:path";
@@ -76,10 +76,139 @@ async function verifiedArchive(archive, url, expected) {
   return archive;
 }
 
+async function verifyChecksumsSigstore(baseURL, checksumsText) {
+  if (process.env.NIGHTWARD_NPM_REQUIRE_SIGSTORE !== "1") {
+    return;
+  }
+  requireCosignAvailable();
+  const dir = path.join(tmpdir(), `nightward-sigstore-${process.pid}-${Date.now()}`);
+  const checksumsPath = path.join(dir, "checksums.txt");
+  const bundlePath = path.join(dir, "checksums.txt.sigstore.json");
+  try {
+    await mkdir(dir, { recursive: true });
+    await writeFile(checksumsPath, checksumsText, { mode: 0o600 });
+    await download(`${baseURL}/checksums.txt.sigstore.json`, bundlePath);
+    const result = spawnSync("cosign", [
+      "verify-blob",
+      "--bundle",
+      bundlePath,
+      "--certificate-identity-regexp",
+      "https://github.com/JSONbored/nightward/.github/workflows/release.yml@refs/tags/v.*",
+      "--certificate-oidc-issuer",
+      "https://token.actions.githubusercontent.com",
+      checksumsPath
+    ], { encoding: "utf8" });
+    if (result.error) {
+      throw result.error;
+    }
+    if (result.status !== 0) {
+      throw new Error(`cosign verification failed: ${(result.stderr || result.stdout).trim()}`);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+function requireCosignAvailable() {
+  const cosign = spawnSync("cosign", ["version"], { stdio: "ignore" });
+  if (cosign.error || cosign.status !== 0) {
+    throw new Error("NIGHTWARD_NPM_REQUIRE_SIGSTORE=1 requires cosign on PATH");
+  }
+}
+
 async function assertRegularBinary(binary) {
   const info = await lstat(binary);
   if (!info.isFile() || info.isSymbolicLink()) {
     throw new Error(`cached binary is not a regular file: ${binary}`);
+  }
+}
+
+export function expectedArchiveEntries(target = targetFor()) {
+  return target.os === "windows"
+    ? ["nightward.exe", "nw.exe"]
+    : ["nightward", "nw"];
+}
+
+export function validateArchiveEntryName(entry) {
+  const trimmed = entry.trim();
+  if (!trimmed || trimmed.endsWith("/")) {
+    throw new Error(`release archive contains unexpected directory entry: ${entry}`);
+  }
+  if (trimmed.includes("\\") || path.isAbsolute(trimmed)) {
+    throw new Error(`release archive contains unsafe entry: ${entry}`);
+  }
+  const normalized = trimmed.replace(/^\.\/+/, "");
+  if (
+    !normalized ||
+    normalized.includes("/") ||
+    normalized.split("/").some((part) => part === "." || part === "..")
+  ) {
+    throw new Error(`release archive contains unsafe entry: ${entry}`);
+  }
+  return normalized;
+}
+
+export function validateArchiveEntries(archive, target = targetFor()) {
+  const entries = listArchiveEntries(archive, target);
+  const normalized = entries.map(validateArchiveEntryName);
+  const expected = expectedArchiveEntries(target);
+  const unexpected = normalized.filter((entry) => !expected.includes(entry));
+  const missing = expected.filter((entry) => !normalized.includes(entry));
+  if (unexpected.length > 0) {
+    throw new Error(`release archive contains unexpected entries: ${unexpected.join(", ")}`);
+  }
+  if (missing.length > 0) {
+    throw new Error(`release archive is missing expected entries: ${missing.join(", ")}`);
+  }
+  if (new Set(normalized).size !== normalized.length) {
+    throw new Error("release archive contains duplicate binary entries");
+  }
+  rejectTarSymlinks(archive, target);
+  return normalized;
+}
+
+function listArchiveEntries(archive, target) {
+  const result = target.os === "windows"
+    ? listZipEntries(archive)
+    : spawnSync("tar", ["-tzf", archive], { encoding: "utf8" });
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    throw new Error(`failed to list ${path.basename(archive)}: ${(result.stderr || "").trim()}`);
+  }
+  return result.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+}
+
+function listZipEntries(archive) {
+  const powershell = spawnSync("powershell", [
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-Command",
+    "Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::OpenRead($args[0]).Entries | ForEach-Object { $_.FullName }",
+    archive
+  ], { encoding: "utf8" });
+  if (!powershell.error && powershell.status === 0) {
+    return powershell;
+  }
+  return spawnSync("unzip", ["-Z1", archive], { encoding: "utf8" });
+}
+
+function rejectTarSymlinks(archive, target) {
+  if (target.os === "windows") {
+    return;
+  }
+  const result = spawnSync("tar", ["-tvzf", archive], { encoding: "utf8" });
+  if (result.error || result.status !== 0) {
+    return;
+  }
+  const symlinks = result.stdout
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("l"))
+    .map((line) => line.trim());
+  if (symlinks.length > 0) {
+    throw new Error("release archive contains symlink entries");
   }
 }
 
@@ -154,6 +283,7 @@ async function downloadText(url) {
 
 async function extractArchive(archive, destination, target = targetFor()) {
   await mkdir(destination, { recursive: true });
+  validateArchiveEntries(archive, target);
   const result = target.os === "windows"
     ? spawnSync("powershell", [
       "-NoProfile",
@@ -174,6 +304,9 @@ async function extractArchive(archive, destination, target = targetFor()) {
   if (result.status !== 0) {
     throw new Error(`failed to extract ${path.basename(archive)}`);
   }
+  for (const entry of expectedArchiveEntries(target)) {
+    await assertRegularBinary(path.join(destination, entry));
+  }
 }
 
 export async function ensureBinary(command = commandName()) {
@@ -192,7 +325,12 @@ export async function ensureBinary(command = commandName()) {
   const baseURL = releaseBaseURL(version);
   const archive = path.join(cacheRoot(), version, `${target.os}-${target.arch}`, asset);
   const installDir = path.dirname(binary);
-  const checksums = parseChecksums(await downloadText(`${baseURL}/checksums.txt`));
+  if (process.env.NIGHTWARD_NPM_REQUIRE_SIGSTORE === "1") {
+    requireCosignAvailable();
+  }
+  const checksumsText = await downloadText(`${baseURL}/checksums.txt`);
+  await verifyChecksumsSigstore(baseURL, checksumsText);
+  const checksums = parseChecksums(checksumsText);
   const expected = checksums.get(asset);
   if (!expected) {
     throw new Error(`checksums.txt does not include ${asset}`);

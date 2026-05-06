@@ -13,7 +13,7 @@ CARGO_AUDIT_VERSION ?= 0.22.1
 CARGO_DENY_VERSION ?= 0.19.4
 CARGO_LLVM_COV_VERSION ?= 0.8.5
 
-.PHONY: doctor install-dev-tools test test-fast test-security test-ux test-release test-local test-prepush test-release-install fmt clippy cargo-test cargo-nextest cargo-doc cargo-audit cargo-deny cargo-llvm-cov coverage-check fuzz-smoke test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test gitleaks raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-store-check raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify docs-reference docs-reference-check docs-freshness docs-qa demo-ids-check site-install site-audit site-build site-verify demo-assets tui-media release-snapshot verify build install-local clean-reports
+.PHONY: doctor install-dev-tools test test-fast test-security test-ux test-release test-local test-prepush test-release-install fmt clippy cargo-test cargo-nextest cargo-doc cargo-audit cargo-deny cargo-llvm-cov coverage-check fuzz-check test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test gitleaks raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-store-check raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify docs-reference docs-reference-check docs-qa site-install site-test site-audit site-build site-verify demo-assets tui-media release-snapshot verify build install-local clean-reports
 
 doctor:
 	bash scripts/dev-doctor.sh
@@ -70,8 +70,8 @@ cargo-llvm-cov:
 coverage-check: cargo-llvm-cov
 	@if [ -f "$(REPORTS_DIR)/coverage.txt" ]; then python3 -c 'import pathlib,re,sys; text=pathlib.Path("$(REPORTS_DIR)/coverage.txt").read_text(); nums=[float(x) for x in re.findall(r"([0-9]+(?:\.[0-9]+)?)%", text)]; pct=nums[-1] if nums else 100.0; threshold=float("$(COVERAGE_THRESHOLD)"); print(f"coverage {pct:.1f}% / threshold {threshold:.1f}%"); sys.exit(0 if pct >= threshold else 1)'; fi
 
-fuzz-smoke:
-	@PATH="$(RUST_PATH)"; if command -v cargo-fuzz >/dev/null 2>&1; then cargo fuzz run mcp_config_formats -- -runs=256 && cargo fuzz run redaction_urls_headers -- -runs=256 && cargo fuzz run filesystem_boundaries -- -runs=128; else echo "cargo-fuzz not installed; skipping fuzz smoke"; fi
+fuzz-check:
+	@PATH="$(RUST_PATH)"; if command -v cargo-fuzz >/dev/null 2>&1; then cargo fuzz run mcp_config_formats -- -runs=256 && cargo fuzz run redaction_urls_headers -- -runs=256 && cargo fuzz run filesystem_boundaries -- -runs=128; else echo "cargo-fuzz not installed; skipping fuzz check"; fi
 
 test-junit: clean-reports cargo-test raycast-install
 	mkdir -p $(REPORTS_DIR)/junit
@@ -134,6 +134,9 @@ npm-package-verify: npm-package-install npm-package-test npm-package-audit npm-p
 site-install:
 	cd $(SITE_DIR) && npm ci --ignore-scripts --no-audit
 
+site-test:
+	cd $(SITE_DIR) && npm test
+
 site-audit:
 	cd $(SITE_DIR) && npm audit --audit-level=moderate
 
@@ -146,15 +149,9 @@ docs-reference:
 docs-reference-check:
 	node scripts/generate-reference-docs.mjs --check
 
-docs-freshness:
-	node scripts/check-docs-freshness.mjs
+docs-qa: docs-reference-check site-test
 
-docs-qa: docs-reference-check docs-freshness demo-ids-check
-
-demo-ids-check:
-	node scripts/check-demo-ids.mjs
-
-site-verify: docs-qa site-install site-audit site-build
+site-verify: site-install docs-qa site-audit site-build
 
 demo-assets:
 	node scripts/generate-demo-assets.mjs

@@ -8,12 +8,12 @@ Nightward is designed around local custody. The scanner inspects local file meta
 - No Nightward runtime analytics.
 - No cloud dashboard.
 - No network calls from Nightward runtime.
-- Offline analysis is the default. Local provider execution happens only when the user explicitly selects providers with `--with` or policy config. Online-capable providers stay blocked unless the user explicitly passes `--online` or opts in through policy/config. `socket` is online-capable because it creates a remote Socket scan artifact from dependency manifest metadata.
-- No live backup, restore, Git push, or secret copy.
+- Offline analysis is the default. Local provider execution happens only when the user explicitly selects providers with `--with` or persisted provider settings. Online-capable providers stay blocked unless the user explicitly passes `--online` or opts in through policy/config/settings. `trivy`, `grype`, `osv-scanner`, `scorecard`, and `socket` are online-capable because vulnerability databases, repository checks, or remote scan artifacts can contact third-party services.
+- No restore, Git push, sync, or secret copy.
 - No agent config mutation in scan, doctor, findings, fix, policy, or backup-plan commands.
-- The TUI can copy text, export redacted fix-plan Markdown, and open docs only after explicit keypresses.
-- The Raycast extension calls only read-only Nightward commands and explicit clipboard/report-folder actions.
-- The MCP server is stdio-only and exposes read-only tools/resources. It has no network listener, no schedule tools, no live mutation tools, and no online-provider execution in v1.
+- The TUI can apply only shared action-registry operations after disclosure acceptance and an explicit confirmation keypress.
+- The Raycast extension exposes the same shared action registry and uses Raycast confirmation prompts before applying actions.
+- The MCP server is stdio-only. It exposes read-only scan, analysis, policy, report, rule, provider, prompt, and resource context plus one write-capable path: `nightward_action_apply`, which can apply only shared action-registry operations after disclosure acceptance and `confirm: true`.
 
 ## Write Paths
 
@@ -22,16 +22,24 @@ Nightward writes only when explicitly asked:
 - `scan --output FILE`
 - `policy sarif --output FILE`
 - `policy sarif --output -` writes SARIF to stdout only.
-- TUI `e` key: redacted fix-plan export under `~/.local/state/nightward/exports`
-- Raycast clipboard exports and report-folder open actions after explicit command invocation
+- `disclosure accept` or first TUI acceptance writes `~/.config/nightward/settings.json`
+- Confirmed provider settings and online-provider settings update `~/.config/nightward/settings.json`
+- Confirmed provider installs run only through the shared action registry after preview, disclosure acceptance, and confirmation.
+- Confirmed policy init/ignore actions write bounded Nightward policy files under `NIGHTWARD_HOME`; policy paths must be clean relative Nightward policy paths, and existing symlinks are rejected.
+- Confirmed schedule install/remove writes or removes user-level launchd/systemd files only.
+- Confirmed backup snapshots copy only regular portable backup candidates under `~/.local/state/nightward/snapshots`; symlinked or non-regular candidates are skipped and recorded in the manifest without following targets.
+- Confirmed cleanup actions remove only Nightward-owned report, log, or cache entries.
+- Raycast clipboard exports and report-folder open actions after explicit command invocation.
 
-Schedule install/remove is plan-only in v1. It describes intended launchd/systemd/cron commands, but does not write user-level scheduler files yet.
+Confirmed action writes append audit events under `~/.local/state/nightward/audit.jsonl`. Nightward still does not restore config, push to Git, sync secrets, or rewrite live MCP/agent configs.
 
-`nw mcp serve` is not a write path. It can run read-only scan, policy, finding, rule, report, and fix-plan context operations for an MCP client, but it cannot install schedules, mutate agent config, or enable online providers.
+Nightward-owned state writes reject symlinked directories and symlinked files before writing settings, audit logs, schedules, snapshots, or action-managed policy files.
+
+`nw mcp serve` can write only through the shared action registry. MCP clients cannot request arbitrary file edits, live MCP/agent config rewrites, restore operations, Git pushes, or secret sync. Direct apply requires disclosure acceptance, an explicit `confirm: true` argument, action availability checks, redacted output, and audit logging. MCP tool arguments are validated server-side against strict schemas, and MCP workspace/report paths must stay under `NIGHTWARD_HOME`, exist as regular files or directories as appropriate, and avoid symlink components.
 
 The TUI docs action opens an http(s) documentation URL through the OS default opener after the user presses `o`; Nightward itself does not fetch docs content.
 
-The Raycast extension does not add a Nightward config write path. `Export Nightward Fix Plan` copies redacted Markdown to the clipboard after the user invokes that command. `Open Nightward Reports` opens the existing reports folder and does not create it.
+The Raycast extension's write path is limited to the shared Nightward action registry. `Export Nightward Fix Plan` copies redacted Markdown to the clipboard after the user invokes that command. `Open Nightward Reports` opens the existing reports folder and does not create it.
 
 ## Public Website Analytics
 
@@ -66,7 +74,7 @@ MCP argument evidence redacts secret-looking assignments and flag values, such a
 
 Remote MCP URL evidence is structural only. Nightward records scheme and host for review, strips path/query details, and does not call the endpoint.
 
-Provider doctor output is intentionally about availability and privacy posture. It does not run optional scanners by default, install missing tools, or send package/file metadata to online services. Explicit provider runs use timeouts, bounded output capture, and redacted finding metadata; online-capable providers require `--online` or policy opt-in.
+Provider doctor output is intentionally about availability and privacy posture. It does not run optional scanners by default, install missing tools, or send package/file metadata to online services. Explicit provider runs use timeouts, bounded output capture, and redacted finding metadata; online-capable providers require `--online` or policy/settings opt-in. Provider install actions run only after disclosure acceptance and confirmation.
 
 ## What Still Needs Human Review
 

@@ -7,12 +7,15 @@ MCP config is an executable trust boundary. Nightward treats MCP server definiti
 Nightward checks for:
 
 - Package executors without pinned versions.
+- Package-name impersonation or direct remote package sources.
 - Shell wrappers.
+- Docker/socket or privileged host-control exposure.
 - Sensitive env keys.
 - Sensitive header keys.
 - Local/private endpoints.
 - Broad filesystem mounts.
 - Local token paths.
+- Stale configs and app-owned state that should not be synced as portable dotfiles.
 - Parse failures.
 - Unknown server shapes.
 

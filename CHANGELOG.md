@@ -24,7 +24,7 @@ not be reused.
   provider-warning, policy, SARIF, TUI, Raycast, and HTML behavior.
 - Hardened release publishing with signed-tag verification, Windows-compatible
   builds for non-TUI commands, scoped archive uploads, and Cosign-backed release
-  smoke before npm publication.
+  verification before npm publication.
 
 ## v0.1.5
 
@@ -50,7 +50,7 @@ First stable Nightward release.
 - Added explicit local/online-capable provider execution support with opt-in
   provider gates.
 - Added release-gated GitHub artifacts with checksums, SBOMs, Cosign-signed
-  checksum bundles, release smoke checks, and npm trusted-publishing support for
+  checksum bundles, release archive verification, and npm trusted-publishing support for
   `@jsonbored/nightward`.
 - Added OpenSSF-oriented governance, security policy, threat model, DCO, CodeQL,
   Scorecard, coverage, and release snapshot gates.
@@ -62,5 +62,5 @@ Superseded prerelease attempts.
 - `v0.1.1` and `v0.1.2` were superseded before the final npm/install
   verification path was complete.
 - `v0.1.3` proved GitHub/npm publishing and provenance, but the npm launcher
-  symlink smoke gap was fixed in `v0.1.4`.
+  symlink verification gap was fixed in `v0.1.4`.
 - Use `v0.1.4` or newer.

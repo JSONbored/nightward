@@ -9,7 +9,7 @@ nw scan --json
 nw findings list
 nw findings explain mcp_unpinned_package
 nw analyze --json
-nw providers doctor --with gitleaks,trufflehog,semgrep --json
+nw providers doctor --with gitleaks,trufflehog,semgrep,syft --json
 ```
 
 ## What To Look For
@@ -27,11 +27,11 @@ nw providers doctor --with gitleaks,trufflehog,semgrep --json
 Local providers stay opt-in:
 
 ```sh
-nw analyze --workspace . --with gitleaks,trufflehog,semgrep --json
+nw analyze --workspace . --with gitleaks,trufflehog,semgrep,syft --json
 ```
 
 Online-capable providers require an explicit online gate:
 
 ```sh
-nw analyze --workspace . --with trivy,osv-scanner,socket --online --json
+nw analyze --workspace . --with trivy,osv-scanner,grype,scorecard,socket --online --json
 ```

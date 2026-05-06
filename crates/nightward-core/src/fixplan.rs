@@ -232,6 +232,11 @@ fn group_title(action: &Action) -> String {
         "mcp_secret_env" | "mcp_secret_header" => "Externalize inline secrets".to_string(),
         "mcp_local_endpoint" => "Review machine-local endpoints".to_string(),
         "mcp_broad_filesystem" => "Narrow filesystem access".to_string(),
+        "mcp_docker_socket" => "Review Docker and host-control exposure".to_string(),
+        "mcp_typosquat_package" | "mcp_untrusted_package_source" => {
+            "Review package provenance".to_string()
+        }
+        "config_stale" => "Review stale config".to_string(),
         _ => action.title.clone(),
     }
 }
