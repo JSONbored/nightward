@@ -18,7 +18,7 @@ nw analyze --workspace . --with gitleaks,trufflehog,semgrep,syft --json
 
 Nightward discovers providers on `PATH`, marks unselected optional providers as `skipped`, runs bounded commands only when selected, parses supported JSON shapes, and redacts provider-derived evidence before emitting JSON, SARIF, TUI, Raycast, MCP, policy, badge, or HTML output. Timeout and output-cap failures are provider warnings, not clean results.
 
-Known provider installs are available through the shared action registry and require disclosure acceptance plus `--confirm`, TUI confirmation, or Raycast confirmation:
+Known provider installs are available through the shared action registry and require disclosure acceptance plus `--confirm`, TUI confirmation, Raycast confirmation, or an MCP approval ticket that was approved locally:
 
 ```sh
 nw providers install gitleaks --confirm
@@ -52,3 +52,13 @@ The Raycast Provider Doctor mirrors this model:
 - show install commands and upstream docs when a provider is missing.
 
 Raycast provider actions use the same action registry and confirmation prompts as the CLI/TUI.
+
+## MCP Provider Actions
+
+MCP clients can preview provider install/enable actions and request approval, but cannot self-confirm package-manager execution:
+
+```json
+{ "action_id": "provider.install.gitleaks", "client": "my-ai-client" }
+```
+
+The request response includes an `approval_id`, which is separate from `action_id`; `action_id` names the registry action, while `approval_id` names the one-time approval ticket. You can also find the ticket in the TUI, Raycast approvals list, or `nw approvals list --json`. Approve the exact ticket in the TUI, Raycast, or via CLI: `nw approvals approve <approval-id>`. The MCP client can then apply only that approved ticket once.

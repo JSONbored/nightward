@@ -46,7 +46,7 @@ Run `nw adapters list --json` or `nw adapters explain <name>` for the exact path
 | --- | --- | --- |
 | CLI/TUI | Shipped | Local read-only scan/report flows plus explicit output/export files |
 | [Raycast](/integrations/raycast) | Shipped in-repo | Read-only commands, menu-bar status, clipboard/report-folder actions |
-| [MCP server](/integrations/mcp-server) | Shipped | Stdio-only tools/resources/prompts; read-only action list/preview, with writes applied through CLI/TUI/Raycast |
+| [MCP server](/integrations/mcp-server) | Shipped | Stdio-only tools/resources/prompts; action list/preview, approval request/status, and controlled application of approved actions through the shared local action registry |
 | [GitHub Action](/integrations/github-action) | Shipped | CI policy/SARIF output against repository fixtures/workspaces |
 | [Trunk](/integrations/trunk) | Shipped | Repo-owned plugin definition; users pin to a Nightward tag or SHA |
 

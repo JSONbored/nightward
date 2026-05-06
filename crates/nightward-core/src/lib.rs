@@ -1,5 +1,6 @@
 pub mod actions;
 pub mod analysis;
+pub mod approvals;
 pub mod backupplan;
 pub mod fixplan;
 pub mod inventory;

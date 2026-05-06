@@ -46,7 +46,7 @@ make test-prepush
 After a package is published, verify the install path explicitly:
 
 ```sh
-make test-release-install VERSION=0.1.4
+make test-release-install VERSION=0.1.11
 ```
 
 The lower-level targets remain available for focused iteration:
@@ -87,19 +87,19 @@ make verify
 - Badge artifact tests must cover pass/fail shape, policy summary fields, optional SARIF URL, and no-write stdout mode.
 - Golden-style tests should stay stable for JSON/SARIF shape, not timestamps or host-specific paths. Scan-summary goldens must keep item buckets separate from finding buckets.
 - MCP fixture tests should cover command servers, URL-shaped servers, sensitive headers, local/private endpoints, Docker/socket exposure, package provenance hints, stale configs, app-owned state, and unsupported shapes.
-- MCP server protocol tests should cover initialize negotiation, tools/resources/prompts lists, strict input schemas, server-side invalid-argument rejection, MCP path scoping, structured output, annotations, tool-result errors, disabled MCP action apply, disclosure self-accept rejection, out-of-band disclosure still not enabling MCP writes, and report-change failure paths.
+- MCP server protocol tests should cover initialize negotiation, tools/resources/prompts lists, strict input schemas, server-side invalid-argument rejection, MCP path scoping, structured output, annotations, tool-result errors, disabled legacy MCP action apply, disclosure self-accept rejection, approval request/status/apply-approved flow, pending/denied/expired/replayed ticket blocking, digest mismatch blocking, and report-change failure paths.
 - Parser fuzz harnesses live under `fuzz/` and cover MCP JSON/TOML/YAML parsing, URL/header redaction, symlink traversal, huge-file handling, and malformed config cases. Run a bounded local fuzz check with `make fuzz-check`; run a single target directly with `cargo fuzz run mcp_config_formats -- -runs=1024`.
 - Provider contract tests use `testdata/providers/*` fixtures for `gitleaks`, `trufflehog`, `semgrep`, `trivy`, `osv-scanner`, `grype`, `syft`, `scorecard`, and `socket`.
 - Scheduler tests verify generated launchd, systemd user timer, and cron text without installing schedules.
-- TUI tests cover fixed terminal rendering behavior, redaction boundaries, and embedded OpenTUI layout helpers.
+- TUI tests cover fixed terminal rendering behavior, redaction boundaries, action confirmation, MCP approval review, and embedded OpenTUI layout helpers.
 - Scheduler tests cover report history ordering, finding counts, non-report filtering, and symlink skipping without installing timers.
-- Raycast extension tests cover pure redaction/formatting helpers, safe command execution wrappers, and Provider Doctor install routing through the shared action registry instead of direct shell execution.
+- Raycast extension tests cover pure redaction/formatting helpers, safe command execution wrappers, Provider Doctor install routing through the shared action registry instead of direct shell execution, and MCP approval list/approve/deny command routing.
 - `cargo fmt`, `cargo clippy -D warnings`, `cargo test`, optional `cargo audit`/`cargo deny`, Gitleaks, and coverage checks are part of the local verification bar.
 - `make coverage-check` enforces the practical coverage target when `cargo-llvm-cov` is available, and always runs the Rust workspace tests.
 - `make ci-scripts-test` verifies repository-maintained CI helper scripts such as DCO checking, action path validation, and release-script input validation.
 - Raycast dependency audits run with `npm audit --audit-level=moderate`.
 - The npm launcher tests run with `make npm-package-verify`, including unit tests, `npm audit`, and `npm pack --dry-run`.
-- `make docs-qa` verifies generated CLI/provider/rule/config references and runs the site Vitest docs contracts for stale copy, demo fixture IDs, and MCP tool/resource/prompt docs coverage.
+- `make docs-qa` verifies generated CLI/provider/rule/config references and runs the site Vitest docs contracts for stale copy, demo fixture IDs, stale release tags, CLI help parity, and MCP tool/resource/prompt docs coverage.
 
 ## Trunk Flaky Tests
 

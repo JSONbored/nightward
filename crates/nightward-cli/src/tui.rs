@@ -3,7 +3,7 @@ use nightward_core::analysis::{self, Options as AnalysisOptions};
 use nightward_core::fixplan::{self, Selector};
 use nightward_core::reportdiff::DiffReport;
 use nightward_core::{
-    actions, backupplan, max_risk, state, Classification, Finding, Report, RiskLevel,
+    actions, approvals, backupplan, max_risk, state, Classification, Finding, Report, RiskLevel,
 };
 use opentui::buffer::{BoxOptions, BoxStyle, ClipRect, TitleAlign};
 use opentui::input::{Event, InputParser, KeyCode};
@@ -14,7 +14,7 @@ use std::io::{self, Read};
 use std::sync::mpsc;
 use std::time::Duration;
 
-const VIEWS: [&str; 8] = [
+const VIEWS: [&str; 9] = [
     "Overview",
     "Findings",
     "Analysis",
@@ -22,6 +22,7 @@ const VIEWS: [&str; 8] = [
     "Inventory",
     "Backup",
     "Actions",
+    "MCP Approvals",
     "Help",
 ];
 const REPO_LABEL: &str = "github.com/JSONbored/nightward";
@@ -208,7 +209,9 @@ struct TuiState<'a> {
     active_view: usize,
     selected_finding: usize,
     selected_action: usize,
+    selected_approval: usize,
     pending_action: Option<String>,
+    pending_approval: Option<String>,
     action_message: String,
     disclosure_pending: bool,
     severity_filter: Option<RiskLevel>,
@@ -507,7 +510,9 @@ impl<'a> TuiState<'a> {
             active_view: 0,
             selected_finding: 0,
             selected_action: 0,
+            selected_approval: 0,
             pending_action: None,
+            pending_approval: None,
             action_message: String::new(),
             disclosure_pending: disclosure_pending_for(report),
             severity_filter: None,
@@ -554,6 +559,24 @@ impl<'a> TuiState<'a> {
             }
             return true;
         }
+        if let Some(approval_id) = self.pending_approval.clone() {
+            match key.code {
+                KeyCode::Char('y') | KeyCode::Enter => {
+                    self.approve_mcp_action(approval_id);
+                    self.pending_approval = None;
+                }
+                KeyCode::Char('n') => {
+                    self.deny_mcp_action(approval_id);
+                    self.pending_approval = None;
+                }
+                KeyCode::Esc => {
+                    self.pending_approval = None;
+                    self.action_message = "approval review canceled".to_string();
+                }
+                _ => {}
+            }
+            return true;
+        }
         if self.search_mode {
             match key.code {
                 KeyCode::Esc | KeyCode::Enter => self.search_mode = false,
@@ -575,12 +598,16 @@ impl<'a> TuiState<'a> {
         match key.code {
             KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => self.next_view(),
             KeyCode::BackTab | KeyCode::Left | KeyCode::Char('h') => self.previous_view(),
-            KeyCode::Char(ch @ '1'..='8') => {
-                self.active_view = usize::from(ch as u8 - b'1');
+            KeyCode::Char(ch @ '1'..='9') => {
+                let view = usize::from(ch as u8 - b'1');
+                if view < VIEWS.len() {
+                    self.active_view = view;
+                }
             }
             KeyCode::Down | KeyCode::Char('j') => self.select_next(),
             KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
             KeyCode::Enter if self.active_view == 6 => self.confirm_selected_action(),
+            KeyCode::Enter if self.active_view == 7 => self.confirm_selected_approval(),
             KeyCode::Char('/') => self.search_mode = true,
             KeyCode::Char('s') => self.cycle_severity_filter(),
             KeyCode::Char('x') => self.clear_filters(),
@@ -605,6 +632,13 @@ impl<'a> TuiState<'a> {
             } else {
                 self.selected_action = (self.selected_action + 1) % count;
             }
+        } else if self.active_view == 7 {
+            let count = self.approvals().len();
+            if count == 0 {
+                self.selected_approval = 0;
+            } else {
+                self.selected_approval = (self.selected_approval + 1) % count;
+            }
         } else {
             self.select_next_finding();
         }
@@ -617,6 +651,13 @@ impl<'a> TuiState<'a> {
                 self.selected_action = 0;
             } else {
                 self.selected_action = self.selected_action.checked_sub(1).unwrap_or(count - 1);
+            }
+        } else if self.active_view == 7 {
+            let count = self.approvals().len();
+            if count == 0 {
+                self.selected_approval = 0;
+            } else {
+                self.selected_approval = self.selected_approval.checked_sub(1).unwrap_or(count - 1);
             }
         } else {
             self.select_previous_finding();
@@ -631,6 +672,16 @@ impl<'a> TuiState<'a> {
         self.actions().into_iter().nth(self.selected_action)
     }
 
+    fn approvals(&self) -> Vec<approvals::ActionApproval> {
+        approvals::list(&self.report.home)
+            .map(|list| list.approvals)
+            .unwrap_or_default()
+    }
+
+    fn selected_approval(&self) -> Option<approvals::ActionApproval> {
+        self.approvals().into_iter().nth(self.selected_approval)
+    }
+
     fn confirm_selected_action(&mut self) {
         let Some(action) = self.selected_action() else {
             self.action_message = "no action selected".to_string();
@@ -642,6 +693,27 @@ impl<'a> TuiState<'a> {
         }
         self.pending_action = Some(action.id.clone());
         self.action_message = format!("press y to apply {} or n to cancel", action.id);
+    }
+
+    fn confirm_selected_approval(&mut self) {
+        let Some(approval) = self.selected_approval() else {
+            self.action_message = "no MCP approval selected".to_string();
+            return;
+        };
+        match approval.status.as_str() {
+            "pending" => {
+                self.pending_approval = Some(approval.approval_id.clone());
+                self.action_message =
+                    format!("press y to approve {} or n to deny", approval.approval_id);
+            }
+            "approved" => {
+                self.action_message =
+                    "approval already granted; MCP can apply the exact ticket once".to_string();
+            }
+            other => {
+                self.action_message = format!("approval is {other}");
+            }
+        }
     }
 
     fn apply_action(&mut self, action_id: String) {
@@ -665,6 +737,34 @@ impl<'a> TuiState<'a> {
             }
             Err(err) => {
                 self.action_message = format!("action failed: {err}");
+            }
+        }
+    }
+
+    fn approve_mcp_action(&mut self, approval_id: String) {
+        match approvals::approve(&self.report.home, &approval_id, "approved in Nightward TUI") {
+            Ok(_) => {
+                self.action_message = format!("{approval_id} approved for one MCP apply");
+                self.selected_approval = self
+                    .selected_approval
+                    .min(self.approvals().len().saturating_sub(1));
+            }
+            Err(err) => {
+                self.action_message = format!("approval failed: {err}");
+            }
+        }
+    }
+
+    fn deny_mcp_action(&mut self, approval_id: String) {
+        match approvals::deny(&self.report.home, &approval_id, "denied in Nightward TUI") {
+            Ok(_) => {
+                self.action_message = format!("{approval_id} denied");
+                self.selected_approval = self
+                    .selected_approval
+                    .min(self.approvals().len().saturating_sub(1));
+            }
+            Err(err) => {
+                self.action_message = format!("deny failed: {err}");
             }
         }
     }
@@ -961,7 +1061,7 @@ impl<'a> TuiState<'a> {
         let compact = limit < 48;
         let max_x = x + limit;
         let hints = [
-            ("tab/1-8", "navigate"),
+            ("tab/1-9", "navigate"),
             ("/", "search"),
             ("s", "severity"),
             ("x", "clear"),
@@ -1133,7 +1233,7 @@ impl<'a> TuiState<'a> {
             buffer,
             x,
             posture_y + 6,
-            "tab/1-8 navigate",
+            "tab/1-9 navigate",
             Style::fg(self.palette.muted),
         );
         draw_text(
@@ -1173,6 +1273,7 @@ impl<'a> TuiState<'a> {
             4 => self.render_inventory(buffer, area),
             5 => self.render_backup(buffer, area),
             6 => self.render_actions(buffer, area),
+            7 => self.render_mcp_approvals(buffer, area),
             _ => self.render_help(buffer, area),
         }
     }
@@ -2189,6 +2290,161 @@ impl<'a> TuiState<'a> {
         }
     }
 
+    fn render_mcp_approvals(&self, buffer: &mut OptimizedBuffer, area: Area) {
+        let approvals = self.approvals();
+        let left_w = responsive_width(area.w, 50, 34, 42);
+        let right_x = area.x + left_w + 2;
+        let right_w = area.w.saturating_sub(left_w + 2);
+
+        draw_panel(
+            buffer,
+            Area::new(area.x, area.y, left_w, area.h),
+            "MCP Approval Queue",
+            self.palette.amber,
+            self.palette.panel,
+        );
+        let mut row = area.y + 2;
+        for (idx, approval) in approvals
+            .iter()
+            .enumerate()
+            .take(area.h.saturating_sub(4) as usize / 2)
+        {
+            let selected = idx == self.selected_approval;
+            let color = approval_color(&self.palette, &approval.status);
+            if selected {
+                buffer.fill_rect(
+                    area.x + 1,
+                    row.saturating_sub(1),
+                    left_w.saturating_sub(2),
+                    2,
+                    self.palette.surface,
+                );
+            }
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                &truncate(&approval.action_id, left_w.saturating_sub(16) as usize),
+                if selected {
+                    Style::fg(color).with_bold()
+                } else {
+                    Style::fg(color)
+                },
+            );
+            draw_text(
+                buffer,
+                area.x + left_w.saturating_sub(12),
+                row,
+                &truncate(&approval.status, 10),
+                Style::fg(color),
+            );
+            row += 1;
+            draw_text(
+                buffer,
+                area.x + 2,
+                row,
+                &truncate(&approval.approval_id, left_w.saturating_sub(4) as usize),
+                Style::fg(self.palette.muted),
+            );
+            row += 1;
+        }
+
+        draw_panel(
+            buffer,
+            Area::new(right_x, area.y, right_w, area.h),
+            "Approval Detail",
+            self.palette.cyan,
+            self.palette.surface,
+        );
+        let mut row = area.y + 2;
+        if let Some(approval) = self.selected_approval() {
+            draw_text(
+                buffer,
+                right_x + 2,
+                row,
+                &truncate(
+                    &approval.preview.action.title,
+                    right_w.saturating_sub(4) as usize,
+                ),
+                Style::fg(approval_color(&self.palette, &approval.status)).with_bold(),
+            );
+            row += 2;
+            let expires = approval.expires_at.to_rfc3339();
+            for (label, value) in [
+                ("status", approval.status.as_str()),
+                ("requested by", approval.requested_by.as_str()),
+                ("approval", approval.approval_id.as_str()),
+                ("expires", expires.as_str()),
+            ] {
+                section_label(buffer, right_x + 2, row, label, self.palette.cyan);
+                draw_text(
+                    buffer,
+                    right_x + 18,
+                    row,
+                    &truncate(value, right_w.saturating_sub(20) as usize),
+                    Style::fg(self.palette.white),
+                );
+                row += 2;
+            }
+            section_label(buffer, right_x + 2, row, "writes", self.palette.cyan);
+            row += 2;
+            for write in approval.preview.action.writes.iter().take(4) {
+                draw_text(buffer, right_x + 2, row, "•", Style::fg(self.palette.amber));
+                draw_text(
+                    buffer,
+                    right_x + 5,
+                    row,
+                    &truncate(write, right_w.saturating_sub(7) as usize),
+                    Style::fg(self.palette.white),
+                );
+                row += 1;
+            }
+            if !approval.preview.action.command.is_empty() {
+                row += 1;
+                section_label(buffer, right_x + 2, row, "command", self.palette.cyan);
+                row += 2;
+                draw_text(
+                    buffer,
+                    right_x + 2,
+                    row,
+                    &truncate(
+                        &approval.preview.action.command.join(" "),
+                        right_w.saturating_sub(4) as usize,
+                    ),
+                    Style::fg(self.palette.white),
+                );
+            }
+        }
+        if let Some(approval_id) = &self.pending_approval {
+            draw_text(
+                buffer,
+                right_x + 2,
+                area.y + area.h.saturating_sub(3),
+                &truncate(
+                    &format!("Approve {approval_id}: y approve / n deny"),
+                    right_w.saturating_sub(4) as usize,
+                ),
+                Style::fg(self.palette.amber).with_bold(),
+            );
+        } else if !self.action_message.is_empty() {
+            draw_text(
+                buffer,
+                right_x + 2,
+                area.y + area.h.saturating_sub(3),
+                &truncate(&self.action_message, right_w.saturating_sub(4) as usize),
+                Style::fg(self.palette.cyan),
+            );
+        } else {
+            draw_text(
+                buffer,
+                right_x + 2,
+                area.y + area.h.saturating_sub(3),
+                "Press Enter to review selected MCP approval",
+                Style::fg(self.palette.muted),
+            );
+        }
+    }
+
     fn render_help(&self, buffer: &mut OptimizedBuffer, area: Area) {
         let left_w = responsive_width(area.w, 45, 32, 40);
         let right_x = area.x + left_w + 2;
@@ -2204,7 +2460,7 @@ impl<'a> TuiState<'a> {
         let mut row = area.y + 2;
         for (key, label) in [
             ("tab / shift-tab", "switch views"),
-            ("1-8", "open view"),
+            ("1-9", "open view"),
             ("j / down", "next finding"),
             ("k / up", "previous finding"),
             ("enter", "confirm action"),
@@ -2443,6 +2699,17 @@ fn action_color(palette: &Palette, action: &actions::ActionSpec) -> Rgba {
         "medium" => palette.amber,
         "low" => palette.blue,
         _ => palette.green,
+    }
+}
+
+fn approval_color(palette: &Palette, status: &str) -> Rgba {
+    match status {
+        "pending" => palette.amber,
+        "approved" => palette.green,
+        "denied" | "failed" | "invalidated" => palette.red,
+        "applied" => palette.blue,
+        "expired" => palette.muted,
+        _ => palette.white,
     }
 }
 
@@ -2874,7 +3141,7 @@ mod tests {
         let app = TuiState::new(&report);
         let text = render_text(&app, 120, 36);
 
-        assert!(text.contains("tab/1-8"));
+        assert!(text.contains("tab/1-9"));
         assert!(text.contains(&format!("v{}", version())));
         assert!(text.contains(REPO_LABEL));
         assert!(text.contains(STAR_CTA));
@@ -3017,7 +3284,7 @@ mod tests {
     fn full_help_keyboard_text_does_not_overwrite_panel_border() {
         let report = fixture_report();
         let mut app = TuiState::new(&report);
-        app.active_view = 7;
+        app.active_view = 8;
         let mut buffer = OptimizedBuffer::new(120, 36);
         app.render(&mut buffer, 120, 36);
 
@@ -3030,7 +3297,7 @@ mod tests {
     fn full_help_keyboard_text_uses_short_labels() {
         let report = fixture_report();
         let mut app = TuiState::new(&report);
-        app.active_view = 7;
+        app.active_view = 8;
         let text = render_text(&app, 120, 36);
 
         assert!(text.contains("switch views"));

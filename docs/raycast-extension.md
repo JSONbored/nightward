@@ -16,6 +16,7 @@ integrations/raycast
 - `Nightward Analysis`: built-in offline signals plus explicitly selected providers.
 - `Nightward Provider Doctor`: optional provider availability, privacy posture, install guidance for missing tools, and Raycast Analysis enable/disable controls.
 - `Nightward Actions`: preview and apply confirmed provider, policy, schedule, backup, cleanup, and setup actions.
+- `Nightward MCP Approvals`: approve or deny exact Model Context Protocol (MCP)-requested action tickets.
 - `Explain Nightward Finding`: detail view for a known finding ID.
 - `Explain Nightward Signal`: analysis signal view for a known finding ID.
 - `Export Nightward Fix Plan`: copies `nw fix export --all --format markdown`.
@@ -44,7 +45,7 @@ The extension uses `execFile`, not a shell, for local Nightward commands. It cal
 - `analyze finding <id> --json`
 - `providers doctor [--with providers] [--online] --json`
 
-Write-capable calls are limited to `actions apply <id> --confirm` through the shared action registry. Provider Doctor previews `provider.install.<name>` and applies that registry action after explicit confirmation; it no longer runs package-manager commands through a shell. No Raycast command runs restore, Git, or hidden shell mutation.
+Write-capable calls are limited to `actions apply <id> --confirm` through the shared action registry and `approvals approve|deny <approval-id>` through the Nightward approval queue, the human-reviewed queue for approve/deny decisions on MCP-requested actions. Provider Doctor previews `provider.install.<name>` and applies that registry action only after explicit confirmation; it no longer runs package-manager commands through a shell. MCP Approvals can approve a one-time ticket for MCP to run the specific approved registry action later, but it cannot approve disclosure, exfiltrate secrets, expose environment variables, read private keys, authorize arbitrary edits, perform bulk code changes, run raw shell commands, restore files, push Git state, or mutate live agent config outside the approved registry action.
 
 Nightward is beta operator tooling. Users are responsible for reviewing confirmations, write targets, provider behavior, and package-manager side effects before applying actions. The project provides no warranty.
 
@@ -75,6 +76,7 @@ Manual UI validation must use a fixture `Home Override`, not a real local home, 
 - Analysis renders built-in signals, selected provider output, provider warnings, and blocked-online-provider state.
 - Provider Doctor shows provider status, install guidance, action-registry provider CLI installation, and enable/disable controls for Raycast Analysis without running online-capable providers unless explicit opt-in is enabled.
 - Nightward Actions lists action IDs, risk, writes, commands, blocked reasons, and applies only after confirmation.
+- Nightward MCP Approvals lists approval IDs, requested actions, status, expiry, writes, and commands; approve/deny requires a Raycast confirmation prompt.
 - Export commands copy redacted Markdown and do not mutate local config.
 - Open Reports opens only an existing reports folder.
 

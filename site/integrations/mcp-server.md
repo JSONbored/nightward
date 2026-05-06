@@ -2,13 +2,13 @@
 
 <!-- markdownlint-disable MD033 -->
 
-Nightward ships a stdio [Model Context Protocol](https://modelcontextprotocol.io/) server so AI clients can scan, explain, compare, plan, and preview bounded Nightward actions.
+Nightward ships a stdio [Model Context Protocol](https://modelcontextprotocol.io/) server so AI clients can scan, explain, compare, plan, preview Nightward's bounded actions, and request local approval for exact write tickets.
 
 ```sh
 nw mcp serve
 ```
 
-The MCP surface is read-only. It can list and preview the shared Nightward action registry, but local writes must be applied out-of-band in the Nightward CLI, TUI, or Raycast extension.
+Most MCP tools are read-only. For writes, MCP can request a bounded action approval; the user approves or denies it locally in the Nightward CLI, TUI, or Raycast extension; then MCP can apply only that exact approved one-time ticket. MCP cannot accept the beta responsibility disclosure. That disclosure is Nightward's local one-time acknowledgement that write-capable beta actions are user-authorized, and MCP cannot self-confirm writes.
 
 ## Client Setup
 
@@ -32,7 +32,7 @@ VS Code-style clients use a different key:
 }
 ```
 
-Restart or reload the AI client after editing its MCP config. A useful first prompt is: "Audit my AI setup with Nightward, explain the top risks, and preview any relevant actions without applying writes."
+Restart or reload the AI client after editing its MCP config. A useful first prompt is: "Audit my AI setup with Nightward, explain the top risks, preview relevant actions, and request approval before applying any write action."
 
 ## Tools
 
@@ -50,6 +50,9 @@ Restart or reload the AI client after editing its MCP config. A useful first pro
 | `nightward_report_changes` | Compare two report files or the latest two saved reports. | Read-only. |
 | `nightward_actions_list` | List bounded registry actions. | Read-only. |
 | `nightward_action_preview` | Preview one registry action. | Read-only. |
+| `nightward_action_request` | Request local approval for one exact registry action. | Writes Nightward approval state only. |
+| `nightward_action_status` | Read one approval ticket status. | Read-only. |
+| `nightward_action_apply_approved` | Apply one approved, unexpired, one-time ticket. | Destructive only after local approval. |
 | `nightward_rules` | List rules and remediation metadata. | Read-only. |
 | `nightward_providers` | List provider capabilities and status. | Read-only. |
 
@@ -74,6 +77,7 @@ Compact mode keeps pass/fail, threshold, summary counts, and bounded finding or 
 - `nightward://schedule`
 - `nightward://actions`
 - `nightward://disclosure`
+- `nightward://action-approvals`
 - `nightward://report-history`
 
 ## Prompts
@@ -84,7 +88,7 @@ Compact mode keeps pass/fail, threshold, summary counts, and bounded finding or 
 - `set_up_providers`
 - `compare_reports`
 
-These prompts are workflow starters for clients that expose MCP prompts. They are deliberately cautious: they tell the assistant to preview registry actions and send actual writes through the CLI, TUI, or Raycast extension.
+These prompts are workflow starters for clients that expose MCP prompts. They tell the assistant to preview registry actions, request approval when a bounded action is useful, and only apply exact tickets already approved locally.
 
 ## Safety Model
 
@@ -94,12 +98,14 @@ These prompts are workflow starters for clients that expose MCP prompts. They ar
 - Strict tool input schemas, server-side invalid-argument rejection, and structured output.
 - Tool execution failures return `isError: true`, not protocol crashes.
 - Online-capable providers stay blocked unless explicitly allowed.
-- MCP cannot apply local writes; action application is limited to CLI/TUI/Raycast surfaces with local confirmation.
+- MCP cannot self-confirm local writes.
+- MCP cannot accept the beta responsibility disclosure, Nightward's local one-time acknowledgement that write-capable beta actions are user-authorized.
+- MCP approval requests record only Nightward-owned approval state. Applying an approved action consumes one exact one-time ticket and is audited.
 - No arbitrary MCP/agent config mutation in MCP v1.
 - Explicit workspace and report-diff paths must stay under `NIGHTWARD_HOME`, exist as the expected regular file or directory type, and avoid symlink components.
 - Preview output is redacted and exposes write targets before any out-of-band apply.
 
-Use `nightward_action_preview` before applying an action in the CLI, TUI, or Raycast extension. For package-manager provider installs, read the command, provider privacy boundary, and rollback expectations before confirming outside MCP.
+Use `nightward_action_preview` before `nightward_action_request`. For provider installs that run a package manager such as Homebrew, Go, or npm, review the exact command, provider privacy boundary, and rollback expectations before approving the pending ticket in the CLI, TUI, or Raycast extension.
 
 ## Registry Package
 

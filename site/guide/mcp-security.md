@@ -34,3 +34,14 @@ nw findings explain <finding-id>
 nw analyze finding <finding-id> --json
 nw fix plan --finding <finding-id>
 ```
+
+## MCP action approvals
+
+Nightward MCP clients can request bounded action tickets, but they cannot approve their own requests or accept the beta responsibility disclosure, Nightward's local one-time acknowledgement that write-capable beta actions are user-authorized. Review the exact action, command, writes, risk, and expiry in the TUI, Raycast, or CLI:
+
+```sh
+nw approvals list --json
+nw approvals approve <approval-id> --reason "reviewed locally"
+```
+
+After local approval, the MCP client can apply only that exact one-time ticket once. If the action preview changes, the ticket expires, or the client tries to replay it, Nightward blocks the application.
