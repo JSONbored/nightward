@@ -15,7 +15,7 @@
 | Fix export | `nw fix export --format markdown` | stdout only |
 | Actions list/preview | `nw actions list --json`, `nw actions preview <id> --json` | stdout only |
 | Actions apply | `nw actions apply <id> --confirm` | disclosure-accepted, confirmation-gated provider, policy, schedule, backup, or settings writes |
-| MCP server | `nw mcp serve` | stdio JSON-RPC only; read tools plus shared action-registry apply with disclosure acceptance, `confirm: true`, and audit logging |
+| MCP server | `nw mcp serve` | stdio JSON-RPC only; read tools plus shared action-registry list/preview, no local writes |
 | Schedule install/remove | `nw schedule install --confirm`, `nw schedule remove --confirm` | user-level launchd/systemd files only |
 | Backup snapshot | `nw backup create --confirm` | local snapshot under Nightward state |
 
@@ -26,5 +26,5 @@ Labels used in docs:
 - `online-capable`: can invoke provider behavior that contacts a network service.
 - `plan-only`: generates review material without mutating live config.
 - `confirmed action`: mutates only after explicit preview and confirmation.
-- `mcp direct apply`: mutates only through a shared Nightward action ID; never arbitrary agent/MCP config rewrites.
+- `mcp action preview`: shows shared Nightward action write targets and risks without applying local writes.
 - `future/not shipped`: documented as roadmap, not a current interface.

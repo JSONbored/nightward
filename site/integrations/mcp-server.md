@@ -2,13 +2,13 @@
 
 <!-- markdownlint-disable MD033 -->
 
-Nightward ships a stdio [Model Context Protocol](https://modelcontextprotocol.io/) server so AI clients can scan, explain, compare, plan, and apply bounded Nightward actions without sending users back to raw CLI commands.
+Nightward ships a stdio [Model Context Protocol](https://modelcontextprotocol.io/) server so AI clients can scan, explain, compare, plan, and preview bounded Nightward actions.
 
 ```sh
 nw mcp serve
 ```
 
-The MCP surface is action-capable, but it is not an arbitrary file editor. Applies go only through the shared Nightward action registry and require the responsibility disclosure, `confirm: true`, redacted output, and audit logging.
+The MCP surface is read-only. It can list and preview the shared Nightward action registry, but local writes must be applied out-of-band in the Nightward CLI, TUI, or Raycast extension.
 
 ## Client Setup
 
@@ -32,7 +32,7 @@ VS Code-style clients use a different key:
 }
 ```
 
-Restart or reload the AI client after editing its MCP config. A useful first prompt is: "Audit my AI setup with Nightward, explain the top risks, and do not apply actions unless I explicitly confirm them."
+Restart or reload the AI client after editing its MCP config. A useful first prompt is: "Audit my AI setup with Nightward, explain the top risks, and preview any relevant actions without applying writes."
 
 ## Tools
 
@@ -50,7 +50,6 @@ Restart or reload the AI client after editing its MCP config. A useful first pro
 | `nightward_report_changes` | Compare two report files or the latest two saved reports. | Read-only. |
 | `nightward_actions_list` | List bounded registry actions. | Read-only. |
 | `nightward_action_preview` | Preview one registry action. | Read-only. |
-| `nightward_action_apply` | Apply one registry action, including policy init/ignore-with-reason and report/cache cleanup actions. | Requires disclosure acceptance and `confirm: true`. |
 | `nightward_rules` | List rules and remediation metadata. | Read-only. |
 | `nightward_providers` | List provider capabilities and status. | Read-only. |
 
@@ -85,7 +84,7 @@ Compact mode keeps pass/fail, threshold, summary counts, and bounded finding or 
 - `set_up_providers`
 - `compare_reports`
 
-These prompts are workflow starters for clients that expose MCP prompts. They are deliberately cautious: they tell the assistant to preview registry actions first and avoid apply unless the user explicitly confirms.
+These prompts are workflow starters for clients that expose MCP prompts. They are deliberately cautious: they tell the assistant to preview registry actions and send actual writes through the CLI, TUI, or Raycast extension.
 
 ## Safety Model
 
@@ -95,12 +94,12 @@ These prompts are workflow starters for clients that expose MCP prompts. They ar
 - Strict tool input schemas, server-side invalid-argument rejection, and structured output.
 - Tool execution failures return `isError: true`, not protocol crashes.
 - Online-capable providers stay blocked unless explicitly allowed.
-- Direct apply is limited to shared action-registry IDs.
+- MCP cannot apply local writes; action application is limited to CLI/TUI/Raycast surfaces with local confirmation.
 - No arbitrary MCP/agent config mutation in MCP v1.
 - Explicit workspace and report-diff paths must stay under `NIGHTWARD_HOME`, exist as the expected regular file or directory type, and avoid symlink components.
-- Apply output is redacted and every successful apply appends an audit event.
+- Preview output is redacted and exposes write targets before any out-of-band apply.
 
-Use `nightward_action_preview` before `nightward_action_apply`. For package-manager provider installs, read the command, provider privacy boundary, and rollback expectations before confirming.
+Use `nightward_action_preview` before applying an action in the CLI, TUI, or Raycast extension. For package-manager provider installs, read the command, provider privacy boundary, and rollback expectations before confirming outside MCP.
 
 ## Registry Package
 

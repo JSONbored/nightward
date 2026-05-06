@@ -29,7 +29,7 @@ The README uses a GIF so the preview renders directly on GitHub. The docs homepa
 | --- | --- | --- |
 | TUI | Dashboard, inventory, findings, analysis, fix plan, backup preview, action queue | Read-only until a confirmed action is applied |
 | CLI | Scriptable scan, doctor, policy, SARIF, snapshot, schedule, backup, and action commands | Read-only unless explicit output/export paths or `--confirm` actions are requested |
-| MCP server | Stdio tools/resources/prompts for AI clients | Direct apply only through shared action-registry IDs with disclosure, confirmation, redaction, and audit logging |
+| MCP server | Stdio tools/resources/prompts for AI clients | Read-only; can list/preview actions, but writes must be applied in CLI/TUI/Raycast |
 | Raycast | macOS companion commands plus confirmed Nightward Actions | Clipboard/report-folder actions plus confirmation-gated writes |
 | GitHub Action | Workspace policy and SARIF checks | Writes only requested CI outputs |
 | Trunk plugin | Local workspace policy/analyze linters | Emits SARIF to stdout |
@@ -296,7 +296,7 @@ Secret values are never emitted in scan JSON, findings output, fix-plan JSON, Ma
 
 `nw analyze` turns scan findings and classifications into explainable signals. It does not claim a package, server, binary, or URL is safe. It reports what Nightward can prove from local structure, why it matters, and how confident the signal is.
 
-Default analysis is offline and built in. Optional providers are discovered by `providers doctor`; Nightward does not call online services unless a user explicitly selects providers and opts into network-capable behavior. The CLI/TUI/Raycast/MCP action layer can install known provider CLIs after confirmation. Explicit local providers are `gitleaks`, `trufflehog`, `semgrep`, and `syft`. Online-capable providers are `trivy`, `osv-scanner`, `grype`, `scorecard`, and `socket`, and they require explicit online-provider opt-in. Socket support creates a remote Socket scan artifact from dependency manifest metadata; Nightward does not fetch or normalize remote Socket reports in v1.
+Default analysis is offline and built in. Optional providers are discovered by `providers doctor`; Nightward does not call online services unless a user explicitly selects providers and opts into network-capable behavior. The CLI/TUI/Raycast action layer can install known provider CLIs after confirmation. MCP can list and preview those actions, but cannot apply local writes. Explicit local providers are `gitleaks`, `trufflehog`, `semgrep`, and `syft`. Online-capable providers are `trivy`, `osv-scanner`, `grype`, `scorecard`, and `socket`, and they require explicit online-provider opt-in. Socket support creates a remote Socket scan artifact from dependency manifest metadata; Nightward does not fetch or normalize remote Socket reports in v1.
 
 Provider runs use explicit skip/block/ready states, timeouts, bounded output capture, and redacted metadata only. Oversized provider stdout fails closed as a provider warning instead of being partially parsed. Semgrep execution requires a repo-local config file so Nightward does not use automatic rule discovery by default.
 
@@ -356,7 +356,7 @@ Nightward can expose local context and bounded Nightward action workflows to MCP
 }
 ```
 
-The server supports scan, doctor, findings, finding/signal explanation, analysis, fix-plan, policy-check, report history/diff, action list/preview/apply, rules, providers, resources, and prompts. It uses stdio only, does not open a network listener, and cannot rewrite arbitrary MCP or agent config. `nightward_action_apply` can apply only shared action-registry IDs after disclosure acceptance, `confirm: true`, action availability checks, redacted output, and audit logging.
+The server supports scan, doctor, findings, finding/signal explanation, analysis, fix-plan, policy-check, report history/diff, action list/preview, rules, providers, resources, and prompts. It uses stdio only, does not open a network listener, and cannot rewrite arbitrary MCP or agent config. MCP clients cannot apply local writes because tool-call arguments are not an out-of-band local confirmation channel; use the CLI, TUI, or Raycast extension to apply previewed actions.
 
 ## GitHub Action
 

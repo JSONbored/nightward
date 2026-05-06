@@ -13,7 +13,7 @@ Nightward is designed around local custody. The scanner inspects local file meta
 - No agent config mutation in scan, doctor, findings, fix, policy, or backup-plan commands.
 - The TUI can apply only shared action-registry operations after disclosure acceptance and an explicit confirmation keypress.
 - The Raycast extension exposes the same shared action registry and uses Raycast confirmation prompts before applying actions.
-- The MCP server is stdio-only. It exposes read-only scan, analysis, policy, report, rule, provider, prompt, and resource context plus one write-capable path: `nightward_action_apply`, which can apply only shared action-registry operations after disclosure acceptance and `confirm: true`.
+- The MCP server is stdio-only and read-only. It exposes scan, analysis, policy, report, rule, provider, prompt, resource, action-list, and action-preview context, but cannot apply local writes.
 
 ## Write Paths
 
@@ -35,7 +35,7 @@ Confirmed action writes append audit events under `~/.local/state/nightward/audi
 
 Nightward-owned state writes reject symlinked directories and symlinked files before writing settings, audit logs, schedules, snapshots, or action-managed policy files.
 
-`nw mcp serve` can write only through the shared action registry. MCP clients cannot request arbitrary file edits, live MCP/agent config rewrites, restore operations, Git pushes, or secret sync. Direct apply requires disclosure acceptance, an explicit `confirm: true` argument, action availability checks, redacted output, and audit logging. MCP tool arguments are validated server-side against strict schemas, and MCP workspace/report paths must stay under `NIGHTWARD_HOME`, exist as regular files or directories as appropriate, and avoid symlink components.
+`nw mcp serve` cannot apply local writes. MCP clients cannot accept the Nightward disclosure, request arbitrary file edits, apply shared registry actions, live MCP/agent config rewrites, restore operations, Git pushes, or secret sync. MCP can list and preview shared action-registry operations so the user can apply them out-of-band in the CLI, TUI, or Raycast extension. MCP tool arguments are validated server-side against strict schemas, and MCP workspace/report paths must stay under `NIGHTWARD_HOME`, exist as regular files or directories as appropriate, and avoid symlink components.
 
 The TUI docs action opens an http(s) documentation URL through the OS default opener after the user presses `o`; Nightward itself does not fetch docs content.
 
