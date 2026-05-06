@@ -106,7 +106,7 @@ test("MCP docs list every runtime tool, resource, and prompt", { timeout: 60000 
 
     const missing = [...tools, ...resources, ...prompts].filter((value) => !docs.includes(value));
     assert.deepEqual(missing, []);
-    assert.equal(tools.length, 15);
+    assert.equal(tools.length, 14);
     assert.equal(resources.length, 8);
     assert.equal(prompts.length, 5);
   } finally {

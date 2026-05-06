@@ -6,17 +6,17 @@ Nightward includes a stdio MCP server:
 nw mcp serve
 ```
 
-The server is a first-class Nightward surface for AI clients. It exposes scan, analysis, policy, report, provider, rule, prompt, and bounded action workflows without requiring users to copy CLI commands out of chat.
+The server is a first-class Nightward surface for AI clients. It exposes scan, analysis, policy, report, provider, rule, prompt, and bounded action preview workflows without granting AI clients local write access.
 
 ## Protocol Behavior
 
 - Negotiates MCP `2025-11-25` and remains compatible with `2025-06-18`.
 - Declares `tools`, `resources`, and `prompts` capabilities.
 - Provides strict tool input schemas with `additionalProperties: false`.
-- Enforces those input schemas server-side, including unknown-key rejection, required fields, type checks, severity enums, `confirm: true`, and integer bounds.
+- Enforces those input schemas server-side, including unknown-key rejection, required fields, type checks, severity enums, and integer bounds.
 - Returns `structuredContent` plus text fallback for tool results.
 - Reports tool execution failures as MCP tool results with `isError: true`.
-- Adds output schemas and tool annotations for read-only, destructive, idempotent, and open-world hints.
+- Adds output schemas and tool annotations for read-only, idempotent, and open-world hints.
 
 ## Exposed Tools
 
@@ -32,19 +32,10 @@ The server is a first-class Nightward surface for AI clients. It exposes scan, a
 - `nightward_report_changes`
 - `nightward_actions_list`
 - `nightward_action_preview`
-- `nightward_action_apply`
 - `nightward_rules`
 - `nightward_providers`
 
-`nightward_action_apply` is intentionally narrow. It can apply only shared Nightward action-registry IDs, such as disclosure acceptance, policy init/ignore-with-reason, schedule install/remove where supported, backup snapshot, report/cache cleanup, provider install/enable/disable, and online-provider toggles. It cannot rewrite arbitrary MCP or agent config.
-
-Apply calls require:
-
-- accepted Nightward responsibility disclosure
-- `confirm: true`
-- action availability checks
-- redacted output
-- audit logging under Nightward state
+MCP is read-only. It can show the shared action registry and preview exact write targets, command previews, risk levels, and blocked reasons. Applying those actions must happen out-of-band through the Nightward CLI, TUI, or Raycast extension, where Nightward can receive a local user confirmation that did not come from the MCP client. Cached or manual `nightward_action_apply` calls return an MCP tool-result error before the action registry is reached.
 
 ## Exposed Resources
 
@@ -111,7 +102,7 @@ CI validates that `server.json` and `packages/npm/package.json` agree before the
 - No telemetry.
 - No default network calls.
 - Online-capable providers remain blocked unless explicitly allowed.
-- Direct apply is limited to the shared action registry.
+- MCP cannot apply local writes; action application is limited to CLI/TUI/Raycast surfaces with local confirmation.
 - No live MCP/agent config mutation in MCP v1.
 - Workspace and explicit report-diff paths must stay under `NIGHTWARD_HOME`, exist as the expected regular file or directory type, avoid symlink components, and pass the existing bounded report-size checks.
 - Tool/resource/prompt output is bounded and redacted before it reaches the client.

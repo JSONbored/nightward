@@ -1,4 +1,4 @@
-use crate::actions::{self, ApplyOptions};
+use crate::actions;
 use crate::analysis::{run as analyze, Options as AnalysisOptions};
 use crate::fixplan::{plan as fix_plan, Selector};
 use crate::inventory::{home_dir_from_env, load_report, redact_text, scan_home, scan_workspace};
@@ -97,7 +97,7 @@ fn initialize_result(requested: Option<&str>) -> Value {
             "version": env!("CARGO_PKG_VERSION"),
             "description": "Local-first AI agent, MCP, provider, and dotfiles security posture."
         },
-        "instructions": "Nightward returns redacted local security posture. Write-capable MCP calls are limited to the shared Nightward action registry and require disclosure acceptance plus explicit confirmation."
+        "instructions": "Nightward returns redacted local security posture. MCP is read-only: it can list and preview bounded actions, but local writes must be applied out-of-band in the Nightward CLI, TUI, or Raycast extension."
     })
 }
 
@@ -186,13 +186,6 @@ fn tools() -> Vec<Value> {
             "Preview one bounded Nightward action before applying it.",
             schema_action_id(),
             read_only_annotations("Action preview", false),
-        ),
-        tool(
-            "nightward_action_apply",
-            "Action Apply",
-            "Apply one bounded Nightward action after disclosure acceptance and confirm: true.",
-            schema_action_apply(),
-            write_annotations("Action apply", true, true),
         ),
         tool(
             "nightward_rules",
@@ -349,16 +342,6 @@ fn read_only_annotations(title: &str, open_world: bool) -> Value {
     })
 }
 
-fn write_annotations(title: &str, destructive: bool, open_world: bool) -> Value {
-    json!({
-        "title": title,
-        "readOnlyHint": false,
-        "destructiveHint": destructive,
-        "idempotentHint": false,
-        "openWorldHint": open_world
-    })
-}
-
 fn read_resource(params: Value, home: &Path) -> Result<Value> {
     let uri = params
         .get("uri")
@@ -401,7 +384,7 @@ fn read_prompt(params: Value) -> Result<Value> {
     let finding_id = string_arg(&args, "finding_id");
     let text = match name {
         "audit_my_ai_setup" => {
-            "Use Nightward MCP tools to run nightward_scan, nightward_analysis, and nightward_policy_check with compact output. Explain the highest-risk AI/MCP configuration issues, provider posture, and the safest next actions. Do not apply actions unless I explicitly ask and confirm them."
+            "Use Nightward MCP tools to run nightward_scan, nightward_analysis, and nightward_policy_check with compact output. Explain the highest-risk AI/MCP configuration issues, provider posture, and the safest next actions. MCP is read-only, so preview any relevant action and tell me the CLI/TUI/Raycast path for applying it."
         }
         "explain_top_risks" => {
             "Use nightward_findings and nightward_analysis to identify the top risks. Explain what can actually break or leak, what is probably just review noise, and what should be fixed first."
@@ -410,7 +393,7 @@ fn read_prompt(params: Value) -> Result<Value> {
             return Ok(prompt_result(
                 "Generate a safe Nightward fix workflow.",
                 format!(
-                    "Use nightward_explain_finding and nightward_fix_plan for finding `{}`. If a bounded registry action is relevant, use nightward_action_preview first. Do not call nightward_action_apply unless I explicitly accept the disclosure and provide confirm: true.",
+                    "Use nightward_explain_finding and nightward_fix_plan for finding `{}`. If a bounded registry action is relevant, use nightward_action_preview first. MCP cannot apply local writes, so tell me how to apply the previewed action in the Nightward CLI, TUI, or Raycast extension.",
                     if finding_id.is_empty() {
                         "<finding-id>"
                     } else {
@@ -420,7 +403,7 @@ fn read_prompt(params: Value) -> Result<Value> {
             ));
         }
         "set_up_providers" => {
-            "Use nightward_providers and nightward_actions_list to show missing, blocked, selected, and online-capable providers. Recommend provider.install/provider.enable actions only through nightward_action_preview, and call out online/network behavior before any apply."
+            "Use nightward_providers and nightward_actions_list to show missing, blocked, selected, and online-capable providers. Recommend provider.install/provider.enable actions only through nightward_action_preview, call out online/network behavior, and tell me to apply writes in the Nightward CLI, TUI, or Raycast extension."
         }
         "compare_reports" => {
             "Use nightward_report_history and nightward_report_changes to compare the last two reports. Summarize new, removed, and changed findings, then recommend which changes actually matter."
@@ -456,6 +439,11 @@ fn call_tool_inner(params: Value, home: &Path) -> Result<Value> {
         .get("name")
         .and_then(Value::as_str)
         .ok_or_else(|| anyhow!("tools/call requires a tool name"))?;
+    if name == "nightward_action_apply" {
+        return Err(anyhow!(
+            "nightward_action_apply is disabled in MCP because MCP clients cannot provide out-of-band local confirmation; use nightward_action_preview, then apply writes in the Nightward CLI, TUI, or Raycast extension"
+        ));
+    }
     let args = validate_tool_args(
         name,
         params
@@ -611,25 +599,6 @@ fn call_tool_inner(params: Value, home: &Path) -> Result<Value> {
             }
             tool_result(sanitized_value(&actions::preview(home, &id)?)?)
         }
-        "nightward_action_apply" => {
-            let id = string_arg(&args, "action_id");
-            if id.is_empty() {
-                return Err(anyhow!("action_id is required"));
-            }
-            let result = actions::apply(
-                home,
-                &id,
-                ApplyOptions {
-                    confirm: bool_arg(&args, "confirm", false),
-                    executable: string_arg(&args, "executable"),
-                    policy_path: string_arg(&args, "policy_path"),
-                    finding_id: string_arg(&args, "finding_id"),
-                    rule: string_arg(&args, "rule"),
-                    reason: string_arg(&args, "reason"),
-                },
-            )?;
-            tool_result(sanitized_value(&result)?)
-        }
         "nightward_rules" => tool_result(json!({
             "schema_version": 1,
             "rules": rules::all_rules()
@@ -643,7 +612,6 @@ fn call_tool_inner(params: Value, home: &Path) -> Result<Value> {
 enum ToolArgKind {
     String,
     Bool,
-    ConfirmTrue,
     Limit,
     Severity,
     StringList,
@@ -710,13 +678,6 @@ fn validate_arg_value(tool: &str, spec: ToolArgSpec, value: &Value) -> Result<()
                 Ok(())
             } else {
                 Err(anyhow!("{tool} argument `{}` must be a boolean", spec.name))
-            }
-        }
-        ToolArgKind::ConfirmTrue => {
-            if value.as_bool() == Some(true) {
-                Ok(())
-            } else {
-                Err(anyhow!("{tool} argument `{}` must be true", spec.name))
             }
         }
         ToolArgKind::Limit => {
@@ -830,15 +791,6 @@ fn tool_arg_specs(name: &str) -> Result<Vec<ToolArgSpec>> {
             ToolArgSpec::optional("head", String),
         ],
         "nightward_action_preview" => vec![ToolArgSpec::required("action_id", String)],
-        "nightward_action_apply" => vec![
-            ToolArgSpec::required("action_id", String),
-            ToolArgSpec::required("confirm", ConfirmTrue),
-            ToolArgSpec::optional("executable", String),
-            ToolArgSpec::optional("policy_path", String),
-            ToolArgSpec::optional("finding_id", String),
-            ToolArgSpec::optional("rule", String),
-            ToolArgSpec::optional("reason", String),
-        ],
         _ => return Err(anyhow!("unknown tool {name}")),
     };
     Ok(specs)
@@ -1310,21 +1262,6 @@ fn schema_action_id() -> Value {
     )
 }
 
-fn schema_action_apply() -> Value {
-    schema_object(
-        json!({
-            "action_id": { "type": "string" },
-            "confirm": { "type": "boolean", "const": true },
-            "executable": { "type": "string", "description": "Nightward executable path for schedule install actions." },
-            "policy_path": { "type": "string", "description": "Optional policy path under NIGHTWARD_HOME for policy actions." },
-            "finding_id": { "type": "string", "description": "Finding ID for policy.ignore." },
-            "rule": { "type": "string", "description": "Rule ID for policy.ignore." },
-            "reason": { "type": "string", "description": "Required reviewed reason for policy.ignore." }
-        }),
-        &["action_id", "confirm"],
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1379,17 +1316,23 @@ mod tests {
             "nightward_report_changes",
             "nightward_actions_list",
             "nightward_action_preview",
-            "nightward_action_apply",
             "nightward_rules",
             "nightward_providers",
         ] {
             assert!(names.contains(name), "missing {name}");
         }
+        assert!(!names.contains("nightward_action_apply"));
         assert!(tools
             .iter()
             .all(|tool| tool["inputSchema"]["additionalProperties"] == false));
         assert!(tools.iter().all(|tool| tool.get("outputSchema").is_some()));
         assert!(tools.iter().all(|tool| tool.get("annotations").is_some()));
+        assert!(tools
+            .iter()
+            .all(|tool| tool["annotations"]["readOnlyHint"] == true));
+        assert!(tools
+            .iter()
+            .all(|tool| tool["annotations"]["destructiveHint"] == false));
 
         let resources_response = handle_request_with_home(
             json!({"jsonrpc":"2.0","id":2,"method":"resources/list"}),
@@ -1450,17 +1393,19 @@ mod tests {
     }
 
     #[test]
-    fn action_apply_is_disclosure_gated_tool_result_error() {
+    fn action_apply_is_disabled_and_cannot_accept_disclosure() {
         let home = tempfile::tempdir().expect("temp home");
         let response = handle_request_with_home(
-            json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"nightward_action_apply","arguments":{"action_id":"backup.snapshot","confirm":true}}}),
+            json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"nightward_action_apply","arguments":{"action_id":"disclosure.accept","confirm":true}}}),
             home.path(),
         );
         assert_eq!(response["result"]["isError"], true);
         assert!(response["result"]["content"][0]["text"]
             .as_str()
             .unwrap()
-            .contains("disclosure"));
+            .contains("disabled in MCP"));
+        assert!(!state::disclosure_status(home.path()).accepted);
+        assert!(!state::settings_path(home.path()).exists());
     }
 
     #[test]
@@ -1482,10 +1427,6 @@ mod tests {
             (
                 json!({"name":"nightward_findings","arguments":{"severity":"urgent"}}),
                 "known severity",
-            ),
-            (
-                json!({"name":"nightward_action_apply","arguments":{"action_id":"backup.snapshot","confirm":false}}),
-                "confirm` must be true",
             ),
         ] {
             let response = handle_request_with_home(
@@ -1567,7 +1508,7 @@ mod tests {
     }
 
     #[test]
-    fn action_apply_can_directly_apply_shared_registry_action() {
+    fn action_apply_remains_disabled_after_out_of_band_disclosure() {
         let home = tempfile::tempdir().expect("temp home");
         fs::create_dir_all(home.path().join(".codex")).expect("codex dir");
         fs::write(home.path().join(".codex/config.toml"), "model = \"test\"\n").expect("config");
@@ -1587,15 +1528,12 @@ mod tests {
             home.path(),
         );
 
-        assert_eq!(response["result"]["isError"], false);
-        let writes = response["result"]["structuredContent"]["writes"]
-            .as_array()
-            .unwrap();
-        assert!(!writes.is_empty());
-        assert!(PathBuf::from(writes[0].as_str().unwrap())
-            .join(".codex/config.toml")
-            .is_file());
-        assert!(state::audit_path(home.path()).is_file());
+        assert_eq!(response["result"]["isError"], true);
+        assert!(response["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("disabled in MCP"));
+        assert!(!state::state_dir(home.path()).join("snapshots").exists());
     }
 
     #[test]

@@ -16,7 +16,7 @@ Nightward's primary asset is local AI/devtool state: config files, MCP server de
 - Redaction across JSON, SARIF, Markdown, TUI, and Raycast output.
 - No default network calls.
 - Explicit online-provider opt-in.
-- MCP direct apply is limited to registry action IDs with disclosure acceptance, `confirm: true`, redaction, and audit logging.
+- MCP is read-only: it can list and preview registry actions, but cannot accept disclosure or apply local writes.
 - MCP tool inputs are validated server-side, and explicit workspace/report paths are scoped under `NIGHTWARD_HOME` with no-symlink regular-file/directory checks.
 - GitHub Actions pinned by full SHA.
 - Signed release checksums and SBOMs.
