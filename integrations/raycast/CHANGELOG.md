@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add a top-level Compare Nightward Reports command for read-only latest-report diffs.
 - Use a compact menu-bar finding count and move severity/provider detail into the dropdown.
 - Add scoped finding and rule fix-plan copy actions plus reviewed-policy-ignore snippets.
 - Redact additional provider token-shaped values in Raycast-rendered text.

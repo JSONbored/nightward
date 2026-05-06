@@ -8,11 +8,14 @@ import {
   exportFixPlanMarkdown,
   fixPlan,
   applyAction,
+  latestReportPair,
   listActions,
+  NightwardCommandError,
   normalizePreferences,
   previewAction,
   providersDoctor,
   reportDiff,
+  reportHistory,
   reportsDir,
   runNightwardJSON,
   type RuntimeOptions,
@@ -423,6 +426,74 @@ test("report diff helper calls the CLI compare path", async () => {
     "--to",
     "/tmp/new.json",
   ]);
+});
+
+test("report history helper loads read-only history and selects latest pair", async () => {
+  let observedArgs: string[] = [];
+  const options: RuntimeOptions = {
+    executable: "nightward",
+    allowOnlineProviders: false,
+    timeoutMs: 1000,
+    execFileImpl: (_file, args, _options, callback) => {
+      observedArgs = args;
+      callback(
+        null,
+        JSON.stringify([
+          {
+            path: "/tmp/current.json",
+            report_name: "current.json",
+            mod_time: "2026-05-06T00:00:00Z",
+            findings: 2,
+            size_bytes: 100,
+          },
+          {
+            path: "/tmp/previous.json",
+            report_name: "previous.json",
+            mod_time: "2026-05-05T00:00:00Z",
+            findings: 1,
+            size_bytes: 100,
+          },
+        ]),
+        "",
+      );
+    },
+  };
+
+  const history = await reportHistory(options);
+  const pair = latestReportPair(history);
+
+  assert.deepEqual(observedArgs, ["report", "history", "--json"]);
+  assert.equal(pair.base.path, "/tmp/previous.json");
+  assert.equal(pair.head.path, "/tmp/current.json");
+});
+
+test("latest report pair errors when history cannot be compared", () => {
+  assert.throws(
+    () => latestReportPair([]),
+    (error) =>
+      error instanceof NightwardCommandError &&
+      /At least two saved Nightward reports/.test(error.message),
+  );
+});
+
+test("report diff helper surfaces redacted CLI failures", async () => {
+  const options: RuntimeOptions = {
+    executable: "nightward",
+    allowOnlineProviders: false,
+    timeoutMs: 1000,
+    execFileImpl: (_file, _args, _options, callback) => {
+      const error = new Error("exit 1") as NodeJS.ErrnoException;
+      callback(error, "", "parse failed: API_TOKEN=secret-fixture-value\nmore");
+    },
+  };
+
+  await assert.rejects(
+    () => reportDiff(options, "/tmp/old.json", "/tmp/new.json"),
+    (error) =>
+      error instanceof NightwardCommandError &&
+      /report diff/.test(error.command) &&
+      /API_TOKEN=\[redacted\]/.test(error.message),
+  );
 });
 
 function baseAnalysisJSON(): string {

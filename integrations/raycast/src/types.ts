@@ -203,7 +203,7 @@ export type ReportRecord = {
   findings: number;
   highest_severity?: RiskLevel;
   findings_by_severity?: Partial<Record<RiskLevel, number>>;
-  size_bytes: number;
+  size_bytes?: number;
   report_name: string;
 };
 

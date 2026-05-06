@@ -14,6 +14,7 @@ integrations/raycast
 - `Nightward Status`: compact menu-bar finding count, plus full critical/high/total counts, analysis signals, provider warnings, scheduled-report state, and latest-report access in the dropdown.
 - `Nightward Findings`: searchable findings with a severity filter, detail pane, scoped fix-plan exports, reviewed-policy-ignore snippets, redacted evidence copy, and open-doc actions.
 - `Nightward Analysis`: built-in offline signals plus explicitly selected providers.
+- `Compare Nightward Reports`: read-only diff of the latest two saved reports from `nw report history`.
 - `Nightward Provider Doctor`: optional provider availability, privacy posture, install guidance for missing tools, and Raycast Analysis enable/disable controls.
 - `Nightward Actions`: preview and apply confirmed provider, policy, schedule, backup, cleanup, and setup actions.
 - `Explain Nightward Finding`: detail view for a known finding ID.
@@ -42,6 +43,8 @@ The extension uses `execFile`, not a shell, for local Nightward commands. It cal
 - `fix export --rule <rule> --format markdown`
 - `analyze [--with providers] [--online] --json`
 - `analyze finding <id> --json`
+- `report history --json`
+- `report diff --from <base> --to <head>`
 - `providers doctor [--with providers] [--online] --json`
 
 Write-capable calls are limited to `actions apply <id> --confirm` through the shared action registry. Provider Doctor previews `provider.install.<name>` and applies that registry action after explicit confirmation; it no longer runs package-manager commands through a shell. No Raycast command runs restore, Git, or hidden shell mutation.
@@ -73,6 +76,7 @@ Manual UI validation must use a fixture `Home Override`, not a real local home, 
 - Menu-bar status shows finding, analysis, provider-warning, and schedule counters; its actions open existing read-only commands, open the latest report when present, and copy a redacted summary.
 - Findings search/filter/detail panes render redacted evidence, docs actions, scoped fix-plan exports, and reviewed-policy-ignore snippets.
 - Analysis renders built-in signals, selected provider output, provider warnings, and blocked-online-provider state.
+- Compare Reports renders the latest two fixture reports, handles missing-history errors, and only offers copy/open/refresh actions.
 - Provider Doctor shows provider status, install guidance, action-registry provider CLI installation, and enable/disable controls for Raycast Analysis without running online-capable providers unless explicit opt-in is enabled.
 - Nightward Actions lists action IDs, risk, writes, commands, blocked reasons, and applies only after confirmation.
 - Export commands copy redacted Markdown and do not mutate local config.

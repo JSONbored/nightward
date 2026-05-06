@@ -10,6 +10,7 @@ Nightward’s [Raycast](https://www.raycast.com/) extension is a macOS companion
 | Nightward Status | Compact menu-bar finding count with a structured dropdown. | No |
 | Nightward Findings | Browse findings, copy redacted evidence, export finding/rule fix plans, and copy reviewed-ignore snippets. | Clipboard only |
 | Nightward Analysis | Browse built-in and selected-provider analysis signals. | No |
+| Compare Nightward Reports | Compare the latest two saved Nightward reports. | No |
 | Nightward Provider Doctor | Check provider availability, choose providers for Raycast Analysis, and preview/apply known provider install actions. | Raycast preference or confirmed action-registry provider install |
 | Nightward Actions | Preview and apply confirmed provider, policy, schedule, backup, cleanup, and setup actions. | Confirmation-gated local writes |
 | Explain Finding / Explain Signal | Jump directly to one known ID. | No |

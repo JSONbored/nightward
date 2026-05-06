@@ -28,6 +28,8 @@ declare namespace Preferences {
   export type Findings = ExtensionPreferences & {}
   /** Preferences accessible in the `analysis` command */
   export type Analysis = ExtensionPreferences & {}
+  /** Preferences accessible in the `compare-reports` command */
+  export type CompareReports = ExtensionPreferences & {}
   /** Preferences accessible in the `provider-doctor` command */
   export type ProviderDoctor = ExtensionPreferences & {}
   /** Preferences accessible in the `actions` command */
@@ -53,6 +55,8 @@ declare namespace Arguments {
   export type Findings = {}
   /** Arguments passed to the `analysis` command */
   export type Analysis = {}
+  /** Arguments passed to the `compare-reports` command */
+  export type CompareReports = {}
   /** Arguments passed to the `provider-doctor` command */
   export type ProviderDoctor = {}
   /** Arguments passed to the `actions` command */

@@ -69,6 +69,13 @@
       "keywords": ["analysis", "signals", "security", "privacy", "trust"]
     },
     {
+      "name": "compare-reports",
+      "title": "Compare Nightward Reports",
+      "description": "Compare the latest two saved Nightward reports without mutating local config.",
+      "mode": "view",
+      "keywords": ["reports", "compare", "history", "diff", "security"]
+    },
+    {
       "name": "provider-doctor",
       "title": "Nightward Provider Doctor",
       "description": "Check provider status and select providers for Raycast Analysis.",

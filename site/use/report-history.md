@@ -31,4 +31,4 @@ nw report index
 
 `nw report html` scans HOME by default, renders the explicit `--input` scan JSON, or renders the `--from`/`--to` comparison alongside the latest report content.
 
-The history index summarizes local report files with finding totals, highest severity, severity badges, and deltas against the next-newer report.
+The history index summarizes local report files with report paths, modification times, and finding totals. The Raycast and TUI surfaces compute their review summaries from those saved reports without mutating them.

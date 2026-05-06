@@ -10,6 +10,7 @@ This extension is read-only until a user invokes the shared Nightward action reg
 - `Nightward Status`: compact menu-bar finding count, plus detailed findings, analysis signals, provider warnings, and scheduled-report state in the dropdown.
 - `Nightward Findings`: searchable findings with severity filters, detail panes, scoped fix-plan exports, reviewed-policy-ignore snippets, and redacted evidence copy.
 - `Nightward Analysis`: built-in offline analysis plus any providers explicitly selected in Provider Doctor.
+- `Compare Nightward Reports`: top-level read-only comparison of the latest two saved Nightward reports.
 - `Nightward Provider Doctor`: provider availability, privacy posture, action-registry install guidance for missing tools, and Raycast Analysis enable/disable controls.
 - `Nightward Actions`: preview and apply confirmation-gated provider, policy, schedule, backup, cleanup, and setup actions from the shared Nightward action registry.
 - `Explain Nightward Finding`: detail view for a specific finding ID.

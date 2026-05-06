@@ -2,6 +2,7 @@
 set -euo pipefail
 
 tag="${1:?release tag required}"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 repo="${GITHUB_REPOSITORY:-JSONbored/nightward}"
 if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "invalid release tag: ${tag}" >&2
@@ -50,6 +51,14 @@ cosign verify-blob \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.txt
 sha256sum -c checksums.txt --ignore-missing
+node "${repo_root}/scripts/generate-homebrew-formula.mjs" \
+  --version "${version}" \
+  --repo "${repo}" \
+  --checksums checksums.txt \
+  --output "${tmp_dir}/homebrew/nightward.rb" >/dev/null
+grep -q 'bin.install "nightward", "nw"' "${tmp_dir}/homebrew/nightward.rb"
+grep -q '#{bin}/nightward --version' "${tmp_dir}/homebrew/nightward.rb"
+grep -q '#{bin}/nw --version' "${tmp_dir}/homebrew/nightward.rb"
 mkdir -p extracted
 if [[ "${asset}" == *.zip ]]; then
   unzip -q "${asset}" -d extracted

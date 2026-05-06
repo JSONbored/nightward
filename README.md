@@ -88,7 +88,7 @@ Nightward answers the practical questions first:
 - Redacted plan-only remediation exports for parseable MCP config findings.
 - Read-only snapshot plans plus confirmed portable config snapshot creation.
 - Reusable GitHub Action for scan, policy, and SARIF modes.
-- Raycast extension for Dashboard, Findings, Analysis, Provider Doctor, Nightward Actions, Explain Finding/Signal, Fix Plan/Analysis export, and report-folder access.
+- Raycast extension for Dashboard, Findings, Analysis, Compare Reports, Provider Doctor, Nightward Actions, Explain Finding/Signal, Fix Plan/Analysis export, and report-folder access.
 - Stdio MCP server for AI clients that need local scan, analysis, finding, rule, provider, policy, report, prompt, fix-plan, and bounded action context.
 - User-level nightly scan scheduling for macOS launchd and Linux systemd user timers.
 - No telemetry, no cloud dashboard, and no default network calls from Nightward runtime.

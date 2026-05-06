@@ -62,9 +62,9 @@ The package should not use a long-lived npm token. It should publish through Git
 
 ## Deferred Channels
 
-These are useful, but should wait until signed GitHub Release artifacts prove stable across patch releases:
+These are useful, but still need a publication path:
 
-- Homebrew tap
+- Homebrew tap repository. Formula generation is scaffolded in `scripts/generate-homebrew-formula.mjs` and verified from signed release checksums.
 - Nix package
 - mise/aqua registry entries
 - Docker image for report browsing
