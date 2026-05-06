@@ -251,6 +251,9 @@ jobs:
           cd packages/npm
           npm ci --ignore-scripts --no-audit
           npm version --no-git-tag-version "${version}"
+          cd ../..
+          node scripts/stamp-mcp-registry-version.mjs "${version}"
+          cd packages/npm
           npm test
           npm audit --audit-level=moderate
           npm pack --dry-run
