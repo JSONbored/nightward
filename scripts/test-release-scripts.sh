@@ -37,6 +37,7 @@ if [[ "$(grep -c "validate-release-ref.sh" "${repo_root}/.github/workflows/relea
   echo "expected release workflow to enforce release ref validation before publishing" >&2
   exit 1
 fi
+grep -q "stamp-mcp-registry-version.mjs" "${repo_root}/.github/workflows/release.yml"
 grep -q "ubuntu-24.04-arm" "${repo_root}/.github/workflows/release.yml"
 grep -q "macos-15-intel" "${repo_root}/.github/workflows/release.yml"
 grep -q "aarch64-unknown-linux-gnu" "${repo_root}/.github/workflows/release.yml"
@@ -52,6 +53,43 @@ if grep -q "path: dist/nightward_\\*" "${repo_root}/.github/workflows/release.ym
   echo "expected release upload to exclude staging directories" >&2
   exit 1
 fi
+
+if node "${repo_root}/scripts/stamp-mcp-registry-version.mjs" "v0.1.0" >/dev/null 2>&1; then
+  echo "expected stamp-mcp-registry-version.mjs to reject v-prefixed versions" >&2
+  exit 1
+fi
+
+mkdir -p "${tmp}/stamp/packages/npm"
+cat >"${tmp}/stamp/server.json" <<'JSON'
+{
+  "name": "io.github.jsonbored/nightward",
+  "version": "0.0.0-development",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@jsonbored/nightward",
+      "version": "0.0.0-development",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
+JSON
+cat >"${tmp}/stamp/packages/npm/package.json" <<'JSON'
+{
+  "name": "@jsonbored/nightward",
+  "version": "0.1.10",
+  "mcpName": "io.github.jsonbored/nightward"
+}
+JSON
+NIGHTWARD_REPO_ROOT="${tmp}/stamp" node "${repo_root}/scripts/stamp-mcp-registry-version.mjs" "0.1.10" >/dev/null
+node -e '
+const { readFileSync } = require("node:fs");
+const server = JSON.parse(readFileSync(process.argv[1], "utf8"));
+if (server.version !== "0.1.10") throw new Error("server version was not stamped");
+if (server.packages[0].version !== "0.1.10") throw new Error("package target was not stamped");
+' "${tmp}/stamp/server.json"
 
 mkdir -p "${tmp}/target/release"
 printf '#!/usr/bin/env bash\nprintf "0.1.0\\n"\n' >"${tmp}/target/release/nightward"
