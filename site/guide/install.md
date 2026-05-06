@@ -75,7 +75,7 @@ This installs `nightward` and `nw` into `~/.local/bin` by default.
 | Cargo source build | Development | Useful for local Nightward development and branch comparison. |
 | Trunk plugin import | Shipped | Pin to a Nightward release tag or SHA. |
 | GitHub Action tags | Shipped | Use for policy/SARIF checks in CI. |
-| Homebrew tap | Planned next | Best next macOS distribution channel. |
+| Homebrew formula helper | Scaffolded | Generates a tap-ready formula from signed release checksums; no public tap command yet. |
 | Nix, Scoop, WinGet, mise, aqua | Later | Add after release artifact behavior stays stable. |
 
 Docker is deferred. It is awkward as a primary scanner because Nightward’s most useful mode audits user HOME and local AI-tool config, which should not be casually mounted into containers.

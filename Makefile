@@ -13,7 +13,7 @@ CARGO_AUDIT_VERSION ?= 0.22.1
 CARGO_DENY_VERSION ?= 0.19.4
 CARGO_LLVM_COV_VERSION ?= 0.8.5
 
-.PHONY: doctor install-dev-tools test test-fast test-security test-ux test-release test-local test-prepush test-release-install fmt clippy cargo-test cargo-nextest cargo-doc cargo-audit cargo-deny cargo-llvm-cov coverage-check fuzz-check test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test gitleaks raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-store-check raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify docs-reference docs-reference-check docs-qa site-install site-test site-audit site-build site-verify demo-assets tui-media release-snapshot verify build install-local clean-reports
+.PHONY: doctor install-dev-tools test test-fast test-security test-ux test-release test-local test-prepush test-release-install fmt clippy cargo-test cargo-nextest cargo-doc cargo-audit cargo-deny cargo-llvm-cov coverage-check fuzz-check test-junit trunk-check trunk-fix trunk-flaky-validate ci-scripts-test gitleaks raycast-install raycast-test raycast-test-junit raycast-audit raycast-lint raycast-build raycast-store-check raycast-verify npm-package-install npm-package-test npm-package-audit npm-package-pack npm-package-verify docs-reference docs-reference-check docs-qa site-install site-test site-audit site-build site-verify demo-assets tui-media homebrew-formula release-snapshot verify build install-local clean-reports
 
 doctor:
 	bash scripts/dev-doctor.sh
@@ -158,6 +158,10 @@ demo-assets:
 
 tui-media:
 	node scripts/generate-tui-media.mjs
+
+homebrew-formula:
+	@if [ -z "$${VERSION:-}" ]; then echo "VERSION is required, for example: make homebrew-formula VERSION=0.1.6" >&2; exit 2; fi
+	node scripts/generate-homebrew-formula.mjs --version "$${VERSION}" --checksums dist/checksums.txt
 
 release-snapshot: build
 	bash scripts/release-snapshot-rust.sh

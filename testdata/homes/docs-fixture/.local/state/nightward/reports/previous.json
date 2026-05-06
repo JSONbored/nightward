@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-05-05T00:00:00Z",
+  "hostname": "fixture",
+  "home": "/fixture/nightward-docs",
+  "scan_mode": "home",
+  "summary": {
+    "total_items": 1,
+    "total_findings": 2,
+    "items_by_classification": {
+      "portable": 1
+    },
+    "items_by_risk": {
+      "info": 1
+    },
+    "items_by_tool": {
+      "Codex": 1
+    },
+    "findings_by_severity": {
+      "low": 1,
+      "medium": 1
+    },
+    "findings_by_rule": {
+      "config_stale": 1,
+      "mcp_server_review": 1
+    },
+    "findings_by_tool": {
+      "Codex": 2
+    }
+  },
+  "items": [
+    {
+      "id": "fixture-item",
+      "tool": "Codex",
+      "path": "/fixture/nightward-docs/.codex/config.toml",
+      "kind": "file",
+      "classification": "portable",
+      "risk": "info",
+      "reason": "Path is a portable-looking configuration file.",
+      "recommended_action": "Review generated findings before syncing.",
+      "exists": true
+    }
+  ],
+  "findings": [
+    {
+      "id": "fixture-review",
+      "tool": "Codex",
+      "path": "/fixture/nightward-docs/.codex/config.toml",
+      "server": "docs",
+      "severity": "medium",
+      "rule": "mcp_server_review",
+      "message": "Review MCP server \"docs\" before syncing this config.",
+      "evidence": "npx @modelcontextprotocol/server-filesystem /Users/example/Documents",
+      "recommended_action": "Confirm this server is intentional before syncing.",
+      "impact": "Unsafe portable config can expose secrets or local-only state.",
+      "why_this_matters": "Fixture reports keep docs examples stable.",
+      "docs_url": "https://nightward.aethereal.dev/reference/rules",
+      "fix_available": true,
+      "fix_kind": "manual-review",
+      "confidence": "medium",
+      "risk": "medium",
+      "requires_review": true,
+      "fix_summary": "Confirm this server is intentional before syncing.",
+      "fix_steps": [
+        "Inspect the redacted evidence.",
+        "Re-run Nightward and compare the next report."
+      ]
+    },
+    {
+      "id": "fixture-old",
+      "tool": "Codex",
+      "path": "/fixture/nightward-docs/.codex/config.toml",
+      "server": "docs",
+      "severity": "low",
+      "rule": "config_stale",
+      "message": "Config file has not changed in over 180 days.",
+      "evidence": "last_modified=2025-01-01T00:00:00Z",
+      "recommended_action": "Review whether this config is still active.",
+      "impact": "Stale config can preserve old assumptions.",
+      "why_this_matters": "Fixture reports keep docs examples stable.",
+      "docs_url": "https://nightward.aethereal.dev/reference/rules",
+      "fix_available": true,
+      "fix_kind": "manual-review",
+      "confidence": "medium",
+      "risk": "low",
+      "requires_review": true,
+      "fix_summary": "Review whether this config is still active.",
+      "fix_steps": [
+        "Inspect the redacted evidence."
+      ]
+    }
+  ],
+  "adapters": []
+}

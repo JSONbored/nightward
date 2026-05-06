@@ -16,8 +16,10 @@ Nightward v0.1.4 is distributed through signed GitHub Releases and the npm launc
 
 ## Later Channels
 
-Homebrew is the next packaging target. Nix, Scoop, WinGet, mise, and aqua should follow once release artifacts prove stable across a few tags. Docker is deferred because scanning a user's HOME from a container is awkward and easy to misconfigure.
+Homebrew tap publication is the next packaging target. Nix, Scoop, WinGet, mise, and aqua should follow once release artifacts prove stable across a few tags. Docker is deferred because scanning a user's HOME from a container is awkward and easy to misconfigure.
 
-## Homebrew Path
+## Homebrew Support
 
-Homebrew should be a small tap-backed formula generated from the signed GitHub Release archive and checksum data. The formula should install both `nightward` and `nw`, include a lightweight `nightward --version` test, and point users back to the release-verification docs.
+`scripts/generate-homebrew-formula.mjs` now generates a tap-ready formula from `checksums.txt`. The formula uses the existing signed release archive names, installs both `nightward` and `nw`, and tests both command names with `--version`. The release verifier runs this generation after Cosign and checksum verification, so the formula stays tied to the canonical GitHub Release artifacts.
+
+There is not yet a published Homebrew tap command in public docs.

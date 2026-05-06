@@ -1,0 +1,11 @@
+[mcp_servers.docs]
+command = "npx"
+args = [
+  "@modelcontextprotocol/server-filesystem",
+  "/Users/example/Documents",
+  "--api-key",
+  "docs-fixture-secret"
+]
+
+[mcp_servers.docs.env]
+API_KEY = "docs-fixture-secret"

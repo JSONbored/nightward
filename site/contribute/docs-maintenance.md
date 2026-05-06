@@ -9,6 +9,7 @@ Nightward docs are split between human-authored guides and generated references.
 | CLI reference | `crates/nightward-cli` and `scripts/generate-reference-docs.mjs` | `make docs-reference-check` |
 | Rules reference | rule metadata emitted by the generator | `make docs-reference-check` |
 | Provider reference | analysis provider metadata | `make docs-reference-check` |
+| Public command snippets | committed docs fixture home and real CLI output | `make docs-qa` |
 | Config examples | repo docs and fixture policies | `make docs-qa` |
 | Public guides | `site/**/*.md` | `make site-verify` |
 | Screenshots and samples | committed fixture homes | `make demo-assets` and manual review |
@@ -39,14 +40,6 @@ make docs-qa
 4. Run `make docs-qa` and `make site-verify`.
 5. If screenshots changed, regenerate fixture-only assets and update `docs/screenshots.md`.
 
-## Future Automation
+## Docs Contracts
 
-The next improvement is a docs contract check that compares public snippets against real command output. The useful shape is:
-
-- run documented commands against fixture homes;
-- parse fenced command snippets with stable labels;
-- fail when generated references are stale;
-- fail when public pages mention future channels as shipped;
-- optionally check outbound docs links on a scheduled workflow.
-
-That keeps the docs living without turning every page into generated text.
+`site/test/docs-contract.test.mjs` runs stable public command snippets against `testdata/homes/docs-fixture`. Keep those contracts read-only: no live network commands, no output paths, and no confirmed local actions. The same test fails when public pages describe future channels as shipped or claim output fields that the CLI no longer emits.

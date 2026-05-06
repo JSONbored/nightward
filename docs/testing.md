@@ -93,7 +93,7 @@ make verify
 - Scheduler tests verify generated launchd, systemd user timer, and cron text without installing schedules.
 - TUI tests cover fixed terminal rendering behavior, redaction boundaries, and embedded OpenTUI layout helpers.
 - Scheduler tests cover report history ordering, finding counts, non-report filtering, and symlink skipping without installing timers.
-- Raycast extension tests cover pure redaction/formatting helpers, safe command execution wrappers, and Provider Doctor install routing through the shared action registry instead of direct shell execution.
+- Raycast extension tests cover pure redaction/formatting helpers, safe command execution wrappers, report-history compare loading/error handling, and Provider Doctor install routing through the shared action registry instead of direct shell execution.
 - `cargo fmt`, `cargo clippy -D warnings`, `cargo test`, optional `cargo audit`/`cargo deny`, Gitleaks, and coverage checks are part of the local verification bar.
 - `make coverage-check` enforces the practical coverage target when `cargo-llvm-cov` is available, and always runs the Rust workspace tests.
 - `make ci-scripts-test` verifies repository-maintained CI helper scripts such as DCO checking, action path validation, and release-script input validation.
@@ -118,6 +118,8 @@ CI validates that the JUnit report is parseable for every pull request. Trunk up
 ## Release Snapshot
 
 `make release-snapshot` builds the Rust release binaries, creates a local archive, writes `checksums.txt`, and emits a lightweight SBOM placeholder for archive-shape validation. Real release signing remains restricted to the tag-driven release workflow.
+
+`scripts/verify-release-archive.sh` generates the Homebrew formula only after signed checksum verification has passed. `make ci-scripts-test` keeps that helper wired to the current archive/checksum shape.
 
 ## Raycast Extension
 

@@ -49,6 +49,7 @@ if [[ "$(grep -c "sigstore/cosign-installer" "${repo_root}/.github/workflows/rel
   echo "expected release publish and verification jobs to install cosign" >&2
   exit 1
 fi
+grep -q "generate-homebrew-formula.mjs" "${repo_root}/scripts/verify-release-archive.sh"
 if grep -q "path: dist/nightward_\\*" "${repo_root}/.github/workflows/release.yml"; then
   echo "expected release upload to exclude staging directories" >&2
   exit 1
@@ -90,6 +91,24 @@ const server = JSON.parse(readFileSync(process.argv[1], "utf8"));
 if (server.version !== "0.1.10") throw new Error("server version was not stamped");
 if (server.packages[0].version !== "0.1.10") throw new Error("package target was not stamped");
 ' "${tmp}/stamp/server.json"
+
+cat >"${tmp}/checksums.txt" <<'EOF'
+1111111111111111111111111111111111111111111111111111111111111111  nightward_0.1.10_darwin_arm64.tar.gz
+2222222222222222222222222222222222222222222222222222222222222222  nightward_0.1.10_darwin_amd64.tar.gz
+3333333333333333333333333333333333333333333333333333333333333333  nightward_0.1.10_linux_arm64.tar.gz
+4444444444444444444444444444444444444444444444444444444444444444  nightward_0.1.10_linux_amd64.tar.gz
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  checksums.txt.sigstore.json
+EOF
+node "${repo_root}/scripts/generate-homebrew-formula.mjs" \
+  --version "0.1.10" \
+  --repo "JSONbored/nightward" \
+  --checksums "${tmp}/checksums.txt" \
+  --output "${tmp}/nightward.rb" >/dev/null
+grep -q 'url "https://github.com/JSONbored/nightward/releases/download/v0.1.10/nightward_0.1.10_darwin_arm64.tar.gz"' "${tmp}/nightward.rb"
+grep -q 'sha256 "1111111111111111111111111111111111111111111111111111111111111111"' "${tmp}/nightward.rb"
+grep -q 'bin.install "nightward", "nw"' "${tmp}/nightward.rb"
+grep -q '#{bin}/nightward --version' "${tmp}/nightward.rb"
+grep -q '#{bin}/nw --version' "${tmp}/nightward.rb"
 
 mkdir -p "${tmp}/target/release"
 printf '#!/usr/bin/env bash\nprintf "0.1.0\\n"\n' >"${tmp}/target/release/nightward"

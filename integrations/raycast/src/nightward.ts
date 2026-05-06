@@ -13,6 +13,7 @@ import type {
   Finding,
   FixPlan,
   ProviderStatus,
+  ReportRecord,
   ScanReport,
   NightwardAction,
   NightwardActionPreview,
@@ -190,6 +191,28 @@ export async function reportDiff(
     ["report", "diff", "--from", base, "--to", head],
     options,
   );
+}
+
+export async function reportHistory(
+  options: RuntimeOptions,
+): Promise<ReportRecord[]> {
+  return runNightwardJSON<ReportRecord[]>(
+    ["report", "history", "--json"],
+    options,
+  );
+}
+
+export function latestReportPair(history: ReportRecord[]): {
+  base: ReportRecord;
+  head: ReportRecord;
+} {
+  if (history.length < 2) {
+    throw new NightwardCommandError(
+      "nightward report history",
+      "At least two saved Nightward reports are required for comparison.",
+    );
+  }
+  return { base: history[1], head: history[0] };
 }
 
 export async function explainSignal(

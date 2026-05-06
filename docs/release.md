@@ -101,6 +101,8 @@ The release workflow verifies the published GitHub archive before npm publish:
 bash scripts/verify-release-archive.sh vX.Y.Z
 ```
 
+That verifier also generates a Homebrew formula from the signed `checksums.txt` file and checks that the formula installs/tests both `nightward` and `nw`.
+
 The npm job then installs the packed npm tarball and runs both command names before publishing.
 
 After npm publish, verify package metadata and launcher install behavior:

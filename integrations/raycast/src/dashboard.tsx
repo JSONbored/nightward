@@ -16,8 +16,6 @@ import {
   findingTitle,
   fixPlanTotal,
   maxSeverity,
-  reportDiffMarkdown,
-  reportDiffSubtitle,
   severityColor,
   sortedFindings,
 } from "./format";
@@ -26,16 +24,14 @@ import {
   doctor,
   fixPlan,
   normalizePreferences,
-  reportDiff,
   reportsDir,
   scan,
-  type RuntimeOptions,
 } from "./nightward";
+import { ReportCompareDetail } from "./report-compare";
 import type {
   AnalysisReport,
   DoctorReport,
   FixPlan,
-  ReportRecord,
   ScanReport,
 } from "./types";
 
@@ -454,96 +450,6 @@ function ScheduleDetail({ doctor }: { doctor: DoctorReport }) {
             text={doctor.schedule.log_dir}
           />
         </List.Item.Detail.Metadata>
-      }
-    />
-  );
-}
-
-function ReportCompareDetail({
-  runtime,
-  base,
-  head,
-}: {
-  runtime: RuntimeOptions;
-  base: ReportRecord;
-  head: ReportRecord;
-}) {
-  const { data, error, isLoading, revalidate } = usePromise(() =>
-    reportDiff(runtime, base.path, head.path),
-  );
-  if (error) {
-    return (
-      <Detail
-        markdown={`# Report Compare\n\n${error.message}`}
-        actions={
-          <ActionPanel>
-            <Action
-              title="Refresh"
-              icon={Icon.ArrowClockwise}
-              onAction={revalidate}
-            />
-            <Action.ShowInFinder title="Show Latest Report" path={head.path} />
-            <Action.ShowInFinder
-              title="Show Previous Report"
-              path={base.path}
-            />
-          </ActionPanel>
-        }
-      />
-    );
-  }
-  if (!data) {
-    return <Detail isLoading={isLoading} markdown="# Report Compare" />;
-  }
-  const markdown = reportDiffMarkdown(data);
-  return (
-    <Detail
-      isLoading={isLoading}
-      markdown={markdown}
-      metadata={
-        <Detail.Metadata>
-          <Detail.Metadata.TagList title="Change">
-            <Detail.Metadata.TagList.Item
-              text={reportDiffSubtitle(data)}
-              color={severityColor(data.summary.max_added_severity)}
-            />
-          </Detail.Metadata.TagList>
-          <Detail.Metadata.Separator />
-          <Detail.Metadata.Label
-            title="Added"
-            text={String(data.summary.added)}
-          />
-          <Detail.Metadata.Label
-            title="Removed"
-            text={String(data.summary.removed)}
-          />
-          <Detail.Metadata.Label
-            title="Changed"
-            text={String(data.summary.changed)}
-          />
-          <Detail.Metadata.Label
-            title="Max Added"
-            text={data.summary.max_added_severity}
-          />
-          <Detail.Metadata.Separator />
-          <Detail.Metadata.Label title="Base" text={basename(base.path)} />
-          <Detail.Metadata.Label title="Head" text={basename(head.path)} />
-        </Detail.Metadata>
-      }
-      actions={
-        <ActionPanel>
-          <Action.CopyToClipboard
-            title="Copy Compare Markdown"
-            content={markdown}
-          />
-          <Action
-            title="Refresh"
-            icon={Icon.ArrowClockwise}
-            onAction={revalidate}
-          />
-          <Action.ShowInFinder title="Show Latest Report" path={head.path} />
-          <Action.ShowInFinder title="Show Previous Report" path={base.path} />
-        </ActionPanel>
       }
     />
   );
