@@ -21,7 +21,7 @@ Nightward is read-only by default, but it can run explicit, confirmation-gated l
 
 [![Scrubbed Nightward OpenTUI walkthrough showing overview, findings, analysis, fix plan, inventory, backup, and help screens](site/public/demo/nightward-opentui.gif)](site/guide/tui.md)
 
-The README uses a GIF so the preview renders directly on GitHub. The docs homepage uses the lighter [WebM loop](site/public/demo/tui/nightward-opentui.webm), and the [TUI guide](site/guide/tui.md) keeps the full seven-screen gallery.
+The README uses a GIF so the preview renders directly on GitHub. The docs homepage uses the lighter [WebM loop](site/public/demo/tui/nightward-opentui.webm), and the [TUI guide](site/guide/tui.md) keeps the full section gallery.
 
 ## At A Glance
 
@@ -29,7 +29,7 @@ The README uses a GIF so the preview renders directly on GitHub. The docs homepa
 | --- | --- | --- |
 | TUI | Dashboard, inventory, findings, analysis, fix plan, backup preview, action queue | Read-only until a confirmed action is applied |
 | CLI | Scriptable scan, doctor, policy, SARIF, snapshot, schedule, backup, and action commands | Read-only unless explicit output/export paths or `--confirm` actions are requested |
-| MCP server | Stdio tools/resources/prompts for AI clients | Read-only; can list/preview actions, but writes must be applied in CLI/TUI/Raycast |
+| MCP server | Stdio tools/resources/prompts for AI clients | Can request local action approvals; applies only the locally approved action once |
 | Raycast | macOS companion commands plus confirmed Nightward Actions | Clipboard/report-folder actions plus confirmation-gated writes |
 | GitHub Action | Workspace policy and SARIF checks | Writes only requested CI outputs |
 | Trunk plugin | Local workspace policy/analyze linters | Emits SARIF to stdout |
@@ -296,7 +296,7 @@ Secret values are never emitted in scan JSON, findings output, fix-plan JSON, Ma
 
 `nw analyze` turns scan findings and classifications into explainable signals. It does not claim a package, server, binary, or URL is safe. It reports what Nightward can prove from local structure, why it matters, and how confident the signal is.
 
-Default analysis is offline and built in. Optional providers are discovered by `providers doctor`; Nightward does not call online services unless a user explicitly selects providers and opts into network-capable behavior. The CLI/TUI/Raycast action layer can install known provider CLIs after confirmation. MCP can list and preview those actions, but cannot apply local writes. Explicit local providers are `gitleaks`, `trufflehog`, `semgrep`, and `syft`. Online-capable providers are `trivy`, `osv-scanner`, `grype`, `scorecard`, and `socket`, and they require explicit online-provider opt-in. Socket support creates a remote Socket scan artifact from dependency manifest metadata; Nightward does not fetch or normalize remote Socket reports in v1.
+Default analysis is offline and built-in. Optional providers are discovered by `providers doctor`; Nightward does not call online services unless a user explicitly selects providers and opts into network-capable behavior. The CLI/TUI/Raycast action layer can install known provider CLIs after confirmation. MCP can list and preview those actions, request a local approval ticket, and apply only the exact ticket after it is approved outside the MCP request. Explicit local providers are `gitleaks`, `trufflehog`, `semgrep`, and `syft`. Online-capable providers are `trivy`, `osv-scanner`, `grype`, `scorecard`, and `socket`, and they require explicit online-provider opt-in. Socket support creates a remote Socket scan artifact from dependency manifest metadata; Nightward does not fetch or normalize remote Socket reports in v1.
 
 Provider runs use explicit skip/block/ready states, timeouts, bounded output capture, and redacted metadata only. Oversized provider stdout fails closed as a provider warning instead of being partially parsed. Semgrep execution requires a repo-local config file so Nightward does not use automatic rule discovery by default.
 
@@ -326,6 +326,7 @@ The default `nightward` / `nw` command opens the TUI:
 - Fix Plan: safe/review/blocked remediation groups
 - Backup Plan: private-dotfiles dry-run preview
 - Actions: confirmation-gated provider, policy, schedule, backup, cleanup, and setup actions
+- MCP Approvals: approve or deny exact MCP-requested action tickets
 
 The TUI is now part of the Rust CLI binary and uses `opentui_rust` directly for the colored dashboard, filled panels, severity ribbons, and fixture-driven screenshots. Release archives and npm-downloaded binaries only need `nightward` and `nw`.
 
@@ -333,7 +334,7 @@ Keyboard shortcuts:
 
 - `1`-`8`: switch sections
 - arrow keys or `h`/`j`/`k`/`l`: navigate
-- `enter`: confirm selected action in the Actions view
+- `enter`: confirm selected action in the Actions view or review a pending MCP approval
 - `/`: search findings
 - `s`: cycle severity
 - `x`: clear filters
@@ -356,14 +357,14 @@ Nightward can expose local context and bounded Nightward action workflows to MCP
 }
 ```
 
-The server supports scan, doctor, findings, finding/signal explanation, analysis, fix-plan, policy-check, report history/diff, action list/preview, rules, providers, resources, and prompts. It uses stdio only, does not open a network listener, and cannot rewrite arbitrary MCP or agent config. MCP clients cannot apply local writes because tool-call arguments are not an out-of-band local confirmation channel; use the CLI, TUI, or Raycast extension to apply previewed actions.
+The server supports scan, doctor, findings, finding/signal explanation, analysis, fix-plan, policy-check, report history/diff, action list/preview/request/status/apply-approved, rules, providers, resources, and prompts. It uses stdio only, does not open a network listener, and cannot rewrite arbitrary MCP or agent config. MCP clients cannot self-confirm writes because tool-call arguments are not an out-of-band local confirmation channel; they can request a bounded action approval, then apply only the exact one-time ticket after the user approves it in the CLI, TUI, or Raycast extension. Cached `nightward_action_apply` calls remain blocked.
 
 ## GitHub Action
 
 Nightward can run as a local GitHub Action in scan, policy, or SARIF mode:
 
 ```yaml
-- uses: JSONbored/nightward@v0.1.4
+- uses: JSONbored/nightward@v0.1.11
   with:
     mode: sarif
     output: nightward.sarif
@@ -388,7 +389,7 @@ See [docs/website.md](docs/website.md) for the page map, custom-domain notes, an
 Nightward includes an in-repo `plugin.yaml` for Trunk Check. Import a pinned release tag and enable repo/workspace policy scans:
 
 ```sh
-trunk plugins add --id nightward https://github.com/JSONbored/nightward v0.1.4
+trunk plugins add --id nightward https://github.com/JSONbored/nightward v0.1.11
 trunk check enable nightward-policy
 ```
 
@@ -419,7 +420,7 @@ Commands:
 - `Export Nightward Analysis`
 - `Open Nightward Reports`
 
-The extension shells out to `nw` or `nightward`, renders redacted output, copies explicitly requested exports, and opens the local reports folder. Provider Doctor can enable/disable provider selection for Raycast Analysis and can preview/apply known provider installs only through the shared action registry. `Nightward Actions` uses that same registry as the CLI/TUI for confirmed provider, policy, schedule, backup, cleanup, and disclosure actions.
+The extension shells out to `nw` or `nightward`, renders redacted output, copies explicitly requested exports, and opens the local reports folder. Provider Doctor can enable/disable provider selection for Raycast Analysis and can preview/apply known provider installs only through the shared action registry. `Nightward Actions` uses that same registry as the CLI/TUI for confirmed provider, policy, schedule, backup, cleanup, and disclosure actions. `Nightward MCP Approvals` lets the user approve or deny exact MCP-requested action tickets.
 
 See [docs/raycast-extension.md](docs/raycast-extension.md) for preferences, validation, and read-only boundaries.
 

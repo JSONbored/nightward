@@ -1,6 +1,6 @@
 # Distribution
 
-Nightward v0.1.4 is distributed through signed GitHub Releases and the npm launcher.
+Nightward is distributed through signed GitHub Releases and the npm launcher.
 
 ## Current Channels
 
@@ -12,7 +12,7 @@ Nightward v0.1.4 is distributed through signed GitHub Releases and the npm launc
 | [GitHub Action](/integrations/github-action) | Shipped | Uses release tags for CI policy/SARIF workflows. |
 | [Trunk plugin import](/integrations/trunk) | Shipped | Imports the in-repo plugin from release tags. |
 | [Raycast extension](/integrations/raycast) | Development-ready | Local Raycast extension commands and menu-bar status; store PR still pending. |
-| [MCP server](/integrations/mcp-server) | Shipped in CLI | Stdio tools/resources/prompts plus bounded read-only action list/preview. Registry metadata lives in `server.json`. |
+| [MCP server](/integrations/mcp-server) | Shipped in CLI | Stdio tools/resources/prompts plus bounded action preview, approval request/status, and approved-ticket apply. Registry metadata lives in `server.json`. |
 
 ## Later Channels
 

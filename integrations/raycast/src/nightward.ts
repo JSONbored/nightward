@@ -15,6 +15,8 @@ import type {
   ProviderStatus,
   ScanReport,
   NightwardAction,
+  NightwardApproval,
+  NightwardApprovalList,
   NightwardActionPreview,
   NightwardActionResult,
 } from "./types";
@@ -178,6 +180,37 @@ export async function applyAction(
   return runNightwardJSON<NightwardActionResult>(
     ["actions", "apply", actionId, "--confirm", "--json"],
     { ...options, timeoutMs: Math.max(options.timeoutMs, 120000) },
+  );
+}
+
+export async function listApprovals(
+  options: RuntimeOptions,
+): Promise<NightwardApprovalList> {
+  return runNightwardJSON<NightwardApprovalList>(
+    ["approvals", "list", "--json"],
+    options,
+  );
+}
+
+export async function approveApproval(
+  options: RuntimeOptions,
+  approvalId: string,
+  reason = "approved in Raycast",
+): Promise<NightwardApproval> {
+  return runNightwardJSON<NightwardApproval>(
+    ["approvals", "approve", approvalId, "--reason", reason, "--json"],
+    options,
+  );
+}
+
+export async function denyApproval(
+  options: RuntimeOptions,
+  approvalId: string,
+  reason = "denied in Raycast",
+): Promise<NightwardApproval> {
+  return runNightwardJSON<NightwardApproval>(
+    ["approvals", "deny", approvalId, "--reason", reason, "--json"],
+    options,
   );
 }
 

@@ -19,10 +19,10 @@ const umamiDomains = process.env.NIGHTWARD_UMAMI_DOMAINS ?? "nightward.aethereal
 const pageDescriptions: Record<string, string> = {
   "": "Nightward audits AI-agent configs, MCP servers, and dotfiles sync risk locally, with redacted reports and an OpenTUI review flow.",
   "guide/install": "Install Nightward with the npm launcher, signed GitHub Release binaries, or a local Rust source build.",
-  "guide/tui": "Explore Nightward's OpenTUI dashboard, findings, analysis, fix-plan, inventory, backup, and help screens from scrubbed fixture media.",
+  "guide/tui": "Explore Nightward's OpenTUI dashboard, findings, analysis, fix-plan, inventory, backup, actions, MCP approvals, and help screens from scrubbed fixture media.",
   "guide/privacy-model": "Understand Nightward's local-first privacy model, write paths, redaction rules, optional providers, and website analytics boundary.",
   "reference/cli": "Generated Nightward CLI reference for scan, analyze, provider, policy, report, TUI, and MCP server commands.",
-  "integrations/raycast": "Use Nightward's read-only Raycast extension for menu-bar status, findings, analysis, provider doctor, and redacted exports.",
+  "integrations/raycast": "Use Nightward's Raycast extension for menu-bar status, findings, analysis, provider doctor, actions, MCP approvals, and redacted exports.",
   "integrations/github-action": "Run Nightward in GitHub Actions for workspace scans, policy checks, SARIF upload, and release-gated CI review.",
   "security/release-verification": "Verify Nightward signed releases, checksums, npm launcher behavior, and installed binaries before trusting a release.",
 };

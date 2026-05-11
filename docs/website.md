@@ -28,7 +28,7 @@ TUI media is generated separately because it needs VHS and ffmpeg:
 make tui-media
 ```
 
-That target uses the scrubbed sample scan plus `NIGHTWARD_TUI_VIEW` to write seven gallery PNGs under `site/public/demo/tui/`, refresh the legacy TUI PNG/GIF, and build `site/public/demo/tui/nightward-opentui.webm` for the homepage animation. Review generated frames for `/Users`, username, hostname, private MCP names, real project paths, and secret-looking values before committing.
+That target uses the scrubbed sample scan plus `NIGHTWARD_TUI_VIEW` to write gallery PNGs under `site/public/demo/tui/`, refresh the legacy TUI PNG/GIF, and build `site/public/demo/tui/nightward-opentui.webm` for the homepage animation. Review generated frames for `/Users`, username, hostname, private MCP names, real project paths, and secret-looking values before committing.
 
 ## Site Goals
 
@@ -38,7 +38,7 @@ That target uses the scrubbed sample scan plus `NIGHTWARD_TUI_VIEW` to write sev
 - Show the local-first privacy stance clearly.
 - Use fixture-only terminal media on the homepage, with a reduced-motion static fallback.
 - Document CLI, TUI, policy, integrations, security, and release verification.
-- Document the read-only MCP server as an AI-client integration, not a write/control surface.
+- Document MCP as an AI-client integration where agents can request approval tickets, but only locally approved exact tickets can write. Exact tickets must match the canonical action preview digest for the operation, arguments, write targets, command preview, risk, and availability; parameter substitution, extra fields, and wildcarding are rejected. Example: a locally approved `provider.install.socket` ticket can only apply that same provider install preview, not `provider.install.trivy` or the same action with extra arguments.
 - Avoid runtime analytics, telemetry, or hosted-docs dependencies by default.
 - Allow the deployed public website to use explicitly configured, self-hosted Umami for aggregate visitor analytics.
 

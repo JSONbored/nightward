@@ -308,3 +308,25 @@ export type NightwardActionResult = {
   writes: string[];
   audit_path?: string;
 };
+
+export type NightwardApproval = {
+  schema_version?: number;
+  approval_id: string;
+  status: string;
+  action_id: string;
+  preview_digest: string;
+  preview: NightwardActionPreview;
+  requested_by: string;
+  requested_at: string;
+  expires_at: string;
+  decision_reason?: string;
+  decided_at?: string;
+  applied_at?: string;
+  result_message?: string;
+  action_audit_path?: string;
+};
+
+export type NightwardApprovalList = {
+  schema_version?: number;
+  approvals: NightwardApproval[];
+};

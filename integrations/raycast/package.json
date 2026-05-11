@@ -83,6 +83,13 @@
       "keywords": ["actions", "apply", "backup", "schedule", "providers", "fix"]
     },
     {
+      "name": "approvals",
+      "title": "Nightward MCP Approvals",
+      "description": "Review and approve or deny pending Nightward MCP action requests.",
+      "mode": "view",
+      "keywords": ["mcp", "approval", "actions", "security", "confirm"]
+    },
+    {
       "name": "explain-finding",
       "title": "Explain Nightward Finding",
       "description": "Open a detailed explanation for one Nightward finding ID.",

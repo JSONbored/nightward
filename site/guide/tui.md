@@ -21,7 +21,7 @@ nw tui --input scan.json
 <section class="nw-tui-media" aria-labelledby="tui-loop">
   <div class="nw-tui-media__copy">
     <p class="nw-eyebrow">Fixture walkthrough</p>
-    <h2 id="tui-loop">Seven screens from one scrubbed report.</h2>
+    <h2 id="tui-loop">Nine sections from one scrubbed report.</h2>
     <p>The homepage loop and gallery below are generated from `site/public/demo/nightward-sample-scan.json`, not from a live workstation scan.</p>
     <p class="nw-tui-media__links">
       <a :href="withBase('/demo/nightward-opentui.gif')">Open GIF</a>
@@ -64,6 +64,14 @@ nw tui --input scan.json
     <figcaption><strong>Backup.</strong> Dry-run portable candidates and never-sync exclusions from the fixture home model.</figcaption>
   </figure>
   <figure>
+    <img :src="withBase('/demo/tui/actions.png')" alt="Nightward TUI fixture actions">
+    <figcaption><strong>Actions.</strong> Shared-registry actions with exact writes, commands, risk, and confirmation state.</figcaption>
+  </figure>
+  <figure>
+    <img :src="withBase('/demo/tui/mcp-approvals.png')" alt="Nightward TUI fixture MCP approvals">
+    <figcaption><strong>MCP Approvals.</strong> Pending or recent MCP-requested action tickets for local approval or denial.</figcaption>
+  </figure>
+  <figure>
     <img :src="withBase('/demo/tui/help.png')" alt="Nightward TUI fixture help">
     <figcaption><strong>Help.</strong> Keyboard controls and the confirmed-action safety model shown inside the app.</figcaption>
   </figure>
@@ -78,25 +86,26 @@ nw tui --input scan.json
 - Inventory: discovered AI-tool paths by tool, classification, and risk.
 - Backup: dry-run dotfiles backup choices.
 - Actions: preview and confirm bounded provider, policy, schedule, backup, cleanup, and setup actions.
+- MCP Approvals: approve or deny exact MCP-requested action tickets; MCP can only apply an approved ticket once.
 - Help: key bindings and safety reminders.
 
 The Rust CLI is the source of truth. The TUI uses embedded `opentui_rust` rendering for the colored dashboard; there is no Bun package or `nightward-tui` sidecar.
 
 ## Shortcuts
 
-- `1`-`8`: switch sections.
+- `1`-`9`: switch sections.
 - `tab`, `right`, or `l`: next section.
 - `left` or `h`: previous section.
 - `up`, `down`, `j`, or `k`: move selection.
-- `enter`: confirm the selected action in the Actions section.
-- `y` / `n`: apply or cancel the pending action.
+- `enter`: confirm the selected action or review the selected MCP approval.
+- `y` / `n`: apply/cancel a pending action or approve/deny a pending MCP ticket.
 - `/`: search.
 - `s`: cycle severity.
 - `x`: clear filters.
 - `q` or `esc`: quit.
 
 > [!NOTE]
-> The TUI is read-only until the user accepts the beta responsibility disclosure and confirms a specific action. High-risk MCP edits remain review-first; bounded provider, policy, schedule, backup, cleanup, and setup actions can be applied from the Actions section.
+> The TUI is read-only until the user accepts the beta responsibility disclosure and confirms a specific action. High-risk MCP edits remain review-first; bounded provider, policy, schedule, backup, cleanup, and setup actions can be applied from the Actions section. MCP-requested writes require a separate local approval in MCP Approvals before the MCP client can apply the exact ticket once.
 
 ## Local Development
 
@@ -107,4 +116,4 @@ make demo-assets
 make tui-media
 ```
 
-Use fixture media for public docs; do not capture a real workstation. `make tui-media` requires `vhs` and `ffmpeg`, writes the seven gallery PNGs under `site/public/demo/tui/`, refreshes the legacy TUI PNG/GIF, and builds the homepage WebM loop.
+Use fixture media for public docs; do not capture a real workstation. `make tui-media` requires `vhs` and `ffmpeg`, writes the gallery PNGs under `site/public/demo/tui/`, refreshes the legacy TUI PNG/GIF, and builds the homepage WebM loop.

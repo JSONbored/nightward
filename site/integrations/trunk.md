@@ -3,7 +3,7 @@
 Nightward includes a [Trunk](https://trunk.io/) plugin definition so teams can run policy and SARIF checks through Trunk Code Quality.
 
 ```sh
-trunk plugins add --id nightward https://github.com/JSONbored/nightward v0.1.4
+trunk plugins add --id nightward https://github.com/JSONbored/nightward v0.1.11
 trunk check enable nightward-policy
 ```
 

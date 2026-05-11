@@ -12,7 +12,7 @@ Nightward’s roadmap is intentionally conservative. The next releases should ma
 - Explicit provider execution for local providers and online-gated provider runs.
 - Confirmation-gated provider setup/settings, user-level schedule install/remove, and local portable backup snapshots through the shared action registry.
 - Static HTML reports with local finding filters, report diffs, report history, and sample fixture assets.
-- Read-only stdio MCP server for local AI-client integration.
+- Stdio MCP server for local AI-client integration with local-approval-gated action tickets.
 - Embedded Rust OpenTUI dashboard with colored severity panels, findings, analysis, fix plan, inventory, backup preview, and help sections.
 - OpenSSF-oriented governance, coverage, DCO, threat model, and release hardening.
 - Generated CLI, provider, rule, and config reference pages.

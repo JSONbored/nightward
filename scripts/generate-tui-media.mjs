@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   copyFileSync,
   existsSync,
@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir, userInfo } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -23,6 +23,7 @@ const videoOutput = join(outputDir, "nightward-opentui.webm");
 const posterOutput = join(outputDir, "poster.png");
 const tapePath = join(repoRoot, "docs", "demo", "nightward-tui.tape");
 const tempDir = mkdtempSync(join(tmpdir(), "nightward-tui-media-"));
+let mediaHome = join(tempDir, "home");
 const toolPath = `${process.env.HOME}/.cargo/bin:${process.env.HOME}/go/bin:/opt/homebrew/bin:${process.env.PATH || ""}`;
 
 const views = [
@@ -32,6 +33,8 @@ const views = [
   ["fix-plan", "fix-plan", "Fix Plan"],
   ["inventory", "inventory", "Inventory"],
   ["backup", "backup", "Backup"],
+  ["actions", "actions", "Actions"],
+  ["mcp-approvals", "mcp-approvals", "MCP Approvals"],
   ["help", "help", "Help"],
 ];
 
@@ -41,6 +44,23 @@ function run(command, args, options = {}) {
     env: { ...process.env, PATH: toolPath, ...options.env },
     stdio: options.stdio ?? "inherit",
   });
+}
+
+function runChecked(command, args, options = {}) {
+  const result = spawnSync(command, args, {
+    cwd: repoRoot,
+    env: { ...process.env, PATH: toolPath, ...options.env },
+    encoding: "utf8",
+    stdio: "pipe",
+  });
+  if (result.error || result.status !== 0) {
+    const output = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
+    if (output) {
+      console.error(output);
+    }
+    throw result.error ?? new Error(`${command} ${args.join(" ")} failed with ${result.status}`);
+  }
+  return result;
 }
 
 function requireTool(command, args = ["--version"]) {
@@ -53,6 +73,14 @@ function requireTool(command, args = ["--version"]) {
   } catch {
     throw new Error(`${command} is required for TUI media generation`);
   }
+}
+
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\\''")}'`;
+}
+
+function nightwardEnvPrefix() {
+  return `NIGHTWARD_HOME=${shellQuote(mediaHome)}`;
 }
 
 function writeStillTape(view, outputGif) {
@@ -76,13 +104,50 @@ Set Theme "TokyoNight"
 Hide
 Type "stty rows 36 cols 120"
 Enter
-Type "NIGHTWARD_TUI_CAPTURE=1 NIGHTWARD_TUI_CAPTURE_HOLD_MS=2600 NIGHTWARD_TUI_VIEW=${view} target/debug/nw tui --input site/public/demo/nightward-sample-scan.json"
+Type "${nightwardEnvPrefix()} NIGHTWARD_TUI_CAPTURE=1 NIGHTWARD_TUI_CAPTURE_HOLD_MS=5000 NIGHTWARD_TUI_VIEW=${view} target/debug/nw tui --input site/public/demo/nightward-sample-scan.json"
 Enter
 Show
-Sleep 3000ms
+Sleep 5600ms
 `,
   );
   return tape;
+}
+
+function writeWalkthroughTape() {
+  const tape = join(tempDir, "nightward-tui-walkthrough.tape");
+  const original = readFileSync(tapePath, "utf8");
+  const command =
+    'Type "target/debug/nw tui --input site/public/demo/nightward-sample-scan.json"';
+  if (!original.includes(command)) {
+    throw new Error(`walkthrough tape missing expected command pattern: ${command}`);
+  }
+  const text = original.replace(
+    command,
+    `Type "${nightwardEnvPrefix()} target/debug/nw tui --input site/public/demo/nightward-sample-scan.json"`,
+  );
+  writeFileSync(tape, text);
+  return tape;
+}
+
+function resetMediaHomeState() {
+  const resolvedMediaHome = resolve(mediaHome);
+  const resolvedTempDir = resolve(tempDir);
+  const tempRelative = relative(resolvedTempDir, resolvedMediaHome);
+  const isTempChild =
+    (tempRelative.length === 0 ||
+      (!tempRelative.startsWith("..") && !isAbsolute(tempRelative)));
+  const allowed =
+    resolvedMediaHome === resolve("/tmp/nightward-fixture-home") || isTempChild;
+  if (!allowed) {
+    throw new Error(`refusing to reset unexpected media home: ${mediaHome}`);
+  }
+  for (const rel of [
+    [".config", "nightward"],
+    [".local", "state", "nightward"],
+    [".cache", "nightward"],
+  ]) {
+    rmSync(join(resolvedMediaHome, ...rel), { recursive: true, force: true });
+  }
 }
 
 function extractBestPng(inputGif, outputPng) {
@@ -96,9 +161,10 @@ function extractBestPng(inputGif, outputPng) {
     inputGif,
   ]).toString("utf8");
   const duration = Number.parseFloat(durationRaw);
-  const stamps = Number.isFinite(duration) && duration > 0
-    ? [0.18, 0.28, 0.38, 0.48, 0.58].map((pct) => (duration * pct).toFixed(2))
-    : ["0.80", "1.10", "1.40", "1.70", "2.00"];
+  const stamps =
+    Number.isFinite(duration) && duration > 0
+      ? [0.42, 0.52, 0.62, 0.72].map((pct) => (duration * pct).toFixed(2))
+      : ["2.10", "2.40", "2.70", "3.00"];
   const candidates = [];
   for (const stamp of stamps) {
     const candidate = join(tempDir, `${Date.now()}-${stamp}.png`);
@@ -128,8 +194,7 @@ function extractBestPng(inputGif, outputPng) {
   if (candidates.length === 0) {
     throw new Error(`failed to extract a still frame from ${inputGif}`);
   }
-  const largest = candidates.sort((a, b) => statSync(b).size - statSync(a).size)[0];
-  copyFileSync(largest, outputPng);
+  copyFileSync(candidates[0], outputPng);
 }
 
 function assertScrubbed(label, path) {
@@ -155,16 +220,29 @@ try {
   if (!existsSync(fixtureScan)) {
     throw new Error("missing scrubbed sample scan; run `make demo-assets` first");
   }
+  mediaHome = JSON.parse(readFileSync(fixtureScan, "utf8")).home || mediaHome;
 
   mkdirSync(outputDir, { recursive: true });
+  resetMediaHomeState();
+  mkdirSync(mediaHome, { recursive: true });
   run("cargo", ["build", "-p", "nightward-cli", "--bin", "nw"]);
+  runChecked("target/debug/nw", ["disclosure", "accept", "--json"], {
+    env: { NIGHTWARD_HOME: mediaHome },
+  });
+  runChecked(
+    "target/debug/nw",
+    ["approvals", "request", "backup.snapshot", "--client", "demo-mcp", "--json"],
+    {
+      env: { NIGHTWARD_HOME: mediaHome },
+    },
+  );
 
   for (const [slug, view, label] of views) {
     const gif = join(tempDir, `${slug}.gif`);
     const png = join(outputDir, `${slug}.png`);
     const tape = writeStillTape(view, gif);
     console.log(`capturing ${label}`);
-    run("vhs", [tape]);
+    run("vhs", [tape], { env: { NIGHTWARD_HOME: mediaHome } });
     extractBestPng(gif, png);
     assertScrubbed(`${label} PNG`, png);
   }
@@ -173,7 +251,7 @@ try {
   copyFileSync(join(outputDir, "overview.png"), posterOutput);
 
   console.log("capturing walkthrough GIF");
-  run("vhs", [tapePath]);
+  run("vhs", [writeWalkthroughTape()], { env: { NIGHTWARD_HOME: mediaHome } });
   assertScrubbed("walkthrough GIF", legacyGif);
   run("ffmpeg", [
     "-hide_banner",

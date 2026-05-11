@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      - uses: JSONbored/nightward@v0.1.4
+      - uses: JSONbored/nightward@v0.1.11
         with:
           mode: sarif
           output: nightward.sarif
@@ -41,7 +41,7 @@ The action runs Nightward locally. It does not upload findings unless your workf
 For repository CI, the action defaults to `GITHUB_WORKSPACE`; pass `workspace` explicitly when you want to scan a narrower checkout path:
 
 ```yaml
-- uses: JSONbored/nightward@v0.1.4
+- uses: JSONbored/nightward@v0.1.11
   with:
     mode: sarif
     workspace: ${{ github.workspace }}
@@ -52,7 +52,7 @@ For repository CI, the action defaults to `GITHUB_WORKSPACE`; pass `workspace` e
 To publish a small badge JSON artifact alongside SARIF:
 
 ```yaml
-- uses: JSONbored/nightward@v0.1.4
+- uses: JSONbored/nightward@v0.1.11
   with:
     mode: badge
     workspace: ${{ github.workspace }}

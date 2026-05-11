@@ -23,7 +23,7 @@ pub struct ActionSpec {
     pub blocked_reason: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionPreview {
     pub schema_version: u32,
     pub action: ActionSpec,
@@ -31,7 +31,7 @@ pub struct ActionPreview {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionResult {
     pub schema_version: u32,
     pub action_id: String,
@@ -42,7 +42,7 @@ pub struct ActionResult {
     pub audit_path: String,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ApplyOptions {
     pub confirm: bool,
     pub executable: String,

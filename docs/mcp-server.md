@@ -6,7 +6,7 @@ Nightward includes a stdio MCP server:
 nw mcp serve
 ```
 
-The server is a first-class Nightward surface for AI clients. It exposes scan, analysis, policy, report, provider, rule, prompt, and bounded action preview workflows without granting AI clients local write access.
+The server is a first-class Nightward surface for AI clients. It exposes scan, analysis, policy, report, provider, rule, prompt, bounded action preview, and approval-ticket workflows without letting MCP clients self-confirm local writes.
 
 ## Protocol Behavior
 
@@ -32,10 +32,15 @@ The server is a first-class Nightward surface for AI clients. It exposes scan, a
 - `nightward_report_changes`
 - `nightward_actions_list`
 - `nightward_action_preview`
+- `nightward_action_request`
+- `nightward_action_status`
+- `nightward_action_apply_approved`
 - `nightward_rules`
 - `nightward_providers`
 
-MCP is read-only. It can show the shared action registry and preview exact write targets, command previews, risk levels, and blocked reasons. Applying those actions must happen out-of-band through the Nightward CLI, TUI, or Raycast extension, where Nightward can receive a local user confirmation that did not come from the MCP client. Cached or manual `nightward_action_apply` calls return an MCP tool-result error before the action registry is reached.
+MCP can list and preview shared action registry actions. To run one, the client calls `nightward_action_request`, then waits for the user to approve the exact one-time ticket in the Nightward CLI, TUI, or Raycast extension. Clients can call `nightward_action_status` while waiting to check whether the ticket is pending, approved, denied, expired, or already applied.
+
+`nightward_action_apply_approved` consumes only that approved exact one-time ticket. Legacy `nightward_action_apply` is intentionally blocked for MCP clients; direct calls return a tool-result error before the action registry is reached.
 
 ## Exposed Resources
 
@@ -46,6 +51,7 @@ MCP is read-only. It can show the shared action registry and preview exact write
 - `nightward://schedule`
 - `nightward://actions`
 - `nightward://disclosure`
+- `nightward://action-approvals`
 - `nightward://report-history`
 
 ## Exposed Prompts
@@ -102,7 +108,10 @@ CI validates that `server.json` and `packages/npm/package.json` agree before the
 - No telemetry.
 - No default network calls.
 - Online-capable providers remain blocked unless explicitly allowed.
-- MCP cannot apply local writes; action application is limited to CLI/TUI/Raycast surfaces with local confirmation.
+- MCP cannot self-confirm local writes.
+- MCP cannot accept the beta responsibility disclosure (Nightward's local one-time acknowledgement that write-capable beta actions are user-authorized).
+- MCP can request approvals, read approval status, and apply only exact tickets already approved outside the MCP request.
 - No live MCP/agent config mutation in MCP v1.
+- Approval request files live under Nightward-owned state, expire, reject symlinked storage paths, are redacted before MCP output, and are audited alongside final action results.
 - Workspace and explicit report-diff paths must stay under `NIGHTWARD_HOME`, exist as the expected regular file or directory type, avoid symlink components, and pass the existing bounded report-size checks.
 - Tool/resource/prompt output is bounded and redacted before it reaches the client.

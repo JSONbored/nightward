@@ -3,7 +3,7 @@
 Nightward ships a composite [GitHub Action](https://docs.github.com/en/actions) for repository policy checks.
 
 ```yaml
-- uses: JSONbored/nightward@v0.1.4
+- uses: JSONbored/nightward@v0.1.11
   with:
     mode: sarif
     workspace: .

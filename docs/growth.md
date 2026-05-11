@@ -11,7 +11,7 @@ Nightward's growth should come from practical trust and low-friction adoption, n
 - Contributor fixture templates for adapters and rules.
 - Richer Nightward badge examples for CI users.
 - Polished sample reports and before-syncing-dotfiles walkthroughs.
-- Read-only MCP resources/tools for AI-client assisted local audits.
+- MCP resources/tools for AI-client assisted local audits plus local-approval-gated action tickets.
 - Read-only local report browser after static reports are mature.
 - Public JSON schemas and generated docs contracts for scan, analysis, policy badge, report diff/history, provider status, rules, and adapters.
 

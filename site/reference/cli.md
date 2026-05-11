@@ -24,10 +24,13 @@ USAGE:
   nightward actions apply reports.cleanup --confirm
   nightward actions apply cache.cleanup --confirm
   nightward actions apply policy.ignore --finding <id> --reason "reviewed" --confirm
+  nightward approvals list --json
+  nightward approvals approve <approval-id> --reason "reviewed"
+  nightward approvals apply <approval-id>
   nightward report html --input scan.json --output report.html
   nightward report html --from old.json --to new.json --output report.html
   nightward policy check --json
   nightward mcp serve
 
-Nightward is local-first and read-only by default. Write-capable actions require disclosure acceptance and explicit confirmation.
+Nightward is local-first and read-only by default. Write-capable actions require disclosure acceptance and explicit confirmation. Approval commands do not take --confirm: approve is the local confirmation step, and apply only consumes an already-approved one-time ticket.
 ```

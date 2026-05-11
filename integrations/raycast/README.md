@@ -12,6 +12,7 @@ This extension is read-only until a user invokes the shared Nightward action reg
 - `Nightward Analysis`: built-in offline analysis plus any providers explicitly selected in Provider Doctor.
 - `Nightward Provider Doctor`: provider availability, privacy posture, action-registry install guidance for missing tools, and Raycast Analysis enable/disable controls.
 - `Nightward Actions`: preview and apply confirmation-gated provider, policy, schedule, backup, cleanup, and setup actions from the shared Nightward action registry.
+- `Nightward MCP Approvals`: approve or deny specific one-time MCP (Model Context Protocol) action tickets after reviewing file, configuration, and system changes, plus command preview, risk, and expiry.
 - `Explain Nightward Finding`: detail view for a specific finding ID.
 - `Explain Nightward Signal`: detail view for the analysis signal attached to a finding ID.
 - `Export Nightward Fix Plan`: copies `nw fix export --format markdown` output.
